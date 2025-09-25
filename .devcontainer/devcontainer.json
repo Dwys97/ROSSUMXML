@@ -1,25 +1,16 @@
 {
   "name": "AWS Serverless App",
-  // Use a standard Microsoft container image with Node.js, Python, and Docker
   "image": "mcr.microsoft.com/devcontainers/universal:2",
-
-  // Add features for the AWS CLI and AWS SAM CLI
   "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/python:1": {},
-    "ghcr.io/devcontainers-contrib/features/aws-sam-cli:1": {},
     "ghcr.io/devcontainers/features/git-lfs:1": {}
   },
-
-  // Forward the ports we'll need
   "forwardPorts": [
-    3000, // For the SAM local API
-    8080  // A common port for frontend dev servers (change if yours is different)
+    3000,
+    8080
   ],
-
-  // Run commands after the codespace is created
   "postCreateCommand": "pipx install aws-sam-cli && npm install && echo 'Environment is ready!'",
-
-  // Configure VS Code settings and extensions
   "customizations": {
     "vscode": {
       "extensions": [
