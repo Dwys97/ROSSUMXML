@@ -5,7 +5,7 @@
 
   // Add features for the AWS CLI and AWS SAM CLI
   "features": {
-    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/python:1": {},
     "ghcr.io/devcontainers-contrib/features/aws-sam-cli:1": {}
   },
 
@@ -16,7 +16,7 @@
   ],
 
   // Run commands after the codespace is created
-  "postCreateCommand": "npm install && echo 'Environment is ready!'",
+  "postCreateCommand": "pipx install aws-sam-cli && npm install && echo 'Environment is ready!'",
 
   // Configure VS Code settings and extensions
   "customizations": {
