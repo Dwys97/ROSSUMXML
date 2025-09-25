@@ -6,7 +6,8 @@
   // Add features for the AWS CLI and AWS SAM CLI
   "features": {
     "ghcr.io/devcontainers/features/python:1": {},
-    "ghcr.io/devcontainers-contrib/features/aws-sam-cli:1": {}
+    "ghcr.io/devcontainers-contrib/features/aws-sam-cli:1": {},
+    "ghcr.io/devcontainers/features/git-lfs:1": {}
   },
 
   // Forward the ports we'll need
