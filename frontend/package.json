@@ -1,0 +1,12 @@
+{
+  "name": "xml-transform-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "serve -s .",
+    "build": "echo 'No build needed for plain JS frontend'"
+  },
+  "dependencies": {
+    "serve": "^14.2.0"
+  }
+}

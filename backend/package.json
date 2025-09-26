@@ -1,0 +1,9 @@
+{
+  "name": "transform-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda for XML transform",
+  "main": "index.js",
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.4"
+  }
+}

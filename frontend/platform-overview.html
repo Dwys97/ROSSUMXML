@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platform Overview - XML Generator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Top Nav (same as main landing) */
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      background: #1b263b;
+      border-bottom: 1px solid #3a506b;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .top-nav .logo { height: 48px; }
+    .top-nav .nav-links { display: flex; gap: 30px; font-weight: 600; }
+    .top-nav .nav-item { position: relative; }
+    .top-nav .nav-links > a, .top-nav .nav-item > a { color: #e0e1dd; text-decoration: none; transition: color 0.2s ease; }
+    .top-nav .nav-links > a:hover, .top-nav .nav-item > a:hover { color: #2ecc71; }
+
+    /* Dropdown */
+    .dropdown {
+      position: absolute;
+      top: 110%;
+      left: 0;
+      min-width: 200px;
+      background: #1e2a3a;
+      border: 1px solid #3a506b;
+      border-radius: 10px;
+      padding: 10px 0;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: scale(0.95) translateY(-5px);
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 1001;
+    }
+    .dropdown a {
+      display: block;
+      padding: 12px 18px;
+      color: #e0e1dd;
+      font-size: 0.95rem;
+      text-decoration: none;
+    }
+    .dropdown a:hover { background: #2c3e50; color: #2ecc71; }
+    .nav-item.open .dropdown { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
+
+    .top-nav .nav-buttons { display: flex; gap: 10px; }
+    .top-nav .nav-buttons button { border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s ease; }
+    .trial-btn { background: #2ecc71; color: #fff; }
+    .trial-btn:hover { background: #28a745; }
+    .demo-btn { background: #1d72f3; color: #fff; }
+    .demo-btn:hover { background: #1558b0; }
+    .login-btn { background: transparent; color: #2ecc71; border: 1px solid #2ecc71; }
+    .login-btn:hover { background: #2ecc71; color: #fff; }
+
+    /* Hero Section */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 120px 20px 80px 20px;
+      background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%);
+      overflow: hidden;
+    }
+    .hero h1,
+    .hero p,
+    .hero .cta-btn { opacity: 0; transform: translateY(40px); }
+    .hero h1.animate { animation: fadeInUp 0.6s forwards; }
+    .hero p.animate { animation: fadeInUp 0.6s forwards 0.3s; }
+
+    @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+    .hero h1 { font-size: 3rem; margin-bottom: 20px; color: #ffffff; }
+    .hero p { font-size: 1.25rem; margin-bottom: 30px; color: #a5a9b5; max-width: 700px; }
+
+    /* Page Content */
+    .page-content { max-width: 1000px; margin: 40px auto 80px auto; padding: 0 20px; color: #e0e1dd; }
+    .page-content h2 { color: #2ecc71; margin-bottom: 15px; }
+    .page-content p { color: #a5a9b5; line-height: 1.6; margin-bottom: 15px; }
+
+    /* Footer */
+    footer { background: #0d1b2a; padding: 40px 20px; text-align: center; color: #a5a9b5; font-size: 0.85rem; }
+    footer a { color: #2ecc71; text-decoration: none; }
+    footer a:hover { color: #28a745; }
+  </style>
+</head>
+<body>
+
+<!-- Top Navigation -->
+<div class="top-nav app-container">
+  <a href="main.html" class="logo-link"><img src="assets/logo-light.svg" alt="SchemaBridge Logo" class="logo"></a>
+  <div class="nav-links">
+    <div class="nav-item"><a href="#">Platform ▾</a>
+      <div class="dropdown">
+        <a href="platform-overview.html">Overview</a>
+        <a href="#">Features</a>
+        <a href="#">Integrations</a>
+      </div>
+    </div>
+    <div class="nav-item"><a href="#">Solutions ▾</a>
+      <div class="dropdown">
+        <a href="#">For Developers</a>
+        <a href="#">For Enterprises</a>
+        <a href="#">Industry Use Cases</a>
+      </div>
+    </div>
+    <div class="nav-item"><a href="#">Resources ▾</a>
+      <div class="dropdown">
+        <a href="#">Documentation</a>
+        <a href="#">Guides</a>
+        <a href="#">API Reference</a>
+      </div>
+    </div>
+    <div class="nav-item"><a href="#">Partners ▾</a>
+      <div class="dropdown">
+        <a href="#">Partner Program</a>
+        <a href="#">Integrators</a>
+      </div>
+    </div>
+    <div class="nav-item"><a href="#">Company ▾</a>
+      <div class="dropdown">
+        <a href="#">About Us</a>
+        <a href="#">Careers</a>
+        <a href="#">Contact</a>
+      </div>
+    </div>
+  </div>
+  <div class="nav-buttons">
+    <button class="trial-btn">Try Free</button>
+    <button class="demo-btn">Demo</button>
+    <button class="login-btn">Login</button>
+  </div>
+</div>
+
+<!-- Hero Section (using page title instead of landing headline) -->
+<div class="hero app-container">
+  <h1>Platform Overview</h1>
+  <p>Discover our platform capabilities, features, and integrations that help you transform XML efficiently.</p>
+</div>
+
+<!-- Page Content -->
+<div class="page-content app-container">
+  <h2>Introduction</h2>
+  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed sit amet ligula eget nunc dictum feugiat.</p>
+
+  <h2>Core Features</h2>
+  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lacinia purus ac purus cursus, nec porttitor sapien iaculis.</p>
+
+  <h2>Integrations</h2>
+  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris nec felis ut velit convallis tempus.</p>
+</div>
+
+<!-- Footer -->
+<footer>
+  &copy; 2025 XML Generator. All rights reserved. |
+  <a href="privacy.html">Privacy Policy</a> |
+  <a href="terms.html">Terms of Service</a>
+</footer>
+
+<script>
+  // Dropdown hover effect
+  document.querySelectorAll('.nav-item').forEach(item => {
+    let timer;
+    item.addEventListener('mouseenter', () => { clearTimeout(timer); item.classList.add('open'); });
+    item.addEventListener('mouseleave', () => { timer = setTimeout(() => item.classList.remove('open'), 150); });
+  });
+
+  // Animate hero content
+  const heroElements = document.querySelectorAll('.hero h1, .hero p');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => { if(entry.isIntersecting){ entry.target.classList.add('animate'); } });
+  }, { threshold: 0.5 });
+  heroElements.forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

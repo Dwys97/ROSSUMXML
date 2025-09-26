@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saved Mappings - XML Generator</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="menu.css"/>
+<style>
+  .app-container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+  .mappings-card {
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    color: #e0e1dd;
+  }
+  .mappings-card h3 { margin-top: 0; color: #ffffff; }
+  .mapping-list { display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; }
+  .mapping-item {
+    background: #0d1b2a;
+    border: 1px solid #3a506b;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  .mapping-item:hover { transform: translateY(-2px); background: #1e2a3a; }
+  .mapping-info { display: flex; flex-direction: column; gap: 4px; }
+  .mapping-info span { font-size: 0.9rem; color: #a5a9b5; }
+  .mapping-buttons { display: flex; gap: 8px; }
+  .mapping-buttons button {
+    background: #1d72f3;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: 0.2s ease;
+    font-size: 0.85rem;
+  }
+  .mapping-buttons button:hover { background: #1558b0; }
+  .mapping-buttons .delete-btn { background: #e74c3c; }
+  .mapping-buttons .delete-btn:hover { background: #c0392b; }
+</style>
+</head>
+<body>
+<div class="app-container">
+
+  <!-- Menu placeholder -->
+  <div id="menu-placeholder"></div>
+
+  <a href="index.html" class="home-link">← Return to Home</a>
+
+  <div class="mappings-card">
+    <h3>Saved Mappings</h3>
+    <div class="mapping-list" id="mapping-list">
+      <!-- Mappings will be injected here -->
+    </div>
+  </div>
+
+</div>
+
+<script src="menu-loader.js" type="module" defer></script>
+<script>
+  const mappingList = document.getElementById('mapping-list');
+
+  // Example structure for saved mappings in localStorage:
+  // localStorage.setItem('savedMappings', JSON.stringify([
+  //   {name:'InvoiceMapping', annotation:'For invoices', created:'2025-09-24 10:30', json:{...}},
+  //   ...
+  // ]));
+
+  function loadMappings() {
+    mappingList.innerHTML = '';
+    const mappings = JSON.parse(localStorage.getItem('savedMappings') || '[]');
+    if(mappings.length === 0) {
+      mappingList.innerHTML = '<span style="color:#a5a9b5;">No saved mappings yet.</span>';
+      return;
+    }
+
+    mappings.forEach((map, index) => {
+      const item = document.createElement('div');
+      item.className = 'mapping-item';
+      item.innerHTML = `
+        <div class="mapping-info">
+          <strong>${map.name || 'Unnamed Mapping'}</strong>
+          <span>Annotation: ${map.annotation || '-'}</span>
+          <span>Created: ${map.created || '-'}</span>
+        </div>
+        <div class="mapping-buttons">
+          <button class="download-btn">Download</button>
+          <button class="delete-btn">Delete</button>
+        </div>
+      `;
+
+      // Download button
+      item.querySelector('.download-btn').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(map.json, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${map.name || 'mapping'}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // Delete button
+      item.querySelector('.delete-btn').addEventListener('click', () => {
+        if(confirm('Are you sure you want to delete this mapping?')) {
+          mappings.splice(index,1);
+          localStorage.setItem('savedMappings', JSON.stringify(mappings));
+          loadMappings();
+        }
+      });
+
+      mappingList.appendChild(item);
+    });
+  }
+
+  loadMappings();
+</script>
+</body>
+</html>

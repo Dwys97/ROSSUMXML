@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="transparent"/>
+  
+  <!-- Document body -->
+  <rect x="8" y="8" width="40" height="48" rx="4" ry="4"
+        stroke="white" stroke-width="3" fill="none"/>
+  
+  <!-- Folded corner -->
+  <polygon points="48,8 36,8 48,20" fill="white"/>
+  
+  <!-- Inner lines -->
+  <line x1="16" y1="24" x2="36" y2="24" stroke="white" stroke-width="3" opacity="0.7"/>
+  <line x1="16" y1="34" x2="36" y2="34" stroke="white" stroke-width="3" opacity="0.7"/>
+  <line x1="16" y1="44" x2="28" y2="44" stroke="white" stroke-width="3" opacity="0.7"/>
+</svg>

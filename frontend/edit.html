@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>XML Schema Mapping Editor</title>
+  <link rel="icon" type="image/png" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+
+<!-- Dynamic Menu Placeholder -->
+<div id="menu-placeholder"></div>
+
+<div class="app-container">
+  <header class="app-header">
+    <img src="assets/logo-light.svg" alt="SchemaBridge Logo" class="logo">
+  </header>
+  <a href="index.html" class="home-link">← Back to Transformer</a>
+
+  <div class="upload-section">
+    <div class="upload-card" id="dropSourceSettings">
+      <div class="icon">📄</div>
+      <h3>Source XML</h3>
+      <p>Upload your source XML schema</p>
+      <input type="file" id="sourceXmlFile" hidden>
+    </div>
+    <div class="upload-card" id="dropTargetSettings">
+      <div class="icon">📄</div>
+      <h3>Target XML</h3>
+      <p>Upload your target XML schema</p>
+      <input type="file" id="targetXmlFile" hidden>
+    </div>
+    <div class="upload-card" id="dropMapSettings">
+      <div class="icon">⚙️</div>
+      <h3>Mapping JSON</h3>
+      <p>Load existing mapping configuration</p>
+      <input type="file" id="mappingFile" hidden>
+    </div>
+  </div>
+
+  <div class="editor-section">
+    <div class="schema-card">
+      <h3>Source Schema</h3>
+      <div class="search-wrapper">
+        <input type="search" id="sourceSearch" class="tree-search" placeholder="Search nodes...">
+        <button class="clear-search-btn" id="clearSourceSearchBtn" hidden>×</button>
+      </div>
+      <div id="sourceTree" class="tree-container"></div>
+    </div>
+
+    <svg id="mappingSVG" class="mapping-svg"></svg>
+
+    <div class="schema-card">
+      <h3>Target Schema</h3>
+      <div class="search-wrapper">
+        <input type="search" id="targetSearch" class="tree-search" placeholder="Search nodes...">
+        <button class="clear-search-btn" id="clearTargetSearchBtn" hidden>×</button>
+      </div>
+      <div id="targetTree" class="tree-container"></div>
+    </div>
+
+    <div class="schema-card mappings-card">
+      <h3>Mappings</h3>
+      <div class="annotation">
+        <strong>How to Map Repeating Items:</strong>
+        <ol>
+          <li>In the source tree, find the first repeating item element (e.g., <code>tuple [schema_id=line_item]</code>) and tick its <code>☐</code> box.</li>
+          <li>In the target tree, find the corresponding first repeating item element (e.g., <code>CommercialInvoiceLine</code>) and tick its <code>☐</code> box.</li>
+          <li>Map the child elements between them as normal.</li>
+        </ol>
+      </div>
+      <div id="loadedMappingsList" class="mappings-list"></div>
+      <div class="mapping-buttons">
+        <button id="undoBtn" class="secondary-btn">↩ Undo Last Action</button>
+        <button id="saveMappingsBtn" class="primary-btn">⬇ Download Mappings</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="how-to-use">
+    <h2>How to Use</h2>
+    <div class="steps-container">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-text">
+          <h3>Upload Schemas</h3>
+          <p>Upload your source and target XML schema files to begin mapping.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-text">
+          <h3>Create Mappings</h3>
+          <p>Drag elements from the source schema and drop them onto target elements.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-text">
+          <h3>Export Configuration</h3>
+          <p>Download your mapping configuration as JSON for use in data transformation.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer class="app-footer">
+  Created by Daniils Radionovs
+</footer>
+
+<script src="menu-loader.js" type="module" defer></script>
+<script src="editor.js"></script>
+</body>
+</html>

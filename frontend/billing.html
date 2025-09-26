@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billing Settings</title>
+<link rel="icon" type="image/png" href="assets/favicon.svg">
+<link rel="stylesheet" href="styles.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" … />
+</head>
+<body>
+
+<!-- Dynamic Menu Placeholder -->
+<div id="menu-placeholder"></div>
+
+<div class="app-container">
+
+ <header class="app-header">
+    <img src="assets/logo-light.svg" alt="SchemaBridge Logo" class="logo">
+  </header>
+  <a href="index.html" class="home-link">← Back to Transformer</a>
+
+
+  <!-- Billing Card -->
+  <div class="billing-card">
+    <h3>Billing History</h3>
+    <input type="text" id="invoice-search" class="billing-input" placeholder="Search invoices...">
+    <div class="billing-list" id="billing-list">
+      <div class="billing-item" data-invoice="001" data-amount="29.99" data-date="2025-08-01">
+        <span>Invoice #001 - £29.99 - Aug 1, 2025</span>
+        <button class="download-btn"><i>⬇️</i>Download</button>
+      </div>
+      <div class="billing-item" data-invoice="002" data-amount="29.99" data-date="2025-09-01">
+        <span>Invoice #002 - £29.99 - Sep 1, 2025</span>
+        <button class="download-btn"><i>⬇️</i>Download</button>
+      </div>
+      <div class="billing-item" data-invoice="003" data-amount="49.99" data-date="2025-09-15">
+        <span>Invoice #003 - £49.99 - Sep 15, 2025</span>
+        <button class="download-btn"><i>⬇️</i>Download</button>
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="secondary-btn" id="undo-btn">Undo</button>
+      <button class="primary-btn" id="pay-btn">Pay Now</button>
+    </div>
+  </div>
+
+  <!-- Payment Methods Card -->
+  <div class="payment-card">
+    <h3>Manage Payment Methods</h3>
+    <div class="payment-list" id="payment-list">
+      <div class="payment-item">
+        <span>Visa **** 1234 - Exp 12/25</span>
+        <div>
+          <button class="secondary-btn edit-card-btn">Edit</button>
+          <button class="secondary-btn remove-card-btn">Remove</button>
+        </div>
+      </div>
+      <div class="payment-item">
+        <span>Mastercard **** 5678 - Exp 03/26</span>
+        <div>
+          <button class="secondary-btn edit-card-btn">Edit</button>
+          <button class="secondary-btn remove-card-btn">Remove</button>
+        </div>
+      </div>
+    </div>
+    <button class="add-card-btn" id="show-add-card">+ Add New Card</button>
+
+    <div class="payment-form" id="add-card-form" style="display:none;">
+      <input type="text" class="payment-input" placeholder="Card Number">
+      <input type="text" class="payment-input" placeholder="Name on Card">
+      <input type="text" class="payment-input" placeholder="Expiry MM/YY">
+      <input type="text" class="payment-input" placeholder="CVC">
+      <div class="action-buttons">
+        <button class="secondary-btn" id="cancel-add-card">Cancel</button>
+        <button class="primary-btn" id="save-card">Save Card</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Billing search
+  const searchInput = document.getElementById('invoice-search');
+  const billingList = document.getElementById('billing-list');
+  searchInput.addEventListener('input', () => {
+    const term = searchInput.value.toLowerCase();
+    [...billingList.children].forEach(item => {
+      item.style.display = item.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+  });
+
+  // Undo button
+  document.getElementById('undo-btn').addEventListener('click', () => {
+    alert('Undo last billing action');
+  });
+
+  // Pay button
+  document.getElementById('pay-btn').addEventListener('click', () => {
+    alert('Proceed to payment gateway');
+  });
+
+  // Show add card form
+  const showAddBtn = document.getElementById('show-add-card');
+  const addCardForm = document.getElementById('add-card-form');
+  const cancelAddBtn = document.getElementById('cancel-add-card');
+  showAddBtn.addEventListener('click', () => addCardForm.style.display = 'flex');
+  cancelAddBtn.addEventListener('click', () => addCardForm.style.display = 'none');
+
+  // Save new card
+  const saveCardBtn = document.getElementById('save-card');
+  const paymentList = document.getElementById('payment-list');
+  saveCardBtn.addEventListener('click', () => {
+    const inputs = addCardForm.querySelectorAll('input');
+    if(inputs[0].value && inputs[1].value && inputs[2].value && inputs[3].value) {
+      const newCard = document.createElement('div');
+      newCard.className = 'payment-item';
+      newCard.innerHTML = `<span>**** ${inputs[0].value.slice(-4)} - ${inputs[2].value}</span>
+                           <div>
+                             <button class="secondary-btn edit-card-btn">Edit</button>
+                             <button class="secondary-btn remove-card-btn">Remove</button>
+                           </div>`;
+      paymentList.appendChild(newCard);
+      addCardForm.style.display = 'none';
+      inputs.forEach(i => i.value = '');
+    } else {
+      alert('Please fill all fields');
+    }
+  });
+
+  // Edit and Remove card buttons
+  paymentList.addEventListener('click', e => {
+    const item = e.target.closest('.payment-item');
+    if(!item) return;
+
+    if(e.target.classList.contains('remove-card-btn')) {
+      item.remove();
+    }
+
+    if(e.target.classList.contains('edit-card-btn')) {
+      const currentSpan = item.querySelector('span');
+      const currentText = currentSpan.textContent;
+      const cardParts = currentText.match(/(.*) - Exp (.*)/);
+      const numberMask = cardParts ? cardParts[1].split(' ').pop() : '';
+      const expiry = cardParts ? cardParts[2] : '';
+
+      item.innerHTML = `
+        <input type="text" class="payment-input" value="${numberMask}" placeholder="Card Number">
+        <input type="text" class="payment-input" value="" placeholder="Name on Card">
+        <input type="text" class="payment-input" value="${expiry}" placeholder="Expiry MM/YY">
+        <input type="text" class="payment-input" value="" placeholder="CVC">
+        <div class="action-buttons">
+          <button class="secondary-btn cancel-edit-btn">Cancel</button>
+          <button class="primary-btn save-edit-btn">Save</button>
+        </div>
+      `;
+
+      item.querySelector('.cancel-edit-btn').addEventListener('click', () => {
+        item.innerHTML = `<span>${currentText}</span>
+                          <div>
+                            <button class="secondary-btn edit-card-btn">Edit</button>
+                            <button class="secondary-btn remove-card-btn">Remove</button>
+                          </div>`;
+      });
+
+      item.querySelector('.save-edit-btn').addEventListener('click', () => {
+        const inputs = item.querySelectorAll('input');
+        if(inputs[0].value && inputs[2].value) {
+          const newText = `**** ${inputs[0].value.slice(-4)} - Exp ${inputs[2].value}`;
+          item.innerHTML = `<span>${newText}</span>
+                            <div>
+                              <button class="secondary-btn edit-card-btn">Edit</button>
+                              <button class="secondary-btn remove-card-btn">Remove</button>
+                            </div>`;
+        } else {
+          alert('Please fill Card Number and Expiry');
+        }
+      });
+    }
+  });
+</script>
+<script src="menu-loader.js" type="module" defer></script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SchemaBridge - XML Transformer</title>
+  <link rel="icon" type="image/png" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+
+<div id="menu-placeholder"></div>
+
+<div class="app-container">
+  
+  <header class="app-header">
+    <img src="assets/logo-light.svg" alt="SchemaBridge Logo" class="logo">
+  </header>
+
+  <section class="how-to-use">
+    <div class="steps-container">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-text">
+          <h3>Upload Files</h3>
+          <p>Upload source XML(s), a destination template, and a JSON mapping file.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-text">
+          <h3>Configure & Transform</h3>
+          <p>Enable XPath if needed, then click the 'Transform' button to start.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-text">
+          <h3>Download Results</h3>
+          <p>Preview the output and download your transformed XML file or ZIP archive.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+<br>
+<br>
+  <div class="upload-section">
+    <div id="dropSource" class="upload-card" tabindex="0">
+      <div class="icon"><i class="fa-solid fa-file-code"></i></div>
+      <h3>Source XML(s)</h3>
+      <p>Drop XML or ZIP files here</p>
+      <span class="file-count">Selected: <span id="sourceCount">0</span></span>
+    </div>
+
+    <div id="dropDest" class="upload-card" tabindex="0">
+      <div class="icon"><i class="fa-solid fa-file-import"></i></div>
+      <h3>Destination Template</h3>
+      <p>Drop a single XML template</p>
+    </div>
+
+    <div id="dropXsd" class="upload-card" tabindex="0">
+        <div class="icon"><i class="fa-solid fa-file-circle-check"></i></div>
+        <h3>XSD Schema</h3>
+        <p>Drop XSD for output validation (Optional)</p>
+    </div>
+
+    <div id="dropMap" class="upload-card" tabindex="0">
+      <div class="icon"><i class="fa-solid fa-code-merge"></i></div>
+      <h3>Mapping JSON</h3>
+      <p>Drop your mapping file</p>
+    </div>
+  </div>
+
+  <div class="config-card">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="useXPathCheckbox" class="checkbox">
+        <label for="useXPathCheckbox" class="text-sm cursor-pointer">
+          Enable XPath evaluation
+          <abbr title="Use XPath expressions in your JSON mapping for advanced matching." class="tooltip">&#9432;</abbr>
+        </label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="removeEmptyTagsCheckbox" class="checkbox" checked>
+        <label for="removeEmptyTagsCheckbox" class="text-sm cursor-pointer">
+          Remove Empty Tags
+          <abbr title="Tick this to remove empty XML tags from the output. Cargowise requires this to pass schema validation." class="tooltip">&#9432;</abbr>
+        </label>
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button id="transformBtn" class="primary-btn">Transform</button>
+      <a href="edit.html" class="secondary-btn" role="button">Create / Edit Mapping</a>
+    </div>
+    <div id="actions" class="status-message">Ready</div>
+  </div>
+
+  <section class="previews">
+    <div class="preview-card">
+      <h3 class="card-title">Input XML Preview</h3>
+      <textarea id="inputXml" class="monospace" readonly placeholder="Source XML content appears here..."></textarea>
+    </div>
+    <div class="preview-card">
+      <div class="card-header">
+        <h3 class="card-title">Output XML</h3>
+        <div class="flex gap-2 items-center">
+            <button id="copyBtn" class="btn-ghost">Copy</button>
+            <a id="downloadLink" class="primary-btn hidden" download="transformed.xml">Download</a>
+        </div>
+      </div>
+      <textarea id="outputXml" class="monospace" readonly placeholder="Transformed XML output will appear here..."></textarea>
+    </div>
+  </section>
+</div>
+
+<footer class="app-footer">
+  © 2025 SchemaBridge — Built for production · EDI & XML integration
+</footer>
+
+<script src="libxml.js" type="module"></script>
+<script src="script.js"></script>
+<script src="validation.js" type="module"></script>
+<script src="menu-loader.js" type="module" defer></script>
+</body>
+</html>

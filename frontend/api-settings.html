@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Settings - XML Generator</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="menu.css"/>
+<style>
+  .app-container { max-width: 900px; margin: 0 auto; padding: 20px; }
+  .settings-card {
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    color: #e0e1dd;
+  }
+  .settings-card h3 { margin-top: 0; color: #ffffff; }
+  .settings-card input[type=text],
+  .settings-card select,
+  .settings-card input[type=file] {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #3a506b;
+    background: #0d1b2a;
+    color: #e0e1dd;
+    margin-bottom: 12px;
+  }
+  .settings-card button {
+    background: #1d72f3;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s ease;
+    margin-top: 5px;
+  }
+  .settings-card button:hover { background: #1558b0; }
+  .settings-info {
+    font-size: 0.9rem;
+    color: #a5a9b5;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="app-container">
+
+  <!-- Menu placeholder -->
+  <div id="menu-placeholder"></div>
+
+  <a href="index.html" class="home-link">← Return to Home</a>
+
+  <div class="settings-card">
+    <h3>API Settings</h3>
+    
+    <div class="settings-info">Your API Key:</div>
+    <input type="text" id="api-key" readonly>
+    <button id="generate-key-btn">Generate New API Key</button>
+
+    <div class="settings-info">Upload JSON Mapping File:</div>
+    <input type="file" id="mapping-file" accept=".json">
+    <button id="save-map-btn">Save Mapping</button>
+
+    <div class="settings-info">Default Delivery Method:</div>
+    <select id="default-delivery">
+      <option value="download">Download</option>
+      <option value="email">Email</option>
+      <option value="save">Save to Server</option>
+    </select>
+    <button id="save-delivery-btn">Save Delivery Method</button>
+
+    <div id="save-status" class="settings-info"></div>
+  </div>
+
+</div>
+
+<script src="menu-loader.js" type="module" defer></script>
+<script>
+  // Load saved settings from localStorage
+  const apiKeyInput = document.getElementById('api-key');
+  const defaultDelivery = document.getElementById('default-delivery');
+  const saveStatus = document.getElementById('save-status');
+
+  const savedApiKey = localStorage.getItem('apiKey');
+  if(savedApiKey) apiKeyInput.value = savedApiKey;
+
+  const savedDelivery = localStorage.getItem('defaultDelivery');
+  if(savedDelivery) defaultDelivery.value = savedDelivery;
+
+  // Generate API key
+  document.getElementById('generate-key-btn').addEventListener('click', () => {
+    const newKey = 'API-' + Math.random().toString(36).substr(2, 16).toUpperCase();
+    apiKeyInput.value = newKey;
+    localStorage.setItem('apiKey', newKey);
+    saveStatus.textContent = 'New API Key generated and saved.';
+  });
+
+  // Save mapping file
+  document.getElementById('save-map-btn').addEventListener('click', () => {
+    const fileInput = document.getElementById('mapping-file');
+    if(fileInput.files.length === 0) {
+      saveStatus.textContent = 'Please select a JSON mapping file.';
+      return;
+    }
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const map = JSON.parse(e.target.result);
+        localStorage.setItem('jsonMapping', JSON.stringify(map));
+        saveStatus.textContent = 'Mapping file saved successfully.';
+      } catch(err) {
+        saveStatus.textContent = 'Invalid JSON file.';
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // Save default delivery method
+  document.getElementById('save-delivery-btn').addEventListener('click', () => {
+    const method = defaultDelivery.value;
+    localStorage.setItem('defaultDelivery', method);
+    saveStatus.textContent = `Default delivery method saved: ${method}`;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Instructions - XML Generator</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="menu.css"/>
+<style>
+  .app-container { max-width: 900px; margin: 0 auto; padding: 20px; }
+  .instructions-card {
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    color: #e0e1dd;
+  }
+  .instructions-card h3 { margin-top: 0; color: #ffffff; }
+  .instructions-card code {
+    display: block;
+    background: #0d1b2a;
+    padding: 8px;
+    border-radius: 6px;
+    margin: 8px 0;
+    overflow-x: auto;
+  }
+  .delivery-methods { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+  .method-btn { background: #2ecc71; color: #fff; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; transition: 0.2s ease; }
+  .method-btn:hover { background: #28a745; }
+  .example { margin-top: 15px; font-size: 0.9rem; color: #a5a9b5; }
+  .api-simulator {
+    background: #0d1b2a;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #3a506b;
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .api-simulator textarea {
+    width: 100%;
+    height: 120px;
+    border-radius: 6px;
+    border: 1px solid #3a506b;
+    background: #1e2a3a;
+    color: #e0e1dd;
+    padding: 8px;
+    font-family: monospace;
+    resize: vertical;
+  }
+  .api-simulator select, .api-simulator input[type=text] {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #3a506b;
+    background: #1e2a3a;
+    color: #e0e1dd;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .api-simulator button {
+    width: fit-content;
+    background: #1d72f3;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  .api-simulator button:hover { background: #1558b0; }
+  .api-response {
+    background: #1a202c;
+    color: #a5a9b5;
+    padding: 10px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    font-family: monospace;
+    min-height: 60px;
+  }
+</style>
+</head>
+<body>
+<div class="app-container">
+
+  <!-- Menu placeholder -->
+  <div id="menu-placeholder"></div>
+
+  <a href="index.html" class="home-link">← Return to Home</a>
+
+  <div class="instructions-card">
+    <h3>XML Generator API</h3>
+    <p>This API allows you to transform XML files using your JSON mapping and receive the transformed XML via your chosen method.</p>
+    
+    <h4>Endpoint:</h4>
+    <code>POST /transform</code>
+
+    <h4>Required JSON body:</h4>
+    <code>
+{
+  "sourceXml": "&lt;root&gt;&lt;item&gt;Example&lt;/item&gt;&lt;/root&gt;",
+  "mappingJson": { ... },
+  "deliveryMethod": "download|email|save",
+  "deliveryTarget": "optional for email/save"
+}
+    </code>
+
+    <h4>Delivery Methods:</h4>
+    <div class="delivery-methods">
+      <button class="method-btn" onclick="showExample('download')">Download</button>
+      <button class="method-btn" onclick="showExample('email')">Email</button>
+      <button class="method-btn" onclick="showExample('save')">Save to Server</button>
+    </div>
+
+    <div id="example-output" class="example">
+      Click a delivery method to see example usage.
+    </div>
+
+    <div class="api-simulator">
+      <h4>Try it in the browser (simulation)</h4>
+      <label>Source XML:</label>
+      <textarea id="sim-xml">&lt;root&gt;&lt;item&gt;Test&lt;/item&gt;&lt;/root&gt;</textarea>
+      <label>Mapping JSON:</label>
+      <textarea id="sim-json"></textarea>
+      <label>Delivery Method:</label>
+      <select id="sim-method">
+        <option value="download">Download</option>
+        <option value="email">Email</option>
+        <option value="save">Save</option>
+      </select>
+      <label>Delivery Target (email address or server path if applicable):</label>
+      <input type="text" id="sim-target" placeholder="user@example.com or /tmp/output.xml">
+      <button id="simulate-btn">Simulate API Call</button>
+      <div class="api-response" id="sim-response"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="menu-loader.js" type="module" defer></script>
+<script>
+  const exampleOutput = document.getElementById('example-output');
+  const simXml = document.getElementById('sim-xml');
+  const simJson = document.getElementById('sim-json');
+  const simMethod = document.getElementById('sim-method');
+  const simTarget = document.getElementById('sim-target');
+  const simResponse = document.getElementById('sim-response');
+
+  // Load saved mapping and delivery method from localStorage
+  const savedMapping = localStorage.getItem('jsonMapping');
+  if(savedMapping) simJson.value = savedMapping;
+
+  const savedDelivery = localStorage.getItem('defaultDelivery');
+  if(savedDelivery) simMethod.value = savedDelivery;
+
+  const examples = {
+    download: `POST /transform
+Body:
+{
+  "sourceXml": "<root><item>Test</item></root>",
+  "mappingJson": {...},
+  "deliveryMethod": "download"
+}
+Response: Transformed XML file`,
+    
+    email: `POST /transform
+Body:
+{
+  "sourceXml": "<root><item>Test</item></root>",
+  "mappingJson": {...},
+  "deliveryMethod": "email",
+  "deliveryTarget": "user@example.com"
+}
+Response: JSON { status: 'Email sent successfully' }`,
+    
+    save: `POST /transform
+Body:
+{
+  "sourceXml": "<root><item>Test</item></root>",
+  "mappingJson": {...},
+  "deliveryMethod": "save",
+  "deliveryTarget": "/tmp/transformed.xml"
+}
+Response: JSON { status: 'File saved successfully', path: '/tmp/transformed.xml' }`
+  };
+
+  function showExample(method) {
+    exampleOutput.textContent = examples[method];
+  }
+
+  // Simulation logic
+  document.getElementById('simulate-btn').addEventListener('click', () => {
+    const xml = simXml.value;
+    let mapping;
+    try {
+      mapping = JSON.parse(simJson.value);
+    } catch(e) {
+      simResponse.textContent = 'Invalid JSON mapping.';
+      return;
+    }
+    const method = simMethod.value;
+    const target = simTarget.value;
+
+    // Simulated transformation (calls your script.js logic if needed)
+    // Here we just append mapping keys to xml for demo
+    let transformedXml = xml;
+    for(const key in mapping) {
+      transformedXml = transformedXml.replace(new RegExp(`<${key}>(.*?)<\/${key}>`, 'g'), `<${key}>${mapping[key]}</${key}>`);
+    }
+
+    let response = '';
+    if(method === 'download') {
+      response = transformedXml;
+    } else if(method === 'email') {
+      response = target ? `Simulated sending email to ${target}...\nSuccess!\n\nTransformed XML:\n${transformedXml}` : 'Please provide email address.';
+    } else if(method === 'save') {
+      response = target ? `Simulated saving file to ${target}...\nSuccess!\n\nTransformed XML:\n${transformedXml}` : 'Please provide server path.';
+    }
+
+    simResponse.textContent = response;
+  });
+</script>
+</body>
+</html>
