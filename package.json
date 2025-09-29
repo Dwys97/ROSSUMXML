@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "install:all": "npm install --prefix backend",
-    "start:backend": "sam local start-api --template-file backend/template.yml --port 3000 --debug",
-    "start:frontend": "python3 -m http.server 8080 --directory frontend",
+    "start:backend": "sam local start-api --template-file backend/template.yml --port 3000",
+    "start:frontend": "python3 proxy_server.py",
     "dev": "concurrently \"npm:start:*\""
   },
   "devDependencies": {
