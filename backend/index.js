@@ -133,6 +133,7 @@ function transformSingleFile(sourceXmlString, destinationXml, mappingJson, remov
 // ------------------
 // Lambda Handlers
 // ------------------
+
 const createResponse = (statusCode, body, contentType='application/xml') => ({
     statusCode,
     body,
@@ -144,6 +145,17 @@ const createResponse = (statusCode, body, contentType='application/xml') => ({
 });
 
 exports.handler = async (event) => {
+    if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers: {
+                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
+            },
+            body: ''
+        };
+    }
     try {
         const path = event.requestContext?.http?.path || event.path; // API Gateway v2 or v1
         const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
