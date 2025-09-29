@@ -1,9 +1,9 @@
 {
-  "name": "transform-lambda",
+  "name": "backend",
   "version": "1.0.0",
-  "description": "AWS Lambda for XML transform",
-  "main": "index.js",
+  "description": "Lambda function for XML transformation.",
+  "main": "transformFunction/index.js",
   "dependencies": {
-    "@xmldom/xmldom": "^0.8.4"
+    "@xmldom/xmldom": "^0.8.10"
   }
 }
