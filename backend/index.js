@@ -138,10 +138,10 @@ const createResponse = (statusCode, body, contentType='application/xml') => ({
     statusCode,
     body,
     headers: {
-        'Content-Type': contentType,
-        'Access-Control-Allow-Origin': '*'
-        'Access-Control-Allow-Methods": "POST, GET, OPTIONS'
-    }
+                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
+            }
 });
 
 exports.handler = async (event) => {
