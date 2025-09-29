@@ -7,7 +7,7 @@ Resources:
   TransformFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: transformFunction/
+      CodeUri: .
       Handler: index.handler
       Runtime: nodejs18.x
       Architectures:
