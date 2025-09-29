@@ -139,6 +139,7 @@ const createResponse = (statusCode, body, contentType='application/xml') => ({
     headers: {
         'Content-Type': contentType,
         'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Methods": "POST, GET, OPTIONS'
     }
 });
 
