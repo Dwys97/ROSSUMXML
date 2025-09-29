@@ -3,6 +3,15 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   Backend for the XML Transformation App
 
+Globals:
+  Function:
+    Timeout: 3
+  Api:
+    Cors:
+      AllowMethods: "'POST, GET, OPTIONS'"
+      AllowHeaders: "'Content-Type, X-Amz-Date, Authorization, X-Api-Key, X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+
 Resources:
   TransformFunction:
     Type: AWS::Serverless::Function
