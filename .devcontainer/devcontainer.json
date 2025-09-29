@@ -4,13 +4,19 @@
   "features": {
     "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/python:1": {},
-    "ghcr.io/devcontainers/features/git-lfs:1": {}
+    "ghcr.io/devcontainers/features/git-lfs:1": {},
+    // Added Docker support for AWS SAM
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "forwardPorts": [
-    3000,
-    8080
+    3000, // Backend API
+    5173, // Common frontend port (Vite)
+    8080  // Alternative frontend port
   ],
-  "postCreateCommand": "pipx install aws-sam-cli && npm install && echo 'Environment is ready!'",
+  // Updated command to install dependencies in root, backend, and frontend
+  "postCreateCommand": "pipx install aws-sam-cli && npm install && npm install --prefix backend && npm install --prefix frontend",
+  // Added command to start both servers when Codespace starts
+  "postStartCommand": "npm run dev",
   "customizations": {
     "vscode": {
       "extensions": [
