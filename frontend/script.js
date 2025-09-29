@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // Call raw XML endpoint
-            const response = await fetch('https://xtgjg7etwj.execute-api.eu-north-1.amazonaws.com/prod/api/transform', {
+            const response = await fetch('${API_BASE_URL}/api/transform', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -78,3 +78,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
