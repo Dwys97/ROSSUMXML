@@ -1,5 +1,6 @@
 // backend transformFunction index.js
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
+const { parseXmlToTree } = require('./services/xmlParser.service');
 
 // ------------------
 // XML Helpers (existing logic preserved)
@@ -186,6 +187,21 @@ exports.handler = async (event) => {
             // For demo: just return success
             return createResponse(200, JSON.stringify({ received: true }), 'application/json');
         }
+
+        if (path.endsWith('/api/schema/parse') || path.endsWith('/prod/api/schema/parse')) {
+            // Parse XML and return tree structure
+            const { xmlString } = body;
+            if (!xmlString) {
+                return createResponse(400, JSON.stringify({ error: 'Missing xmlString' }), 'application/json');
+        }
+    
+    try {
+        const tree = parseXmlToTree(xmlString);
+        return createResponse(200, JSON.stringify({ tree }), 'application/json');
+    } catch (err) {
+        return createResponse(400, JSON.stringify({ error: err.message }), 'application/json');
+    }
+}
 
         return createResponse(404, JSON.stringify({ error: 'Endpoint not found' }), 'application/json');
 
