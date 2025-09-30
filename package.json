@@ -1,11 +1,11 @@
+// In your root package.json
 {
   "name": "xml-transformer-app",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "install:all": "npm install --prefix backend",
     "start:backend": "sam local start-api --template-file backend/template.yml --port 3000",
-    "start:frontend": "python3 proxy_server.py",
+    "start:frontend": "npm run --prefix frontend dev",
     "dev": "concurrently \"npm:start:*\""
   },
   "devDependencies": {
