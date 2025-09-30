@@ -5,10 +5,12 @@ import TransformerPage from './pages/TransformerPage'; // We will build this nex
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/transformer" element={<TransformerPage />} />
-    </Routes>
+<div className="App"> 
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/transformer" element={<TransformerPage />} />
+      </Routes>
+    </div>
   );
 }
 
