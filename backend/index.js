@@ -158,20 +158,20 @@ exports.handler = async (event) => {
         };
     }
     try {
-        const path = event.requestContext?.http?.path || event.path; // API Gateway v2 or v1
+        const path = event.requestContext?.http?.path || event.path;
         const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 
         if (path.endsWith('/api/transform') || path.endsWith('/prod/api/transform')) {
-            // RAW XML endpoint
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
-            if (!sourceXml || !destinationXml || !mappingJson)
-                return createResponse(400, 'Missing required fields', 'application/json');
+            if (!sourceXml || !destinationXml || !mappingJson) {
+                // Made error message consistent JSON
+                return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
+            }
             const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
             return createResponse(200, transformed, 'application/xml');
         }
 
         if (path.endsWith('/api/transform-json') || path.endsWith('/prod/api/transform-json')) {
-            // JSON-wrapped endpoint for 3rd-party
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
             if (!sourceXml || !destinationXml || !mappingJson)
                 return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
@@ -180,28 +180,24 @@ exports.handler = async (event) => {
         }
 
         if (path.endsWith('/api/rossum-webhook') || path.endsWith('/prod/api/rossum-webhook')) {
-            // Simple webhook handler
             const { exportedXml } = body;
             if (!exportedXml)
                 return createResponse(400, JSON.stringify({ error: 'Missing exportedXml' }), 'application/json');
-            // For demo: just return success
             return createResponse(200, JSON.stringify({ received: true }), 'application/json');
         }
 
         if (path.endsWith('/api/schema/parse') || path.endsWith('/prod/api/schema/parse')) {
-            // Parse XML and return tree structure
             const { xmlString } = body;
             if (!xmlString) {
                 return createResponse(400, JSON.stringify({ error: 'Missing xmlString' }), 'application/json');
-        }
-    
-    try {
-        const tree = parseXmlToTree(xmlString);
-        return createResponse(200, JSON.stringify({ tree }), 'application/json');
-    } catch (err) {
-        return createResponse(400, JSON.stringify({ error: err.message }), 'application/json');
-    }
-}
+            }
+            try {
+                const tree = parseXmlToTree(xmlString);
+                return createResponse(200, JSON.stringify({ tree }), 'application/json');
+            } catch (err) {
+                return createResponse(400, JSON.stringify({ error: err.message }), 'application/json');
+            }
+        } // <-- CORRECTED: Added the missing closing brace here
 
         return createResponse(404, JSON.stringify({ error: 'Endpoint not found' }), 'application/json');
 
