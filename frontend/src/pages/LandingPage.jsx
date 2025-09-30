@@ -68,7 +68,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer>
         {/* The footer content is already centered by its own CSS, so it doesn't need the container */}
-        © 2025 XML Generator. All rights reserved. | 
+        © 2025 XML Generator. All rights reserved. |
         <a href="#">Privacy Policy</a> | 
         <a href="#">Terms of Service</a>
       </footer>
