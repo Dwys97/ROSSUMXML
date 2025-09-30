@@ -1,0 +1,789 @@
+/* ==========================================================================
+   Global App & Component Styles
+   ========================================================================== */
+.app-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+input[type="file"] {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ==========================================================================
+   Header & Logo
+   ========================================================================== */
+.app-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 30px; /* Creates space before the 'how-to' section */
+}
+
+.logo {
+    max-width: 600px; /* Adjust size as needed */
+    height: auto;
+    margin-bottom: 5px; /* Space between logo and subtitle */
+}
+
+
+/* ==========================================================================
+   Titles & General Text
+   ========================================================================== */
+.app-title {
+    margin-bottom: 5px;
+    color: #ffffff;
+    font-size: 2rem;
+    text-align: center;
+}
+
+.subtitle {
+    margin-top: 5px; /* CHANGE THIS LINE */
+    color: #a5a9b5;
+    text-align: center;
+}
+
+/* ==========================================================================
+   Buttons & Links
+   ========================================================================== */
+/* Consolidated base button styles for consistency */
+button,
+a.primary-btn,
+a.secondary-btn {
+    display: inline-block;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.primary-btn {
+    background: #28a745;
+}
+.primary-btn:hover {
+    background: #1d72f3;
+}
+
+.secondary-btn {
+    background: #3a506b;
+}
+.secondary-btn:hover {
+    background: #4b627d;
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid #3a506b;
+    color: #a5a9b5;
+}
+.btn-ghost:hover {
+    background: #3a506b;
+    color: #fff;
+}
+
+.home-link {
+    position: relative;
+    z-index: 1010;
+    display: inline-block;
+    padding: 8px 16px;
+    margin-bottom: 15px;
+    background-color: #3a506b;
+    border-radius: 8px;
+    color: #e0e1dd;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+.home-link:hover {
+    background-color: #4b627d;
+    color: #fff;
+}
+
+/* ==========================================================================
+   Side Menu & Overlay
+   ========================================================================== */
+.menu-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1001;
+    padding: 0.6rem 1rem;
+    background: #28a745;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.side-menu {
+    position: fixed;
+    top: 0;
+    right: -300px;
+    z-index: 1000;
+    width: 280px;
+    height: 100%;
+    padding: 1rem;
+    background-color: #1f1f1f;
+    color: white;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+    overflow-y: auto;
+    transition: right 0.3s ease;
+}
+.side-menu.open {
+    right: 0;
+}
+
+.side-menu .menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+}
+
+.side-menu .close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.side-menu .menu-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.side-menu .menu-list li {
+    margin-bottom: 1rem;
+}
+
+.side-menu .menu-list li a {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    color: white;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+.side-menu .menu-list li a:hover {
+    color: #2ecc71;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 999;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    transition: opacity 0.3s ease;
+}
+.overlay.hidden {
+    display: none;
+}
+
+/* ==========================================================================
+   Cards (Upload, Config, Preview)
+   ========================================================================== */
+.upload-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.upload-card {
+    padding: 20px;
+    background: #1e2a3a;
+    border: 2px dashed #3a506b;
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+.upload-card:hover,
+.upload-card.dragover {
+    background: #2c3e50;
+    border-color: #1d72f3;
+    transform: translateY(-3px);
+}
+.upload-card.file-uploaded {
+    border-color: #28a745;
+    transform: none;
+}
+.upload-card .icon,
+.upload-card .icon i {
+    margin-bottom: 10px;
+    color: #1d72f3;
+    font-size: 2.5rem;
+    transition: color 0.2s ease;
+}
+.upload-card:hover .icon i,
+.upload-card.dragover .icon i {
+    color: #a5a9b5;
+}
+.upload-card.file-uploaded .icon i {
+    color: #28a745;
+}
+.upload-card h3 {
+    margin: 10px 0 5px 0;
+    color: #ffffff;
+}
+.upload-card p,
+.file-count {
+    margin: 0;
+    color: #a5a9b5;
+    font-size: 0.9rem;
+}
+
+.config-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.status-message {
+    width: 100%;
+    margin-top: 10px;
+    color: #a5a9b5;
+    font-size: 0.9rem;
+    font-style: italic;
+    text-align: center;
+}
+
+.previews {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+@media (min-width: 1024px) {
+    .previews {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.preview-card {
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.card-title {
+    margin: 0;
+    color: #ffffff;
+    font-size: 1.1rem;
+}
+
+/* ==========================================================================
+   Form Elements & Misc Components
+   ========================================================================== */
+.monospace {
+    flex-grow: 1;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 400px;
+    padding: 1rem;
+    background-color: #0d1b2a;
+    border: 1px solid #3a506b;
+    border-radius: 8px;
+    color: #e0e1dd;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.875rem;
+    resize: vertical;
+}
+.monospace:focus {
+    border-color: #1d72f3;
+    outline: none;
+}
+
+.checkbox {
+    width: 16px;
+    height: 16px;
+    background-color: #0d1b2a;
+    accent-color: #1d72f3;
+}
+
+.tooltip {
+    position: relative;
+    border-bottom: 1px dotted #6b7280;
+    text-decoration: none;
+    cursor: help;
+}
+.tooltip::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    z-index: 10;
+    padding: 8px 12px;
+    background-color: #1f2937;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%);
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.tooltip:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ==========================================================================
+   How-to-Use Section
+   ========================================================================== */
+.how-to-use {
+    margin-top: 40px;
+    padding: 20px;
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+}
+.how-to-use h2 {
+    margin-top: 0;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.steps-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+}
+
+.step {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.step-number {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background-color: #1d72f3;
+    border-radius: 50%;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.step-text h3 {
+    margin: 0 0 5px 0;
+}
+.step-text p {
+    margin: 0;
+    color: #a5a9b5;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   Editor Specific Section
+   ========================================================================== */
+.editor-section {
+    position: relative;
+    display: grid;
+    /* AMENDED: This change allows the first two columns to shrink properly */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 350px;
+    gap: 20px;
+}
+
+.schema-card {
+    display: flex;
+    flex-direction: column;
+    height: 60vh;
+    padding: 15px;
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+}
+.schema-card h3 {
+    margin: 0 0 10px 0;
+}
+
+.mapping-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.mappings-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.annotation {
+    margin-bottom: 1rem;
+    padding: 12px;
+    background-color: #1a202c;
+    border-left: 3px solid #1d72f3;
+    border-radius: 8px;
+    color: #a5a9b5;
+    font-size: 0.8rem;
+}
+
+.mappings-list {
+    flex: 1;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #0d1b2a;
+    border: 1px solid #3a506b;
+    border-radius: 8px;
+    overflow-y: auto;
+}
+
+.mapping-item button {
+    padding: 2px 6px;
+    background: #e74c3c;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+.mapping-item button:hover {
+    background: #c0392b;
+}
+
+.mapping-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* --- Search within Editor --- */
+.search-wrapper {
+    position: relative;
+    /* Add display: flex to center its children, specifically the search input and the button */
+    display: flex;
+    align-items: center; /* Vertically align items in the middle */
+}
+
+.tree-search {
+    box-sizing: border-box;
+    flex-grow: 1; /* Allow search input to take up available space */
+    margin-bottom: 0; /* Remove margin as parent is flex */
+    padding: 8px 28px 8px 8px;
+    background: #0d1b2a;
+    border: 1px solid #3a506b;
+    border-radius: 6px;
+    color: #e0e1dd;
+}
+
+.clear-search-btn {
+    /* Position the button next to the input, aligned by flexbox */
+    position: static; /* Remove absolute positioning */
+    /* top: 50%; */ /* REMOVED */
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: #a5a9b5;
+    font-size: 1.4rem;
+    cursor: pointer;
+    /* transform: translateY(-50%); */ /* REMOVED */
+    
+    /* Use flexbox on the button itself to center its 'x' content */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%; /* Make button take full height of its parent */
+    padding: 0 8px; /* Add some padding for better click area */
+    margin-left: -35px; /* Adjust this value to overlap the button with the input slightly */
+    z-index: 1; /* Ensure it's above the input if there's overlap */
+}
+
+/* --- Tree Views within Editor --- */
+.tree-container {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-color: #3a506b #1e2a3a;
+    scrollbar-width: thin;
+}
+
+.tree-container ul {
+    position: relative;
+    margin: 0;
+    padding-left: 20px;
+    list-style: none;
+}
+.tree-container .tree-root {
+    padding-left: 0;
+}
+
+/* Base state for nested lists, used for animation */
+.tree-container ul ul {
+    overflow: hidden;
+    max-height: 9999px; /* Large value to accommodate content when expanded */
+    opacity: 1;
+    transition: max-height 0.3s ease-out, opacity 0.2s ease-in;
+}
+
+/* Collapsed state for nested lists */
+.tree-container .tree-node-item.collapsed > ul {
+    max-height: 0;
+    opacity: 0;
+    margin: 0; /* Prevents margin from creating space when collapsed */
+}
+
+
+
+/* Merged tree list item and guide line styles */
+.tree-node-item {
+    position: relative;
+}
+
+/* Vertical guide line */
+.tree-node-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -20px;
+    width: 1px;
+    height: 100%;
+    border-left: 1px dashed #3a506b;
+}
+
+/* Horizontal guide line */
+.tree-node-item::after {
+    content: '';
+    position: absolute;
+    top: 12px; /* Vertically center with node */
+    left: 20px;
+    width: 20px;
+    height: 1px;
+    border-top: 1px dashed #3a506b;
+}
+
+/* Consolidated tree-node styles */
+.tree-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    position: relative;
+    /* This positioning context is needed for the toggle-icon */
+}
+.tree-node:hover {
+    background-color: rgba(29, 114, 243, 0.15);
+}
+.tree-node.is-mapped {
+    background-color: #2c3e50;
+}
+.tree-node.drop-flash {
+    background-color: #d4edda;
+    transition: background-color 0.6s ease-out;
+}
+
+/* Styles for the dynamically created toggle icon SPAN */
+.toggle-icon {
+    order: 3;
+    padding: 0 8px;
+    font-size: 1.1rem;
+    color: #a5a9b5;
+    user-select: none;
+    transition: transform 0.3s ease;
+    transform-origin: center;
+    flex-shrink: 0; 
+}
+
+/* Rotates the toggle icon when the parent LI is collapsed */
+.tree-node-item.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+/* rule to handle long text labels */
+.node-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+}
+
+.custom-value-btn {
+    order: 2;
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: #a5a9b5;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    flex-shrink: 0;
+}
+
+.custom-value-btn:hover {
+    color: #1d72f3;
+}
+
+/* ==========================================================================
+   Billing
+   ========================================================================== */
+.billing-card,
+.payment-card {
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 700px;
+    margin: 20px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.billing-card h3,
+.payment-card h3 {
+    margin: 0 0 10px 0;
+    color: #ffffff;
+    text-align: center;
+}
+
+.billing-list,
+.payment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.billing-item,
+.payment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0d1b2a;
+    border: 1px solid #3a506b;
+    border-radius: 8px;
+    padding: 10px;
+    transition: transform 0.2s ease, background 0.2s ease;
+    cursor: pointer;
+}
+.billing-item:hover,
+.payment-item:hover {
+    transform: translateY(-2px);
+    background: #1e2a3a;
+}
+
+.billing-item span,
+.payment-item span {
+    color: #e0e1dd;
+    font-size: 0.95rem;
+}
+
+.download-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #28a745;
+    color: #fff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+.download-btn:hover {
+    background: #1558b0;
+    transform: scale(1.05);
+}
+
+.billing-input,
+.payment-input {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #3a506b;
+    background-color: #0d1b2a;
+    color: #e0e1dd;
+    margin-bottom: 10px;
+}
+
+/* This rule is a more specific version of .action-buttons */
+.billing-card .action-buttons,
+.payment-card .action-buttons {
+    justify-content: flex-end;
+}
+
+.add-card-btn {
+    background: #2ecc71;
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    transition: background 0.2s ease;
+}
+.add-card-btn:hover {
+    background: #28a745;
+}
+
+.payment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+    background: #0d1b2a;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #3a506b;
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.app-footer {
+    padding-bottom: 20px;
+    margin-top: 40px;
+    color: #a5a9b5;
+    font-size: 0.9rem;
+    text-align: center;
+}
