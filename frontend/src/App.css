@@ -1004,3 +1004,189 @@ a.secondary-btn {
     font-size: 0.9rem;
     text-align: center;
 } 
+
+
+/* ===========================================================================
+    React migration 
+   =========================================================================== */
+
+/* Navigation */
+.main-nav {
+    background-color: #1e2a3a;
+    border-bottom: 1px solid #3a506b;
+    padding: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    height: 40px;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-link {
+    color: #e0e1dd;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.nav-link:hover {
+    background-color: #3a506b;
+    color: #2ecc71;
+}
+
+/* Page Layout */
+.transformer-page,
+.editor-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    color: #e0e1dd;
+    margin-bottom: 0.5rem;
+}
+
+.page-header p {
+    color: #a5a5a5;
+}
+
+/* Upload Section */
+.upload-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Transform Section */
+.transform-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.xml-panel {
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.xml-panel h3 {
+    color: #e0e1dd;
+    margin-bottom: 1rem;
+}
+
+.xml-panel textarea {
+    width: 100%;
+    background: #0d1b2a;
+    color: #e0e1dd;
+    border: 1px solid #3a506b;
+    border-radius: 4px;
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    resize: vertical;
+}
+
+.output-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+/* Transform Controls */
+.transform-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    padding: 2rem;
+    background: #1e2a3a;
+    border: 1px solid #3a506b;
+    border-radius: 8px;
+}
+
+.checkbox-label {
+    color: #e0e1dd;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.transform-btn {
+    padding: 1rem 3rem;
+    font-size: 1.1rem;
+}
+
+/* Buttons */
+.primary-btn {
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.primary-btn:hover:not(:disabled) {
+    background-color: #27ae60;
+    transform: translateY(-1px);
+}
+
+.primary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary-btn {
+    background-color: #3a506b;
+    color: #e0e1dd;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.secondary-btn:hover {
+    background-color: #4a607b;
+}
+
+/* Footer */
+.app-footer {
+    text-align: center;
+    padding: 2rem;
+    color: #a5a5a5;
+    border-top: 1px solid #3a506b;
+    margin-top: 4rem;
+}
