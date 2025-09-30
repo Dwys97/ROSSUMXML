@@ -41,7 +41,6 @@ export default function TopNav() {
             <a href="#">For Developers</a>
             <a href="#">For Enterprises</a>
         </NavItem>
-        {/* You can add the other NavItems here */}
       </div>
       <div className="nav-buttons">
         <button className="trial-btn">Try Free</button>

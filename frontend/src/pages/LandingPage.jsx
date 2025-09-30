@@ -38,7 +38,7 @@ export default function LandingPage() {
         <Link to="/transformer" className="cta-btn">Get Started</Link>
       </div>
 
-      {/* Features Section - ADDED app-container HERE */}
+      {/* Features Section */}
       <div className="features app-container">
         <div className="feature-card">
           <h3>Fast & Reliable</h3>
@@ -58,7 +58,7 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* CTA Section - ADDED app-container HERE */}
+      {/* CTA Section */}
       <div className="cta-section app-container">
         <h2>Ready to get started?</h2>
         <p>Create your account, get your API key, and start transforming XML files today!</p>
@@ -67,8 +67,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer>
-        {/* The footer content is already centered by its own CSS, so it doesn't need the container */}
-        © 2025 XML Generator. All rights reserved. |
+        © 2025 XML Generator. All rights reserved. | 
         <a href="#">Privacy Policy</a> | 
         <a href="#">Terms of Service</a>
       </footer>
