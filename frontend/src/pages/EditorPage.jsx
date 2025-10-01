@@ -5,7 +5,6 @@ import FileDropzone from '../components/common/FileDropzone';
 import SchemaTree from '../components/editor/SchemaTree';
 import MappingSVG from '../components/editor/MappingSVG';
 import MappingsList from '../components/editor/MappingsList';
-import styles from './EditorPage.module.css';
 
 function EditorPage() {
     // State for trees, mappings, and collections

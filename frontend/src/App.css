@@ -1,4 +1,8 @@
 /* frontend/src/App.css */
+
+/* ==========================================================================
+   1. Global Styles & CSS Variables
+   ========================================================================== */
 :root {
     --bg-primary: #0d1b2a;
     --bg-secondary: #1e2a3a;
@@ -6,8 +10,12 @@
     --text-primary: #e0e1dd;
     --text-secondary: #a5a9b5;
     --accent-green: #2ecc71;
+    --accent-green-hover: #28a745;
     --accent-blue: #3498db;
+    --accent-blue-hover: #2980b9;
     --accent-red: #e74c3c;
+    --accent-red-hover: #c0392b;
+    --accent-orange: #e67e22;
 }
 
 body {
@@ -16,3 +24,113 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
 }
+
+.app-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+input[type="file"] {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+}
+
+
+/* ==========================================================================
+   2. Shared Components
+   ========================================================================== */
+
+/* --- Main Navigation --- */
+.main-nav { background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-primary); padding: 0; position: sticky; top: 0; z-index: 1000; }
+.nav-container { max-width: 1400px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+.nav-container .logo { height: 40px; }
+.nav-links { display: flex; gap: 2rem; }
+.nav-link { color: var(--text-primary); text-decoration: none; font-weight: 600; padding: 0.5rem 1rem; border-radius: 4px; transition: all 0.2s; }
+.nav-link:hover { background-color: var(--border-primary); color: var(--accent-green); }
+
+/* --- Buttons --- */
+.primary-btn, .secondary-btn { border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; text-align: center; transition: all 0.2s; }
+.primary-btn { background-color: var(--accent-green); color: white; }
+.primary-btn:hover:not(:disabled) { background-color: var(--accent-green-hover); transform: translateY(-1px); }
+.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.secondary-btn { background-color: var(--border-primary); color: var(--text-primary); }
+.secondary-btn:hover { background-color: #4a607b; }
+
+/* --- Page Headers & File Dropzones --- */
+.page-header { text-align: center; margin-bottom: 2rem; }
+.page-header h1 { color: var(--text-primary); margin-bottom: 0.5rem; }
+.page-header p { color: var(--text-secondary); }
+.upload-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.file-dropzone { padding: 20px; background: var(--bg-secondary); border: 2px dashed var(--border-primary); border-radius: 12px; text-align: center; cursor: pointer; transition: 0.2s ease; }
+.file-dropzone:hover, .file-dropzone.dragover { background: #2c3e50; border-color: var(--accent-blue); transform: translateY(-3px); }
+.file-dropzone.file-uploaded { border-color: var(--accent-green); }
+.file-dropzone h3 { margin: 10px 0 5px 0; color: var(--text-primary); }
+.file-dropzone p, .filename { margin: 0; color: var(--text-secondary); font-size: 0.9rem; word-break: break-all; }
+
+
+/* ==========================================================================
+   3. Page: Editor
+   ========================================================================== */
+
+/* --- Editor Layout Grid --- */
+.editor-section { display: grid; grid-template-columns: 2fr 150px 2fr 1.5fr; gap: 15px; position: relative; align-items: start; }
+
+/* --- Tree Views & Mappings List Sizing --- */
+.tree-container, .mappings-list { overflow-y: auto; height: 65vh; border: 1px solid var(--border-primary); border-radius: 4px; padding: 10px; background-color: var(--bg-secondary); }
+
+/* --- Schema Tree Cards --- */
+.schema-card { min-width: 0; }
+.schema-card h3 { margin: 0 0 10px 0; }
+.search-wrapper { position: relative; display: flex; align-items: center; margin-bottom: 10px; }
+.tree-search {
+    width: 100%; box-sizing: border-box; padding: 8px 32px 8px 12px;
+    background: var(--bg-primary); border: 1px solid var(--border-primary);
+    border-radius: 6px; color: var(--text-primary); font-family: 'Courier New', monospace;
+}
+.clear-search-btn { position: absolute; right: 5px; background: transparent; border: none; color: var(--text-secondary); font-size: 1.4rem; cursor: pointer; padding: 0 8px; }
+.tree-container ul { margin: 0; padding-left: 20px; list-style: none; }
+.tree-container .tree-root { padding-left: 0; }
+
+/* --- Tree Node Styling --- */
+.tree-node { padding: 4px; border-radius: 4px; display: flex; align-items: center; gap: 6px; transition: background-color 0.2s; cursor: default; }
+.tree-node.source-node { cursor: grab; }
+.toggle-icon { font-size: 1.1rem; color: var(--text-secondary); user-select: none; cursor: pointer; transition: transform 0.2s ease; }
+.tree-node-item.collapsed .toggle-icon { transform: rotate(-90deg); }
+.node-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.custom-value-btn { margin-left: auto; background: transparent; border: none; color: var(--text-secondary); font-size: 1rem; cursor: pointer; }
+.collection-selector { margin-right: 4px; cursor: pointer; }
+.tree-node.is-mapped > .node-label { background-color: rgba(46, 204, 113, 0.3); padding: 2px 4px; border-radius: 3px; }
+.tree-node.is-collection-root { border: 1px solid var(--accent-blue); background-color: rgba(52, 152, 219, 0.15); }
+.tree-node.drag-over { background-color: rgba(230, 126, 34, 0.3); outline: 2px dashed var(--accent-orange); }
+
+/* --- SVG Mapping Lines --- */
+.mapping-svg-canvas { grid-column: 2 / 3; position: relative; height: 100%; pointer-events: none; z-index: 10; width: 150px; }
+.mapping-svg-canvas path { stroke: var(--accent-green); stroke-width: 2.5; fill: none; stroke-dasharray: 8 4; }
+
+/* --- Mappings List (Right Column) --- */
+.mappings-list-card { background-color: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; }
+.mappings-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0; }
+.mappings-list-header h3 { margin: 0; }
+.no-mappings-text { text-align: center; color: var(--text-secondary); margin-top: 20px; }
+.mapping-item { background-color: #2c3e50; padding: 8px 12px; border-radius: 4px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.mapping-item button { background: none; border: none; color: var(--accent-red); font-size: 20px; cursor: pointer; padding: 0 5px; }
+.mappings-actions button, .clear-all-btn { background-color: var(--accent-blue); color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 14px; transition: background-color 0.2s; }
+.mappings-actions button:hover { background-color: var(--accent-blue-hover); }
+.mappings-actions button:disabled { background-color: #566573; cursor: not-allowed; }
+.clear-all-btn { width: 100%; margin-top: 10px; background-color: var(--accent-red); }
+.clear-all-btn:hover { background-color: var(--accent-red-hover); }
+
+
+/* ==========================================================================
+   4. Page: Transformer
+   ========================================================================== */
+.transform-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+.xml-panel { background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; padding: 1.5rem; }
+.xml-panel h3 { color: var(--text-primary); margin-top: 0; margin-bottom: 1rem; }
+.xml-panel textarea { width: 100%; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 4px; padding: 1rem; font-family: 'Courier New', monospace; font-size: 13px; resize: vertical; }
+.output-actions { display: flex; gap: 1rem; margin-top: 1rem; }
+.transform-controls { display: flex; align-items: center; justify-content: center; gap: 2rem; padding: 2rem; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; }
+.checkbox-label { color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.transform-btn { padding: 1rem 3rem; font-size: 1.1rem; }

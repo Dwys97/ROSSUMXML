@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import TopNav from '../components/TopNav';
-import './LandingPage.css';
 
 // A custom hook to handle the fade-in-on-scroll animation
 const useAnimateOnScroll = () => {
