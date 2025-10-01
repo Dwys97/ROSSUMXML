@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-function MappingSVG({ mappings, nodeRefs, editorRef }) {
+function MappingSVG({ mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef }) {
     const [lines, setLines] = useState([]);
 
     useEffect(() => {
@@ -39,9 +39,14 @@ function MappingSVG({ mappings, nodeRefs, editorRef }) {
         // Use a timeout to ensure DOM has settled before drawing
         const timeoutId = setTimeout(updateLines, 50);
 
-        // Redraw on window resize
+        const sourceTree = sourceTreeRef.current;
+        const targetTree = targetTreeRef.current;
+
+        // Redraw on window resize and scroll
         window.addEventListener('resize', updateLines);
-        
+        sourceTree?.addEventListener('scroll', updateLines);
+        targetTree?.addEventListener('scroll', updateLines);
+
         // Use ResizeObserver to watch for layout changes within the editor
         const observer = new ResizeObserver(updateLines);
         if (editorRef.current) {
@@ -51,11 +56,13 @@ function MappingSVG({ mappings, nodeRefs, editorRef }) {
         return () => {
             clearTimeout(timeoutId);
             window.removeEventListener('resize', updateLines);
+            sourceTree?.removeEventListener('scroll', updateLines);
+            targetTree?.removeEventListener('scroll', updateLines);
             if (editorRef.current) {
                observer.unobserve(editorRef.current);
             }
         };
-    }, [mappings, nodeRefs, editorRef]);
+    }, [mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef]);
 
     return (
         <svg className="mapping-svg">

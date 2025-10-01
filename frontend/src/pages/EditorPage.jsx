@@ -51,6 +51,9 @@ function EditorPage() {
 
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
+    const sourceTreeRef = useRef(null);
+    const targetTreeRef = useRef(null);
+
 
     const registerNodeRef = useCallback((path, element) => {
         if (element) {
@@ -276,6 +279,7 @@ function EditorPage() {
 
             <div className={styles.editorSection} ref={editorSectionRef}>
                 <SchemaTree
+                    ref={sourceTreeRef}
                     title="Source Schema"
                     treeData={sourceTree}
                     isSource={true}
@@ -286,14 +290,17 @@ function EditorPage() {
                 />
 
                 <div className="mapping-svg-container">
-                <MappingSVG
-                    mappings={mappings}
-                    nodeRefs={nodeRefs}
-                    editorRef={editorSectionRef}
-                />
+                    <MappingSVG
+                        mappings={mappings}
+                        nodeRefs={nodeRefs}
+                        editorRef={editorSectionRef}
+                        sourceTreeRef={sourceTreeRef}
+                        targetTreeRef={targetTreeRef}
+                    />
                 </div>
 
                 <SchemaTree
+                    ref={targetTreeRef}
                     title="Target Schema"
                     treeData={targetTree}
                     isSource={false}
