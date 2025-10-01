@@ -54,7 +54,6 @@ function EditorPage() {
     const sourceTreeRef = useRef(null);
     const targetTreeRef = useRef(null);
 
-
     const registerNodeRef = useCallback((path, element) => {
         if (element) {
             nodeRefs.current.set(path, element);
@@ -290,13 +289,13 @@ function EditorPage() {
                 />
 
                 <div className="mapping-svg-container">
-                    <MappingSVG
-                        mappings={mappings}
-                        nodeRefs={nodeRefs}
-                        editorRef={editorSectionRef}
-                        sourceTreeRef={sourceTreeRef}
-                        targetTreeRef={targetTreeRef}
-                    />
+                <MappingSVG
+                    mappings={mappings}
+                    nodeRefs={nodeRefs}
+                    editorRef={editorSectionRef}
+                    sourceTreeRef={sourceTreeRef}
+                    targetTreeRef={targetTreeRef}
+                />
                 </div>
 
                 <SchemaTree

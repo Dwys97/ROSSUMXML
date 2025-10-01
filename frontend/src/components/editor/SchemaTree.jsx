@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import TreeNode from './TreeNode';
 
-function SchemaTree({ title, treeData, isSource, ...props }) {
+const SchemaTree = React.forwardRef(({ title, treeData, isSource, ...props }, ref) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const handleSearch = (e) => {
@@ -25,7 +25,7 @@ function SchemaTree({ title, treeData, isSource, ...props }) {
                 />
                  <button className="clear-search-btn" hidden={!searchTerm} onClick={handleClear}>×</button>
             </div>
-            <div className="tree-container">
+            <div className="tree-container" ref={ref}>
                 {treeData && (
                     <ul className="tree-root">
                         <TreeNode 
@@ -39,6 +39,6 @@ function SchemaTree({ title, treeData, isSource, ...props }) {
             </div>
         </div>
     );
-}
+});
 
 export default SchemaTree;

@@ -39,27 +39,37 @@ function MappingSVG({ mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRe
         // Use a timeout to ensure DOM has settled before drawing
         const timeoutId = setTimeout(updateLines, 50);
 
-        const sourceTree = sourceTreeRef.current;
-        const targetTree = targetTreeRef.current;
-
-        // Redraw on window resize and scroll
+        // Redraw on window resize
         window.addEventListener('resize', updateLines);
-        sourceTree?.addEventListener('scroll', updateLines);
-        targetTree?.addEventListener('scroll', updateLines);
-
+        
         // Use ResizeObserver to watch for layout changes within the editor
         const observer = new ResizeObserver(updateLines);
         if (editorRef.current) {
             observer.observe(editorRef.current);
         }
 
+        const sourceTree = sourceTreeRef.current;
+        const targetTree = targetTreeRef.current;
+
+        if (sourceTree) {
+            sourceTree.addEventListener('scroll', updateLines);
+        }
+        if (targetTree) {
+            targetTree.addEventListener('scroll', updateLines);
+        }
+
+
         return () => {
             clearTimeout(timeoutId);
             window.removeEventListener('resize', updateLines);
-            sourceTree?.removeEventListener('scroll', updateLines);
-            targetTree?.removeEventListener('scroll', updateLines);
             if (editorRef.current) {
                observer.unobserve(editorRef.current);
+            }
+            if (sourceTree) {
+                sourceTree.removeEventListener('scroll', updateLines);
+            }
+            if (targetTree) {
+                targetTree.removeEventListener('scroll', updateLines);
             }
         };
     }, [mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef]);
