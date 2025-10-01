@@ -1,42 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 
-function MappingSVG({ mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef }) {
+const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef }, ref) => {
     const [lines, setLines] = useState([]);
 
+    const updateLines = useCallback(() => {
+        if (!editorRef.current) return;
+
+        const svgRect = editorRef.current.getBoundingClientRect();
+        
+        const newLines = mappings
+            .map(m => {
+                if (m.type === 'custom_element' || !m.source) return null;
+                
+                const sEl = nodeRefs.current.get(m.source);
+                const tEl = nodeRefs.current.get(m.target);
+
+                if (!sEl || !tEl) return null;
+
+                const sRect = sEl.getBoundingClientRect();
+                const tRect = tEl.getBoundingClientRect();
+                
+                if (sRect.width === 0 || tRect.width === 0) return null;
+
+                const x1 = sRect.right - svgRect.left;
+                const y1 = sRect.top + sRect.height / 2 - svgRect.top;
+                const x2 = tRect.left - svgRect.left;
+                const y2 = tRect.top + tRect.height / 2 - svgRect.top;
+                
+                const d = `M${x1},${y1} C${x1 + 100},${y1} ${x2 - 100},${y2} ${x2},${y2}`;
+                return { id: `${m.source}-${m.target}`, d };
+            })
+            .filter(Boolean);
+        
+        setLines(newLines);
+    }, [mappings, nodeRefs, editorRef]);
+
+    useImperativeHandle(ref, () => ({
+        updateLines
+    }));
+
     useEffect(() => {
-        const updateLines = () => {
-            if (!editorRef.current) return;
-
-            const svgRect = editorRef.current.getBoundingClientRect();
-            
-            const newLines = mappings
-                .map(m => {
-                    if (m.type === 'custom_element' || !m.source) return null;
-                    
-                    const sEl = nodeRefs.current.get(m.source);
-                    const tEl = nodeRefs.current.get(m.target);
-
-                    if (!sEl || !tEl) return null;
-
-                    const sRect = sEl.getBoundingClientRect();
-                    const tRect = tEl.getBoundingClientRect();
-                    
-                    if (sRect.width === 0 || tRect.width === 0) return null;
-
-                    const x1 = sRect.right - svgRect.left;
-                    const y1 = sRect.top + sRect.height / 2 - svgRect.top;
-                    const x2 = tRect.left - svgRect.left;
-                    const y2 = tRect.top + tRect.height / 2 - svgRect.top;
-                    
-                    const d = `M${x1},${y1} C${x1 + 100},${y1} ${x2 - 100},${y2} ${x2},${y2}`;
-                    return { id: `${m.source}-${m.target}`, d };
-                })
-                .filter(Boolean);
-            
-            setLines(newLines);
-        };
-
-        // Use a timeout to ensure DOM has settled before drawing
+        // A short timeout to ensure the DOM has settled before the initial drawing
         const timeoutId = setTimeout(updateLines, 50);
 
         // Redraw on window resize
@@ -58,7 +62,6 @@ function MappingSVG({ mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRe
             targetTree.addEventListener('scroll', updateLines);
         }
 
-
         return () => {
             clearTimeout(timeoutId);
             window.removeEventListener('resize', updateLines);
@@ -72,7 +75,7 @@ function MappingSVG({ mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRe
                 targetTree.removeEventListener('scroll', updateLines);
             }
         };
-    }, [mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef]);
+    }, [mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef, updateLines]);
 
     return (
         <svg className="mapping-svg">
@@ -88,6 +91,6 @@ function MappingSVG({ mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRe
             ))}
         </svg>
     );
-}
+});
 
 export default MappingSVG;

@@ -566,6 +566,21 @@ a.secondary-btn {
     color: #1d72f3;
 }
 
+.blinking-dot {
+    height: 8px;
+    width: 8px;
+    background-color: #2ecc71;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 8px;
+    animation: blink-animation 1.5s infinite;
+}
+
+@keyframes blink-animation {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+}
+
 /* ==========================================================================
    Footer
    ========================================================================== */

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import FileDropzone from '../components/common/FileDropzone';
 import SchemaTree from '../components/editor/SchemaTree';
@@ -48,11 +48,25 @@ function EditorPage() {
     const [history, setHistory] = useState([]);
     const [selectedSourceCollection, setSelectedSourceCollection] = useState(null);
     const [selectedTargetCollection, setSelectedTargetCollection] = useState(null);
+    const [isMappingFileLoaded, setIsMappingFileLoaded] = useState(false);
+
 
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
     const sourceTreeRef = useRef(null);
     const targetTreeRef = useRef(null);
+    const mappingSVGRef = useRef(null);
+
+    useEffect(() => {
+        if (isMappingFileLoaded && mappingSVGRef.current) {
+            const timer = setTimeout(() => {
+                mappingSVGRef.current.updateLines();
+                setIsMappingFileLoaded(false); // Reset the flag
+            }, 100);
+
+            return () => clearTimeout(timer);
+        }
+    }, [isMappingFileLoaded]);
 
     const registerNodeRef = useCallback((path, element) => {
         if (element) {
@@ -133,6 +147,7 @@ function EditorPage() {
                 }).filter(m => m.target); // Ensure mappings have a target
             });
             setMappings([...staticMappings, ...collectionMappings]);
+            setIsMappingFileLoaded(true);
         } catch (error) {
             console.error('Invalid mapping JSON:', error);
             alert('Failed to parse mapping file.');
@@ -290,6 +305,7 @@ function EditorPage() {
 
                 <div className="mapping-svg-container">
                 <MappingSVG
+                    ref={mappingSVGRef}
                     mappings={mappings}
                     nodeRefs={nodeRefs}
                     editorRef={editorSectionRef}
