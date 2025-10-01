@@ -1,5 +1,3 @@
-// frontend/src/pages/EditorPage.jsx
-
 import React, { useState, useRef, useCallback } from 'react';
 import FileDropzone from '../components/common/FileDropzone';
 import SchemaTree from '../components/editor/SchemaTree';
@@ -7,7 +5,6 @@ import MappingSVG from '../components/editor/MappingSVG';
 import MappingsList from '../components/editor/MappingsList';
 
 function EditorPage() {
-    // State for trees, mappings, and collections
     const [sourceTree, setSourceTree] = useState(null);
     const [targetTree, setTargetTree] = useState(null);
     const [mappings, setMappings] = useState([]);
@@ -15,7 +12,6 @@ function EditorPage() {
     const [selectedSourceCollection, setSelectedSourceCollection] = useState(null);
     const [selectedTargetCollection, setSelectedTargetCollection] = useState(null);
 
-    // Refs for DOM elements to calculate SVG line positions
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
 
@@ -27,9 +23,8 @@ function EditorPage() {
         }
     }, []);
 
-    // --- State Management ---
     const updateMappings = (newMappings) => {
-        setHistory([...history, mappings]);
+        setHistory(prev => [...prev, mappings]);
         setMappings(newMappings);
     };
 
@@ -40,8 +35,6 @@ function EditorPage() {
         setHistory(history.slice(0, -1));
     };
 
-
-    // --- File Handlers ---
     const handleFile = async (content, setTree) => {
         try {
             const response = await fetch('/api/schema/parse', {
@@ -100,7 +93,6 @@ function EditorPage() {
         }
     };
 
-    // --- Interaction Handlers ---
     const handleDrop = (sourcePath, targetPath) => {
         const newMapping = { source: sourcePath, target: targetPath, type: 'element' };
         const existingIndex = mappings.findIndex(m => m.target === targetPath);
@@ -140,9 +132,44 @@ function EditorPage() {
         }
     };
 
-    // --- Save Logic ---
     const handleSaveMappings = () => {
-        // ... (this logic remains the same)
+        const staticMappings = [];
+        const collectionMap = { mappings: [] };
+
+        if (selectedSourceCollection && selectedTargetCollection) {
+            collectionMap.sourceCollectionPath = selectedSourceCollection.parentPath;
+            collectionMap.targetCollectionPath = selectedTargetCollection.parentPath;
+            collectionMap.sourceItemElementName = selectedSourceCollection.name;
+            collectionMap.targetItemElementName = selectedTargetCollection.name;
+        }
+
+        mappings.forEach(m => {
+            const isSourceInCollection = m.source?.startsWith(selectedSourceCollection?.path);
+            const isTargetInCollection = m.target.startsWith(selectedTargetCollection?.path);
+
+            if (selectedSourceCollection && selectedTargetCollection && isSourceInCollection && isTargetInCollection) {
+                collectionMap.mappings.push({
+                    source: m.source.substring(selectedSourceCollection.path.length + 3),
+                    target: m.target.substring(selectedTargetCollection.path.length + 3),
+                    type: m.type
+                });
+            } else {
+                staticMappings.push(m);
+            }
+        });
+        
+        const dataToSave = {
+            rootElement: targetTree ? targetTree.pathName : "root",
+            staticMappings,
+            collectionMappings: collectionMap.mappings.length > 0 ? [collectionMap] : [],
+        };
+
+        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'mappings.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
     };
 
     const mappedSourcePaths = new Set(mappings.filter(m => m.source).map(m => m.source));
@@ -150,27 +177,28 @@ function EditorPage() {
 
     return (
         <div className="app-container">
-            <header className="app-header">
+            <header className="page-header">
                 <h1>Schema Mapping Editor</h1>
             </header>
 
             <div className="upload-section">
                 <FileDropzone title="Source XML" icon="📄" onFileSelect={(c) => handleFile(c, setSourceTree)} />
-                <FileDropzone title="Target XML" icon="📋" onFileSelect={(c) => handleFile(c, setTargetTree)} />
+                <FileDropzone title="Target Template" icon="📋" onFileSelect={(c) => handleFile(c, setTargetTree)} />
                 <FileDropzone title="Mapping JSON" icon="⚙️" onFileSelect={handleMappingFile} />
             </div>
 
-            {/* --- LAYOUT FIX: MappingsList is now inside editor-section --- */}
-            <div className={styles.editorSection} ref={editorSectionRef}>
-                <SchemaTree
-                    title="Source Schema"
-                    treeData={sourceTree}
-                    isSource={true}
-                    mappedPaths={mappedSourcePaths}
-                    selectedCollection={selectedSourceCollection}
-                    onCollectionSelect={handleCollectionSelect}
-                    registerNodeRef={registerNodeRef}
-                />
+            <div className="editor-section" ref={editorSectionRef}>
+                <div className="schema-card">
+                    <SchemaTree
+                        title="Source Schema"
+                        treeData={sourceTree}
+                        isSource={true}
+                        mappedPaths={mappedSourcePaths}
+                        selectedCollection={selectedSourceCollection}
+                        onCollectionSelect={handleCollectionSelect}
+                        registerNodeRef={registerNodeRef}
+                    />
+                </div>
 
                 <MappingSVG
                     mappings={mappings}
@@ -178,25 +206,29 @@ function EditorPage() {
                     editorRef={editorSectionRef}
                 />
 
-                <SchemaTree
-                    title="Target Schema"
-                    treeData={targetTree}
-                    isSource={false}
-                    mappedPaths={mappedTargetPaths}
-                    selectedCollection={selectedTargetCollection}
-                    onDrop={handleDrop}
-                    onCustomValue={handleCustomValue}
-                    onCollectionSelect={handleCollectionSelect}
-                    registerNodeRef={registerNodeRef}
-                />
-
-                <MappingsList
-                    mappings={mappings}
-                    onUpdateMappings={updateMappings}
-                    onSave={handleSaveMappings}
-                    onUndo={handleUndo}
-                    canUndo={history.length > 0}
-                />
+                <div className="schema-card">
+                    <SchemaTree
+                        title="Target Schema"
+                        treeData={targetTree}
+                        isSource={false}
+                        mappedPaths={mappedTargetPaths}
+                        selectedCollection={selectedTargetCollection}
+                        onDrop={handleDrop}
+                        onCustomValue={handleCustomValue}
+                        onCollectionSelect={handleCollectionSelect}
+                        registerNodeRef={registerNodeRef}
+                    />
+                </div>
+                
+                <div className="mappings-list-card">
+                    <MappingsList
+                        mappings={mappings}
+                        onUpdateMappings={updateMappings}
+                        onSave={handleSaveMappings}
+                        onUndo={handleUndo}
+                        canUndo={history.length > 0}
+                    />
+                </div>
             </div>
         </div>
     );
