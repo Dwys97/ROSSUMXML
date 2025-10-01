@@ -285,11 +285,13 @@ function EditorPage() {
                     registerNodeRef={registerNodeRef}
                 />
 
+                <div className="mapping-svg-container">
                 <MappingSVG
                     mappings={mappings}
                     nodeRefs={nodeRefs}
                     editorRef={editorSectionRef}
                 />
+                </div>
 
                 <SchemaTree
                     title="Target Schema"
