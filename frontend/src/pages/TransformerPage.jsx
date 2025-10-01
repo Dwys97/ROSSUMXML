@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import FileDropzone from '../components/common/FileDropzone';
+import './TransformerPage.css';
 
 function TransformerPage() {
     const [sourceXml, setSourceXml] = useState('');
