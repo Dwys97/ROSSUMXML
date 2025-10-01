@@ -1,7 +1,7 @@
 import React from 'react';
 
 function MappingsList({ mappings, onUpdateMappings, onSave, onUndo, canUndo }) {
-    
+
     const handleRemove = (index) => {
         const newMappings = [...mappings];
         newMappings.splice(index, 1);
@@ -14,47 +14,43 @@ function MappingsList({ mappings, onUpdateMappings, onSave, onUndo, canUndo }) {
         }
     };
 
-    return (
-        <div className="mappings-list-card">
-            <div className="mappings-list-header">
-                <h3>Current Mappings ({mappings.length})</h3>
-                <div className="mappings-actions">
-                     <button onClick={onUndo} disabled={!canUndo} title="Undo last action">Undo</button>
-                     <button onClick={onSave} disabled={mappings.length === 0}>Save Mappings</button>
-                </div>
-            </div>
+    const getDisplayName = (path) => path.split(' > ').pop().replace(/\[.*?\]/g, '');
 
+    return (
+        <div className="schema-card mappings-card">
+            <h3>Mappings</h3>
+            <div className="annotation">
+                <strong>How to Map Repeating Items:</strong>
+                <ol>
+                    <li>In the source tree, find the first repeating item element and tick its ☐ box.</li>
+                    <li>In the target tree, find the corresponding first repeating item and tick its ☐ box.</li>
+                    <li>Map the child elements between them as normal.</li>
+                </ol>
+            </div>
             <div className="mappings-list">
                 {mappings.length === 0 ? (
-                    <p className="no-mappings-text">No mappings created yet. Drag from a source node to a target node.</p>
+                    <p style={{ textAlign: 'center', color: '#a5a5a5' }}>No mappings created yet.</p>
                 ) : (
-                    mappings.map((mapping, i) => {
-                        const targetName = mapping.target.split(' > ').pop().replace(/\[.*?\]/g, '');
-                        let sourceText;
-                        if (mapping.type === 'custom_element') {
-                            sourceText = `"${mapping.value}"`;
-                        } else if (mapping.source) {
-                            sourceText = mapping.source.split(' > ').pop().replace(/\[.*?\]/g, '');
-                        } else {
-							sourceText = 'N/A'
-						}
-
-                        return (
-                            <div className="mapping-item" key={i}>
-                                <span>{sourceText} → {targetName}</span>
-                                <button onClick={() => handleRemove(i)} title="Remove mapping">×</button>
-                            </div>
-                        );
-                    })
+                    mappings.map((mapping, i) => (
+                        <div key={i} className="mapping-item">
+                            <span>
+                                {mapping.type === 'custom_element'
+                                    ? `"${mapping.value}" → ${getDisplayName(mapping.target)}`
+                                    : `${getDisplayName(mapping.source)} → ${getDisplayName(mapping.target)}`
+                                }
+                            </span>
+                            <button onClick={() => handleRemove(i)}>×</button>
+                        </div>
+                    ))
                 )}
             </div>
-             {mappings.length > 0 && (
-                <div className="mappings-footer">
-                    <button className="clear-all-btn" onClick={handleClearAll}>
-                        Clear All Mappings
-                    </button>
-                </div>
-            )}
+            
+            <button onClick={handleClearAll} className="secondary-btn" style={{ background: '#e74c3c', marginBottom: '10px' }}>Clear All Mappings</button>
+
+            <div className="mapping-buttons">
+                <button id="undoBtn" className="secondary-btn" onClick={onUndo} disabled={!canUndo}>↩ Undo Last Action</button>
+                <button id="saveMappingsBtn" className="primary-btn" onClick={onSave}>⬇ Download Mappings</button>
+            </div>
         </div>
     );
 }

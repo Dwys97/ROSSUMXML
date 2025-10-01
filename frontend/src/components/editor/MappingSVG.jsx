@@ -1,63 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 function MappingSVG({ mappings, nodeRefs, editorRef }) {
     const [lines, setLines] = useState([]);
 
     useEffect(() => {
-        const drawLines = () => {
+        const updateLines = () => {
             if (!editorRef.current) return;
-            const editorRect = editorRef.current.getBoundingClientRect();
+
+            const svgRect = editorRef.current.getBoundingClientRect();
             
             const newLines = mappings
-                .filter(m => m.source && m.target) // Only draw lines for element-to-element mappings
-                .map((m, index) => {
-                    const sourceEl = nodeRefs.current.get(m.source);
-                    const targetEl = nodeRefs.current.get(m.target);
-
-                    if (!sourceEl || !targetEl) return null;
+                .map(m => {
+                    if (m.type === 'custom_element' || !m.source) return null;
                     
-                    const sourceRect = sourceEl.getBoundingClientRect();
-                    const targetRect = targetEl.getBoundingClientRect();
+                    const sEl = nodeRefs.current.get(m.source);
+                    const tEl = nodeRefs.current.get(m.target);
 
-                    // Check if elements are visible
-                    if (sourceRect.width === 0 || targetRect.width === 0) return null;
+                    if (!sEl || !tEl) return null;
+
+                    const sRect = sEl.getBoundingClientRect();
+                    const tRect = tEl.getBoundingClientRect();
                     
-                    const x1 = sourceRect.right - editorRect.left;
-                    const y1 = sourceRect.top + sourceRect.height / 2 - editorRect.top;
-                    const x2 = targetRect.left - editorRect.left;
-                    const y2 = targetRect.top + targetRect.height / 2 - editorRect.top;
+                    if (sRect.width === 0 || tRect.width === 0) return null;
 
-                    // Create a curved path
-                    const pathData = `M${x1},${y1} C${x1 + 100},${y1} ${x2 - 100},${y2} ${x2},${y2}`;
-
-                    return <path key={`${m.source}-${m.target}`} d={pathData} />;
+                    const x1 = sRect.right - svgRect.left;
+                    const y1 = sRect.top + sRect.height / 2 - svgRect.top;
+                    const x2 = tRect.left - svgRect.left;
+                    const y2 = tRect.top + tRect.height / 2 - svgRect.top;
+                    
+                    const d = `M${x1},${y1} C${x1 + 100},${y1} ${x2 - 100},${y2} ${x2},${y2}`;
+                    return { id: `${m.source}-${m.target}`, d };
                 })
-                .filter(Boolean); // remove nulls
-
+                .filter(Boolean);
+            
             setLines(newLines);
         };
+
+        // Use a timeout to ensure DOM has settled before drawing
+        const timeoutId = setTimeout(updateLines, 50);
+
+        // Redraw on window resize
+        window.addEventListener('resize', updateLines);
         
-        // Redraw on mappings change or resize
-        drawLines();
-        
-        const sourceTreeEl = editorRef.current?.children[0]?.querySelector('.tree-container');
-        const targetTreeEl = editorRef.current?.children[2]?.querySelector('.tree-container');
-        
-        window.addEventListener('resize', drawLines);
-        sourceTreeEl?.addEventListener('scroll', drawLines);
-        targetTreeEl?.addEventListener('scroll', drawLines);
+        // Use ResizeObserver to watch for layout changes within the editor
+        const observer = new ResizeObserver(updateLines);
+        if (editorRef.current) {
+            observer.observe(editorRef.current);
+        }
 
         return () => {
-            window.removeEventListener('resize', drawLines);
-            sourceTreeEl?.removeEventListener('scroll', drawLines);
-            targetTreeEl?.removeEventListener('scroll', drawLines);
+            clearTimeout(timeoutId);
+            window.removeEventListener('resize', updateLines);
+            if (editorRef.current) {
+               observer.unobserve(editorRef.current);
+            }
         };
     }, [mappings, nodeRefs, editorRef]);
 
-
     return (
-        <svg className="mapping-svg-canvas">
-            {lines}
+        <svg className="mapping-svg">
+            {lines.map(line => (
+                <path
+                    key={line.id}
+                    d={line.d}
+                    stroke="#2ecc71"
+                    strokeWidth="2.5"
+                    fill="none"
+                    strokeDasharray="8 4"
+                />
+            ))}
         </svg>
     );
 }

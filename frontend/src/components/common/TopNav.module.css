@@ -1,0 +1,38 @@
+.nav {
+    background-color: #0d1b2a;
+    border-bottom: 1px solid #3a506b;
+}
+
+.navContainer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.logo {
+    height: 30px;
+    width: auto;
+}
+
+.navLinks {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.navLink {
+    color: #e0e1dd;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.navLink:hover {
+    color: #1d72f3;
+}
+
+.navCta {
+    padding: 6px 14px !important;
+}

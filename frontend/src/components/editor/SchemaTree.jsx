@@ -1,104 +1,40 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import TreeNode from './TreeNode';
 
-function SchemaTree({
-    title,
-    treeData,
-    isSource,
-    mappedPaths = new Set(),
-    selectedCollection,
-    onDrop,
-    onCustomValue,
-    onCollectionSelect,
-    registerNodeRef,
-}) {
-    const [searchQuery, setSearchQuery] = useState('');
+function SchemaTree({ title, treeData, isSource, ...props }) {
+    const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredTree = useMemo(() => {
-        if (!searchQuery || !treeData) return treeData;
-        
-        const matchesSearch = (node) => {
-            const query = searchQuery.toLowerCase();
-            let searchText = '';
-            const nodeName = node.name || '';
-            
-            if (isSource) {
-                const match = nodeName.match(/\[schema_id=(.+?)\]/);
-                searchText = match ? match[1].toLowerCase() : '';
-            } else {
-                searchText = nodeName
-                    .replace(/<[^>]*>/g, '')
-                    .replace(/\[schema_id=.+?\]/g, '')
-                    .toLowerCase();
-            }
-            return searchText.includes(query);
-        };
-
-        const filterNode = (node) => {
-            if (!node) return null;
-            const matches = matchesSearch(node);
-            const filteredChildren = (node.children || [])
-                .map(filterNode)
-                .filter(Boolean);
-
-            if (matches || filteredChildren.length > 0) {
-                return { ...node, children: filteredChildren };
-            }
-            return null;
-        };
-
-        return filterNode(treeData);
-    }, [treeData, searchQuery, isSource]);
-
-
-    if (!treeData) {
-        return (
-            <div className="schema-card">
-                <h3>{title}</h3>
-                <p style={{ textAlign: 'center', color: '#a5a5a5', padding: '20px' }}>
-                    No schema loaded
-                </p>
-            </div>
-        );
-    }
+    const handleSearch = (e) => {
+        setSearchTerm(e.target.value);
+    };
+    
+    const handleClear = () => {
+        setSearchTerm('');
+    };
 
     return (
         <div className="schema-card">
             <h3>{title}</h3>
-            
             <div className="search-wrapper">
                 <input
                     type="search"
                     className="tree-search"
                     placeholder="Search nodes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={searchTerm}
+                    onChange={handleSearch}
                 />
-                {searchQuery && (
-                    <button className="clear-search-btn" onClick={() => setSearchQuery('')}>
-                        ×
-                    </button>
-                )}
+                 <button className="clear-search-btn" hidden={!searchTerm} onClick={handleClear}>×</button>
             </div>
-
             <div className="tree-container">
-                {filteredTree ? (
+                {treeData && (
                     <ul className="tree-root">
-                        <TreeNode
-                            node={filteredTree}
-                            isSource={isSource}
-                            mappedPaths={mappedPaths}
-                            selectedCollection={selectedCollection}
-                            onDrop={onDrop}
-                            onCustomValue={onCustomValue}
-                            onCollectionSelect={onCollectionSelect}
-                            registerNodeRef={registerNodeRef}
+                        <TreeNode 
+                            node={treeData} 
+                            isSource={isSource} 
+                            searchTerm={searchTerm} 
+                            {...props} 
                         />
                     </ul>
-                ) : (
-                    <p style={{ textAlign: 'center', color: '#a5a5a5', padding: '20px' }}>
-                        No results found for "{searchQuery}"
-                    </p>
                 )}
             </div>
         </div>

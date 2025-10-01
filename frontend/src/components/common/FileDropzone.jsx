@@ -1,84 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 
-/**
- * A reusable file upload component with drag-and-drop support
- * 
- * Props:
- * - title: What to display as the heading (e.g., "Source XML")
- * - icon: An emoji or icon to show
- * - onFileSelect: Function to call when a file is selected
- * - acceptedTypes: What file types to accept (e.g., ".xml, .json")
- */
-function FileDropzone({ title, icon, onFileSelect, acceptedTypes = ".xml,.json" }) {
-    const [isDragging, setIsDragging] = useState(false);
-    const [fileName, setFileName] = useState(null);
+function FileDropzone({ onFileSelect, children, multiple = false }) {
+    const [isDragOver, setIsDragOver] = useState(false);
+    const [fileName, setFileName] = useState('');
+    const inputRef = useRef(null);
 
-    // Handle drag events
-    const handleDragOver = (e) => {
-        e.preventDefault(); // Required to allow dropping
-        setIsDragging(true);
+    const processFiles = (files) => {
+        if (!files || files.length === 0) return;
+
+        const filePromises = Array.from(files).map(file => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve({ name: file.name, content: e.target.result });
+                reader.onerror = (e) => reject(e);
+                reader.readAsText(file);
+            });
+        });
+
+        Promise.all(filePromises).then(fileData => {
+            onFileSelect(fileData);
+            setFileName(fileData.map(f => f.name).join(', '));
+        });
     };
 
-    const handleDragLeave = () => {
-        setIsDragging(false);
-    };
-
-    const handleDrop = (e) => {
+    const handleDragOver = useCallback((e) => {
         e.preventDefault();
-        setIsDragging(false);
-        
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            handleFile(file);
-        }
+        e.stopPropagation();
+        setIsDragOver(true);
+    }, []);
+
+    const handleDragLeave = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+    }, []);
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+        processFiles(e.dataTransfer.files);
+    }, [onFileSelect]);
+
+    const handleChange = (e) => {
+        processFiles(e.target.files);
     };
 
-    // Handle file selection (from click or drag)
-    const handleFile = (file) => {
-        setFileName(file.name);
-        
-        // Read the file as text
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const content = e.target.result;
-            // Call the parent component's function with the file content
-            onFileSelect(content, file);
-        };
-        reader.readAsText(file);
+    const handleClick = () => {
+        inputRef.current.click();
     };
 
-    const handleFileInput = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            handleFile(file);
-        }
-    };
+    const classNames = `upload-card ${isDragOver ? 'dragover' : ''} ${fileName ? 'file-uploaded' : ''}`;
 
     return (
-        <div 
-            className={`upload-card ${isDragging ? 'dragover' : ''} ${fileName ? 'file-uploaded' : ''}`}
+        <div
+            className={classNames}
+            onClick={handleClick}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => document.getElementById(`file-input-${title}`).click()}
-            style={{ cursor: 'pointer' }}
+            tabIndex="0"
         >
-            <div className="icon">{icon}</div>
-            <h3>{title}</h3>
-            
-            {fileName ? (
-                <div className="drop-filename">✓ {fileName}</div>
-            ) : (
-                <p>Click or drag file here</p>
-            )}
-            
-            <input 
-                id={`file-input-${title}`}
-                type="file" 
-                accept={acceptedTypes}
-                onChange={handleFileInput}
+            <input
+                type="file"
+                ref={inputRef}
+                onChange={handleChange}
                 style={{ display: 'none' }}
+                multiple={multiple}
             />
+            {fileName ? <div className="file-name-display">✔ {fileName}</div> : children}
         </div>
     );
 }

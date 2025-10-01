@@ -1,0 +1,8 @@
+.editorSection {
+    position: relative;
+    display: grid;
+    /* Updated grid to give a fixed width to the SVG column */
+    grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr) 350px;
+    gap: 20px;
+    align-items: start;
+}
