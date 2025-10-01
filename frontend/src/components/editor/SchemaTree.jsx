@@ -1,5 +1,3 @@
-// frontend/src/components/editor/SchemaTree.jsx
-
 import React, { useState, useMemo } from 'react';
 import TreeNode from './TreeNode';
 
@@ -16,19 +14,20 @@ function SchemaTree({
 }) {
     const [searchQuery, setSearchQuery] = useState('');
 
-    // The filtering logic remains the same
     const filteredTree = useMemo(() => {
         if (!searchQuery || !treeData) return treeData;
         
         const matchesSearch = (node) => {
             const query = searchQuery.toLowerCase();
             let searchText = '';
+            const nodeName = node.name || '';
+            
             if (isSource) {
-                const match = node.name.match(/\[schema_id=(.+?)\]/);
+                const match = nodeName.match(/\[schema_id=(.+?)\]/);
                 searchText = match ? match[1].toLowerCase() : '';
             } else {
-                searchText = node.name
-                    .replace(/<[^>]*>/g, '') // strip html tags
+                searchText = nodeName
+                    .replace(/<[^>]*>/g, '')
                     .replace(/\[schema_id=.+?\]/g, '')
                     .toLowerCase();
             }
@@ -36,10 +35,11 @@ function SchemaTree({
         };
 
         const filterNode = (node) => {
+            if (!node) return null;
             const matches = matchesSearch(node);
-            const filteredChildren = node.children
-                ? node.children.map(filterNode).filter(Boolean)
-                : [];
+            const filteredChildren = (node.children || [])
+                .map(filterNode)
+                .filter(Boolean);
 
             if (matches || filteredChildren.length > 0) {
                 return { ...node, children: filteredChildren };

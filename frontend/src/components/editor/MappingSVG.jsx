@@ -1,5 +1,3 @@
-// frontend/src/components/editor/MappingSVG.jsx
-
 import React, { useState, useEffect } from 'react';
 
 function MappingSVG({ mappings, nodeRefs, editorRef }) {
@@ -32,7 +30,7 @@ function MappingSVG({ mappings, nodeRefs, editorRef }) {
                     // Create a curved path
                     const pathData = `M${x1},${y1} C${x1 + 100},${y1} ${x2 - 100},${y2} ${x2},${y2}`;
 
-                    return <path key={index} d={pathData} />;
+                    return <path key={`${m.source}-${m.target}`} d={pathData} />;
                 })
                 .filter(Boolean); // remove nulls
 
@@ -42,9 +40,8 @@ function MappingSVG({ mappings, nodeRefs, editorRef }) {
         // Redraw on mappings change or resize
         drawLines();
         
-        // Also redraw on scroll
-        const sourceTreeEl = editorRef.current.children[0]?.querySelector('.tree-container');
-        const targetTreeEl = editorRef.current.children[2]?.querySelector('.tree-container');
+        const sourceTreeEl = editorRef.current?.children[0]?.querySelector('.tree-container');
+        const targetTreeEl = editorRef.current?.children[2]?.querySelector('.tree-container');
         
         window.addEventListener('resize', drawLines);
         sourceTreeEl?.addEventListener('scroll', drawLines);

@@ -1,5 +1,3 @@
-// frontend/src/components/editor/TreeNode.jsx
-
 import React, { useState, useRef, useEffect } from 'react';
 
 function TreeNode({
@@ -12,14 +10,14 @@ function TreeNode({
     onCollectionSelect,
     registerNodeRef,
 }) {
-    // --- FIX: Add a guard to prevent rendering if the node is missing ---
     if (!node) {
         return null;
     }
-
+    
     const [isCollapsed, setIsCollapsed] = useState(false);
     const nodeRef = useRef(null);
 
+    // Register the ref with the parent for SVG drawing
     useEffect(() => {
         if (registerNodeRef) {
             registerNodeRef(node.path, nodeRef.current);
@@ -57,7 +55,8 @@ function TreeNode({
             onDrop(sourcePath, node.path);
         }
     };
-
+    
+    // *** FIX: isMapped is now calculated inside each TreeNode ***
     const isMapped = mappedPaths.has(node.path);
     const isCollectionRoot = node.path.endsWith('[0]') && node.children.length > 0;
     const isSelectedCollection = selectedCollection?.path === node.path;
@@ -85,7 +84,7 @@ function TreeNode({
                         type="checkbox"
                         className="collection-selector"
                         checked={isSelectedCollection}
-                        onChange={(e) => onCollectionSelect(node, e.target.checked)}
+                        onChange={(e) => onCollectionSelect(node, e.target.checked, isSource)}
                      />
                 )}
 

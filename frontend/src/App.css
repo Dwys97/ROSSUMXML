@@ -774,6 +774,95 @@ a.secondary-btn {
     padding-left: 0;
 }
 
+/*
+=================================
+Add these styles to frontend/src/App.css
+=================================
+*/
+
+/* --- Editor Layout --- */
+.editor-section {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    position: relative; /* Crucial for SVG overlay */
+}
+
+.schema-card {
+    flex: 1;
+    min-width: 0; /* Prevents flex items from overflowing */
+    display: flex;
+    flex-direction: column;
+}
+
+.tree-container {
+    overflow-y: auto; /* Make trees scrollable */
+    height: 60vh;
+    border: 1px solid #3a506b;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #1e2a3a;
+}
+
+/* --- SVG Mapping Lines --- */
+.mapping-svg-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Allows clicking through the SVG */
+    z-index: 10;
+}
+
+.mapping-svg-canvas path {
+    stroke: #2ecc71; /* Green line color */
+    stroke-width: 2.5;
+    fill: none;
+    stroke-dasharray: 8 4; /* Dashed line effect */
+    transition: stroke 0.2s ease;
+}
+
+/* --- Mapped Node Indicator --- */
+.tree-node.is-mapped > .node-label {
+    background-color: rgba(46, 204, 113, 0.3); /* Green highlight */
+    color: #f1f1f1;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+/* --- Other useful styles from your old editor --- */
+
+/* Highlight for selected collection roots */
+.tree-node.is-collection-root {
+    border: 1px solid #3498db;
+    background-color: rgba(52, 152, 219, 0.15);
+}
+
+/* Visual feedback when dragging over a target node */
+.tree-node.drag-over {
+    background-color: rgba(230, 126, 34, 0.3);
+    outline: 2px dashed #e67e22;
+}
+
+.tree-node {
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.2s ease-in-out;
+    cursor: default;
+}
+
+.tree-node.source-node {
+    cursor: grab;
+}
+
+.collection-selector {
+    margin-right: 4px;
+}
+
 /* Base state for nested lists, used for animation */
 .tree-container ul ul {
     overflow: hidden;

@@ -1,4 +1,4 @@
-// backend transformFunction index.js
+// backend/index.js
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 const { parseXmlToTree } = require('./services/xmlParser.service');
 
@@ -135,14 +135,14 @@ function transformSingleFile(sourceXmlString, destinationXml, mappingJson, remov
 // Lambda Handlers
 // ------------------
 
-const createResponse = (statusCode, body, contentType='application/xml') => ({
+const createResponse = (statusCode, body, contentType = 'application/xml') => ({
     statusCode,
     body,
     headers: {
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
-            }
+        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
+    }
 });
 
 exports.handler = async (event) => {
@@ -163,10 +163,8 @@ exports.handler = async (event) => {
 
         if (path.endsWith('/api/transform') || path.endsWith('/prod/api/transform')) {
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
-            if (!sourceXml || !destinationXml || !mappingJson) {
-                // Made error message consistent JSON
-                return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
-            }
+            if (!sourceXml || !destinationXml || !mappingJson)
+                return createResponse(400, 'Missing required fields', 'application/json');
             const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
             return createResponse(200, transformed, 'application/xml');
         }
@@ -191,13 +189,16 @@ exports.handler = async (event) => {
             if (!xmlString) {
                 return createResponse(400, JSON.stringify({ error: 'Missing xmlString' }), 'application/json');
             }
+            // *** FIX STARTS HERE ***
+            // The try/catch for parseXmlToTree must be inside this 'if' block.
             try {
                 const tree = parseXmlToTree(xmlString);
                 return createResponse(200, JSON.stringify({ tree }), 'application/json');
             } catch (err) {
                 return createResponse(400, JSON.stringify({ error: err.message }), 'application/json');
             }
-        } // <-- CORRECTED: Added the missing closing brace here
+        }
+        // *** FIX ENDS HERE ***
 
         return createResponse(404, JSON.stringify({ error: 'Endpoint not found' }), 'application/json');
 

@@ -1,5 +1,3 @@
-// frontend/src/components/editor/MappingsList.jsx
-
 import React from 'react';
 
 function MappingsList({ mappings, onUpdateMappings, onSave, onUndo, canUndo }) {
@@ -35,9 +33,11 @@ function MappingsList({ mappings, onUpdateMappings, onSave, onUndo, canUndo }) {
                         let sourceText;
                         if (mapping.type === 'custom_element') {
                             sourceText = `"${mapping.value}"`;
-                        } else {
+                        } else if (mapping.source) {
                             sourceText = mapping.source.split(' > ').pop().replace(/\[.*?\]/g, '');
-                        }
+                        } else {
+							sourceText = 'N/A'
+						}
 
                         return (
                             <div className="mapping-item" key={i}>
