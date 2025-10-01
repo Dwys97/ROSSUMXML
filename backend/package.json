@@ -4,6 +4,6 @@
   "description": "Lambda function for XML transformation.",
   "main": "transformFunction/index.js",
   "dependencies": {
-    "@xmldom/xmldom": "^0.8.10"
+    "@xmldom/xmldom": "^0.8.11"
   }
 }

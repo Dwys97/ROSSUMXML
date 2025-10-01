@@ -1,94 +1,194 @@
-import React, { useState } from 'react';
+// frontend/src/pages/EditorPage.jsx
+
+import React, { useState, useRef, useCallback } from 'react';
 import FileDropzone from '../components/common/FileDropzone';
 import SchemaTree from '../components/editor/SchemaTree';
+import MappingSVG from '../components/editor/MappingSVG'; // New component
+import MappingsList from '../components/editor/MappingsList'; // New component
 
 function EditorPage() {
+    // State for trees, mappings, and collections
     const [sourceTree, setSourceTree] = useState(null);
     const [targetTree, setTargetTree] = useState(null);
     const [mappings, setMappings] = useState([]);
+    const [history, setHistory] = useState([]);
+    const [selectedSourceCollection, setSelectedSourceCollection] = useState(null);
+    const [selectedTargetCollection, setSelectedTargetCollection] = useState(null);
 
-    // When source XML is uploaded
-    const handleSourceFile = async (content, file) => {
+    // Refs for DOM elements to calculate SVG line positions
+    const nodeRefs = useRef(new Map());
+    const editorSectionRef = useRef(null);
+
+    const registerNodeRef = useCallback((path, element) => {
+        if (element) {
+            nodeRefs.current.set(path, element);
+        } else {
+            nodeRefs.current.delete(path);
+        }
+    }, []);
+
+    // --- State Management ---
+    const updateMappings = (newMappings) => {
+        setHistory([...history, mappings]);
+        setMappings(newMappings);
+    };
+
+    const handleUndo = () => {
+        if (history.length === 0) return;
+        const previousMappings = history[history.length - 1];
+        setMappings(previousMappings);
+        setHistory(history.slice(0, -1));
+    };
+
+
+    // --- File Handlers ---
+    const handleFile = async (content, setTree) => {
         try {
-            // Call your backend to parse the XML
             const response = await fetch('/api/schema/parse', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ xmlString: content })
+                body: JSON.stringify({ xmlString: content }),
             });
-            
+            if (!response.ok) throw new Error(`Server responded with ${response.status}`);
             const data = await response.json();
-            setSourceTree(data.tree);
+            if (data.error) throw new Error(data.error);
+            setTree(data.tree);
         } catch (error) {
-            console.error('Error parsing source XML:', error);
-            alert('Failed to parse source XML');
+            console.error('Error parsing XML:', error);
+            alert(`Failed to parse XML: ${error.message}`);
         }
     };
 
-    // When target XML is uploaded
-    const handleTargetFile = async (content, file) => {
+    const handleMappingFile = (content) => {
         try {
-            const response = await fetch('/api/schema/parse', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ xmlString: content })
-            });
+            const imported = JSON.parse(content);
+            const staticMappings = imported.staticMappings || [];
             
-            const data = await response.json();
-            setTargetTree(data.tree);
+            // Reconstruct collection mappings from the saved format
+            const collectionMappings = (imported.collectionMappings || []).flatMap(cm => {
+                // Set selected collections based on the first one found in the file
+                if (!selectedSourceCollection && cm.sourceCollectionPath) {
+                    const srcName = cm.sourceItemElementName.split('[')[0];
+                    setSelectedSourceCollection({
+                        path: `${cm.sourceCollectionPath} > ${srcName}[0]`,
+                        name: cm.sourceItemElementName,
+                        parentPath: cm.sourceCollectionPath,
+                    });
+                }
+                 if (!selectedTargetCollection && cm.targetCollectionPath) {
+                    const tgtName = cm.targetItemElementName.split('[')[0];
+                    setSelectedTargetCollection({
+                        path: `${cm.targetCollectionPath} > ${tgtName}[0]`,
+                        name: cm.targetItemElementName,
+                        parentPath: cm.targetCollectionPath
+                    });
+                }
+
+                return (cm.mappings || []).map(m => {
+                    const sourceItemName = (cm.sourceItemElementName || '').split('[')[0];
+                    const targetItemName = (cm.targetItemElementName || '').split('[')[0];
+                    return {
+                        source: m.source ? `${cm.sourceCollectionPath} > ${sourceItemName}[0] > ${m.source}` : undefined,
+                        target: `${cm.targetCollectionPath} > ${targetItemName}[0] > ${m.target}`,
+                        type: m.type || 'element',
+                        value: m.value
+                    };
+                });
+            });
+            updateMappings([...staticMappings, ...collectionMappings]);
         } catch (error) {
-            console.error('Error parsing target XML:', error);
-            alert('Failed to parse target XML');
+            console.error('Invalid mapping JSON:', error);
+            alert('Failed to parse mapping file.');
         }
     };
 
-    // When user drags from source and drops on target
+    // --- Interaction Handlers ---
     const handleDrop = (sourcePath, targetPath) => {
-        // Check if target already has a mapping
+        const newMapping = { source: sourcePath, target: targetPath, type: 'element' };
         const existingIndex = mappings.findIndex(m => m.target === targetPath);
         
-        if (existingIndex >= 0) {
-            // Ask user to confirm replacement
-            if (!window.confirm('This target is already mapped. Replace existing mapping?')) {
-                return;
+        if (existingIndex !== -1) {
+            if (window.confirm('This target is already mapped. Do you want to replace it?')) {
+                const newMappings = [...mappings];
+                newMappings[existingIndex] = newMapping;
+                updateMappings(newMappings);
             }
-            // Remove old mapping
-            const newMappings = [...mappings];
-            newMappings.splice(existingIndex, 1);
-            setMappings(newMappings);
+        } else {
+            updateMappings([...mappings, newMapping]);
         }
-
-        // Add new mapping
-        setMappings([...mappings, {
-            source: sourcePath,
-            target: targetPath,
-            type: 'element'
-        }]);
     };
 
-    // When user sets a custom value on target node
     const handleCustomValue = (targetPath) => {
-        const value = window.prompt('Enter custom value:');
-        if (value !== null && value.trim() !== '') {
-            // Remove any existing mapping for this target
+        const existing = mappings.find(m => m.target === targetPath);
+        const value = window.prompt('Enter custom value:', existing?.value || '');
+        if (value !== null) {
+            const newMapping = { type: 'custom_element', value, target: targetPath };
             const newMappings = mappings.filter(m => m.target !== targetPath);
-            
-            // Add custom value mapping
-            setMappings([...newMappings, {
-                type: 'custom_element',
-                value: value,
-                target: targetPath
-            }]);
+            updateMappings([...newMappings, newMapping]);
+        }
+    };
+    
+    const handleCollectionSelect = (node, isChecked) => {
+        const isSource = !!node.name.match(/schema_id/); // Simple check
+        const collection = {
+            path: node.path,
+            name: node.pathName,
+            parentPath: node.path.split(' > ').slice(0, -1).join(' > ')
+        };
+
+        if (isSource) {
+            setSelectedSourceCollection(isChecked ? collection : null);
+        } else {
+            setSelectedTargetCollection(isChecked ? collection : null);
         }
     };
 
-    // Get sets of mapped paths for highlighting
-    const mappedSourcePaths = new Set(
-        mappings.filter(m => m.source).map(m => m.source)
-    );
-    const mappedTargetPaths = new Set(
-        mappings.map(m => m.target)
-    );
+    // --- Save Logic ---
+    const handleSaveMappings = () => {
+        const staticMappings = [];
+        const collectionMap = { mappings: [] };
+
+        if (selectedSourceCollection && selectedTargetCollection) {
+            collectionMap.sourceCollectionPath = selectedSourceCollection.parentPath;
+            collectionMap.targetCollectionPath = selectedTargetCollection.parentPath;
+            collectionMap.sourceItemElementName = selectedSourceCollection.name;
+            collectionMap.targetItemElementName = selectedTargetCollection.name;
+        }
+
+        mappings.forEach(m => {
+            const isSourceInCollection = m.source?.startsWith(selectedSourceCollection?.path);
+            const isTargetInCollection = m.target.startsWith(selectedTargetCollection?.path);
+
+            if (selectedSourceCollection && selectedTargetCollection && isSourceInCollection && isTargetInCollection) {
+                // This is a collection mapping, make paths relative
+                collectionMap.mappings.push({
+                    source: m.source.substring(selectedSourceCollection.path.length + 3),
+                    target: m.target.substring(selectedTargetCollection.path.length + 3),
+                    type: m.type
+                });
+            } else {
+                // This is a static mapping
+                staticMappings.push(m);
+            }
+        });
+        
+        const dataToSave = {
+            rootElement: targetTree ? targetTree.pathName : "root",
+            staticMappings,
+            collectionMappings: collectionMap.mappings.length > 0 ? [collectionMap] : [],
+        };
+
+        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'mappings.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    };
+
+    // Derived state for highlighting
+    const mappedSourcePaths = new Set(mappings.filter(m => m.source).map(m => m.source));
+    const mappedTargetPaths = new Set(mappings.map(m => m.target));
 
     return (
         <div className="app-container">
@@ -96,29 +196,27 @@ function EditorPage() {
                 <h1>Schema Mapping Editor</h1>
             </header>
 
-            {/* File upload section */}
             <div className="upload-section">
-                <FileDropzone
-                    title="Source XML"
-                    icon="📄"
-                    onFileSelect={handleSourceFile}
-                    acceptedTypes=".xml"
-                />
-                <FileDropzone
-                    title="Target XML"
-                    icon="📄"
-                    onFileSelect={handleTargetFile}
-                    acceptedTypes=".xml"
-                />
+                <FileDropzone title="Source XML" icon="📄" onFileSelect={(c) => handleFile(c, setSourceTree)} />
+                <FileDropzone title="Target XML" icon="📋" onFileSelect={(c) => handleFile(c, setTargetTree)} />
+                <FileDropzone title="Mapping JSON" icon="⚙️" onFileSelect={handleMappingFile} />
             </div>
 
-            {/* Tree editor section */}
-            <div className="editor-section">
+            <div className="editor-section" ref={editorSectionRef}>
                 <SchemaTree
                     title="Source Schema"
                     treeData={sourceTree}
                     isSource={true}
                     mappedPaths={mappedSourcePaths}
+                    selectedCollection={selectedSourceCollection}
+                    onCollectionSelect={handleCollectionSelect}
+                    registerNodeRef={registerNodeRef}
+                />
+
+                <MappingSVG
+                    mappings={mappings}
+                    nodeRefs={nodeRefs}
+                    editorRef={editorSectionRef}
                 />
 
                 <SchemaTree
@@ -126,16 +224,21 @@ function EditorPage() {
                     treeData={targetTree}
                     isSource={false}
                     mappedPaths={mappedTargetPaths}
+                    selectedCollection={selectedTargetCollection}
                     onDrop={handleDrop}
                     onCustomValue={handleCustomValue}
+                    onCollectionSelect={handleCollectionSelect}
+                    registerNodeRef={registerNodeRef}
                 />
             </div>
-
-            {/* Debug: Show current mappings */}
-            <div style={{ margin: '20px', padding: '10px', background: '#f5f5f5' }}>
-                <h4>Current Mappings ({mappings.length})</h4>
-                <pre>{JSON.stringify(mappings, null, 2)}</pre>
-            </div>
+            
+            <MappingsList
+                mappings={mappings}
+                onUpdateMappings={updateMappings}
+                onSave={handleSaveMappings}
+                onUndo={handleUndo}
+                canUndo={history.length > 0}
+            />
         </div>
     );
 }
