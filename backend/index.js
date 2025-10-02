@@ -1,7 +1,22 @@
 // backend/index.js
+require('dotenv').config();
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 const { parseXmlToTree } = require('./services/xmlParser.service');
 
+// --- Database Connection ---
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// --- JWT Secret ---
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is not set!');
+}
 // ------------------
 // XML Helpers (existing logic preserved)
 // ------------------
@@ -159,7 +174,57 @@ exports.handler = async (event) => {
     }
     try {
         const path = event.requestContext?.http?.path || event.path;
-        const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+        const body = (event.body && typeof event.body === 'string') ? JSON.parse(event.body) : event.body || {};
+
+        // --- User Registration Endpoint ---
+        if (path.endsWith('/api/auth/register')) {
+            const { email, password } = body;
+            if (!email || !password) {
+                return createResponse(400, { error: 'Email and password are required' });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            try {
+                const result = await pool.query(
+                    'INSERT INTO users(email, password_hash) VALUES($1, $2) RETURNING id, email',
+                    [email, hashedPassword]
+                );
+                return createResponse(201, { user: result.rows[0] });
+            } catch (dbError) {
+                if (dbError.code === '23505') { // Unique violation
+                    return createResponse(409, { error: 'User with this email already exists' });
+                }
+                throw dbError;
+            }
+        }
+
+        // --- NEW: User Login Endpoint ---
+        if (path.endsWith('/api/auth/login')) {
+            const { email, password } = body;
+            if (!email || !password) {
+                return createResponse(400, { error: 'Email and password are required' });
+            }
+
+            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+            const user = result.rows[0];
+
+            if (!user) {
+                return createResponse(401, { error: 'Invalid credentials' });
+            }
+
+            const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+            if (!isPasswordValid) {
+                return createResponse(401, { error: 'Invalid credentials' });
+            }
+
+            const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1d' });
+
+            return createResponse(200, {
+                token,
+                user: { id: user.id, email: user.email }
+            });
+        }
 
         if (path.endsWith('/api/transform') || path.endsWith('/prod/api/transform')) {
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
