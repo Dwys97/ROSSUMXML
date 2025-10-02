@@ -18,6 +18,15 @@
     5173,
     8080
   ],
+  
+  // --- Start the database ---
+	"dockerComposeFile": [
+		"../docker-compose.yml"
+	],
+	"service": "app",
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+	"overrideCommand": false
+
   // UPDATED: Now uses 'pip' which is more reliable than 'pipx' here
   "postCreateCommand": "pip install aws-sam-cli requests && npm install && npm install --prefix backend && npm install --prefix frontend",
   "postStartCommand": "npm run dev",

@@ -4,6 +4,10 @@
   "description": "Lambda function for XML transformation.",
   "main": "transformFunction/index.js",
   "dependencies": {
-    "@xmldom/xmldom": "^0.8.11"
+    "@xmldom/xmldom": "^0.8.11",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3"
   }
 }
