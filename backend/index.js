@@ -150,10 +150,12 @@ function transformSingleFile(sourceXmlString, destinationXml, mappingJson, remov
 // Lambda Handlers
 // ------------------
 
-const createResponse = (statusCode, body, contentType = 'application/xml') => ({
+// The default is 'application/json' if nothing else is provided
+const createResponse = (statusCode, body, contentType = 'application/json') => ({
     statusCode,
     body,
     headers: {
+        "Content-Type": contentType,
         "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
@@ -174,13 +176,18 @@ exports.handler = async (event) => {
     }
     try {
         const path = event.requestContext?.http?.path || event.path;
+        
+        // ADD THIS LOGGING LINE:
+        console.log(`Received request for path: "${path}"`); 
+
         const body = (event.body && typeof event.body === 'string') ? JSON.parse(event.body) : event.body || {};
 
-        // --- User Registration Endpoint ---
-        if (path.endsWith('/api/auth/register')) {
+                // --- User Registration Endpoint ---
+        // FIX: Path no longer expects '/api'
+        if (path.endsWith('/auth/register')) {
             const { email, password } = body;
             if (!email || !password) {
-                return createResponse(400, { error: 'Email and password are required' });
+                return createResponse(400, JSON.stringify({ error: 'Email and password are required' }), 'application/json');
             }
 
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -190,43 +197,45 @@ exports.handler = async (event) => {
                     'INSERT INTO users(email, password_hash) VALUES($1, $2) RETURNING id, email',
                     [email, hashedPassword]
                 );
-                return createResponse(201, { user: result.rows[0] });
+                return createResponse(201, JSON.stringify({ user: result.rows[0] }), 'application/json');
             } catch (dbError) {
                 if (dbError.code === '23505') { // Unique violation
-                    return createResponse(409, { error: 'User with this email already exists' });
+                    return createResponse(409, JSON.stringify({ error: 'User with this email already exists' }), 'application/json');
                 }
                 throw dbError;
             }
         }
 
-        // --- NEW: User Login Endpoint ---
-        if (path.endsWith('/api/auth/login')) {
+        // --- User Login Endpoint ---
+        // FIX: Path no longer expects '/api'
+        if (path.endsWith('/auth/login')) {
             const { email, password } = body;
             if (!email || !password) {
-                return createResponse(400, { error: 'Email and password are required' });
+                return createResponse(400, JSON.stringify({ error: 'Email and password are required' }), 'application/json');
             }
 
             const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
             const user = result.rows[0];
 
             if (!user) {
-                return createResponse(401, { error: 'Invalid credentials' });
+                return createResponse(401, JSON.stringify({ error: 'Invalid credentials' }), 'application/json');
             }
 
             const isPasswordValid = await bcrypt.compare(password, user.password_hash);
             if (!isPasswordValid) {
-                return createResponse(401, { error: 'Invalid credentials' });
+                return createResponse(401, JSON.stringify({ error: 'Invalid credentials' }), 'application/json');
             }
 
             const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1d' });
 
-            return createResponse(200, {
+            return createResponse(200, JSON.stringify({
                 token,
                 user: { id: user.id, email: user.email }
-            });
+            }), 'application/json');
         }
 
-        if (path.endsWith('/api/transform') || path.endsWith('/prod/api/transform')) {
+        // FIX: Path no longer expects '/api' or '/prod/api'
+        if (path.endsWith('/transform')) {
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
             if (!sourceXml || !destinationXml || !mappingJson)
                 return createResponse(400, 'Missing required fields', 'application/json');
@@ -234,28 +243,29 @@ exports.handler = async (event) => {
             return createResponse(200, transformed, 'application/xml');
         }
 
-        if (path.endsWith('/api/transform-json') || path.endsWith('/prod/api/transform-json')) {
+        // FIX: Path no longer expects '/api' or '/prod/api'
+        if (path.endsWith('/transform-json')) {
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
             if (!sourceXml || !destinationXml || !mappingJson)
                 return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
             const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
             return createResponse(200, JSON.stringify({ transformed }), 'application/json');
         }
-
-        if (path.endsWith('/api/rossum-webhook') || path.endsWith('/prod/api/rossum-webhook')) {
+        
+        // FIX: Path no longer expects '/api' or '/prod/api'
+        if (path.endsWith('/rossum-webhook')) {
             const { exportedXml } = body;
             if (!exportedXml)
                 return createResponse(400, JSON.stringify({ error: 'Missing exportedXml' }), 'application/json');
             return createResponse(200, JSON.stringify({ received: true }), 'application/json');
         }
 
-        if (path.endsWith('/api/schema/parse') || path.endsWith('/prod/api/schema/parse')) {
+        // FIX: Path no longer expects '/api' or '/prod/api'
+        if (path.endsWith('/schema/parse')) {
             const { xmlString } = body;
             if (!xmlString) {
                 return createResponse(400, JSON.stringify({ error: 'Missing xmlString' }), 'application/json');
             }
-            // *** FIX STARTS HERE ***
-            // The try/catch for parseXmlToTree must be inside this 'if' block.
             try {
                 const tree = parseXmlToTree(xmlString);
                 return createResponse(200, JSON.stringify({ tree }), 'application/json');
@@ -267,7 +277,7 @@ exports.handler = async (event) => {
 
         return createResponse(404, JSON.stringify({ error: 'Endpoint not found' }), 'application/json');
 
-    } catch (err) {
+        } catch (err) {
         console.error('Lambda error:', err);
         return createResponse(500, JSON.stringify({ error: 'Transformation failed', details: err.message }), 'application/json');
     }

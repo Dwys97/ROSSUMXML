@@ -12,6 +12,7 @@ function TopNav() {
                 <div className="nav-links">
                     <NavLink to="/editor" className="nav-link">Editor</NavLink>
                     <NavLink to="/transformer" className="nav-link">Transformer</NavLink>
+                    <li><NavLink to="/login" className={styles.loginButton}>Login</NavLink></li>
                 </div>
             </div>
         </nav>
