@@ -3,15 +3,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 8080, // We'll run the frontend on port 8080
+    // We'll let Vite use its default port (5173)
     proxy: {
-      // Proxy API requests to the backend
+      // All requests to /api will be sent to our Python proxy server
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
     },

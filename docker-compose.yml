@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: your_db_name
+      POSTGRES_USER: your_db_user
+      POSTGRES_PASSWORD: your_db_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "3000:3000" # Expose the SAM port
+    volumes:
+      - ./backend:/app # Sync code for hot-reloading
+    # This command starts the SAM API inside the container
+    command: sam local start-api --host 0.0.0.0 --port 3000
+
+    dns:
+      - 8.8.8.8
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    ports:
+      - "8000:8000"
+    environment:
+      # The proxy now talks to the 'backend' service over the Docker network
+      BACKEND_URL: http://backend:3000/api
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

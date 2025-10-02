@@ -1,25 +1,39 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Backend for the XML Transformation App
+  rossumxml
+
+  Sample SAM Template for rossumxml
+
+Globals:
+  Function:
+    Timeout: 3
+    MemorySize: 128
 
 Resources:
   TransformFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
+      CodeUri: ./
       Handler: index.handler
       Runtime: nodejs18.x
       Architectures:
         - x86_64
+      Timeout: 30 # <-- ADD THIS LINE
       Events:
-        TransformApi:
+        ProxyApi:
           Type: Api
           Properties:
             Path: /api/{proxy+}
-            Method: ANY # Use ANY to ensure OPTIONS requests are passed through
+            Method: ANY
 
 Outputs:
-  TransformApi:
+  ApiUrl:
     Description: "API Gateway endpoint URL for Prod stage"
-    Value: !Sub "https://transformapi.example.com/prod/api/"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/"
+  TransformFunction:
+    Description: "Transform Function ARN"
+    Value: !GetAtt TransformFunction.Arn
+  TransformFunctionIamRole:
+    Description: "Implicit IAM Role created for Transform function"
+    Value: !GetAtt TransformFunctionRole.Arn

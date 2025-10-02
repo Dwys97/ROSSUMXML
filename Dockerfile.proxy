@@ -1,0 +1,14 @@
+# Dockerfile.proxy
+FROM python:3.9
+
+WORKDIR /app
+
+COPY proxy_server.py .
+
+# Assuming you might add a requirements.txt for Python dependencies
+# COPY requirements.txt .
+# RUN pip install -r requirements.txt
+
+EXPOSE 8000
+
+CMD ["python", "proxy_server.py"]

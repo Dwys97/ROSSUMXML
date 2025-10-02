@@ -1,16 +1,10 @@
 {
-  "name": "xml-transformer-app",
+  "name": "rossumxml",
   "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "start:backend": "sam local start-api --template-file backend/template.yml --port 3000",
-    "start:frontend": "npm run --prefix frontend dev",
-    "dev": "concurrently \"npm:start:*\""
-  },
+"scripts": {
+  "start:all": "concurrently --names \"DOCKER,VITE\" -c \"blue,cyan\" \"docker-compose up --build\" \"cd frontend && npm run dev\""
+},
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "@xmldom/xmldom": "^0.8.11"
   }
 }
