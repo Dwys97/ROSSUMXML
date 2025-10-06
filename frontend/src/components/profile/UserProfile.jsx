@@ -40,7 +40,7 @@ function UserProfile({ isOpen, onClose }) {
             setLoading(true);
             fetch('/api/user/profile', {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 }
             })
                 .then(res => {
@@ -75,7 +75,7 @@ function UserProfile({ isOpen, onClose }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({
                     currentPassword: passwordForm.currentPassword,
@@ -98,11 +98,11 @@ function UserProfile({ isOpen, onClose }) {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch('/api/user/billing', {
+            const res = await fetch('/api/user/update-billing', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify(billingForm)
             });

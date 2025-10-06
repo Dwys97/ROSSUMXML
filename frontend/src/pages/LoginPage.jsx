@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import styles from './AuthPage.module.css';
 
 const LoginPage = () => {
@@ -7,6 +8,7 @@ const LoginPage = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -27,8 +29,8 @@ const LoginPage = () => {
                 throw new Error(data.error || 'Failed to log in');
             }
 
-            // On success, store the token and navigate to the transformer page
-            localStorage.setItem('authToken', data.token);
+            // Use AuthContext to store user and token
+            login(data.user, data.token);
             navigate('/transformer');
 
         } catch (err) {

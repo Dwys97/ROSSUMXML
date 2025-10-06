@@ -185,13 +185,4 @@ function detectCardBrand(cardNumber) {
     return 'unknown';
 }
 
-// Экспортируем отдельные обработчики для возможности прямого вызова
-module.exports = {
-    post: (path, req, res) => {
-        if (path === '/register') {
-            return router.post('/register', req, res);
-        } else if (path === '/login') {
-            return router.post('/login', req, res);
-        }
-    }
-};
+module.exports = router;
