@@ -4,6 +4,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const { parseXmlToTree } = require('./services/xmlParser.service');
+const { transformSingleFile } = require('./services/transform.service');
 const db = require('./db');
 
 const app = express();
@@ -71,14 +72,15 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 3000;
 
-// Initialize database and start server
+// Try to initialize database, but start server regardless
 db.initDatabase()
     .then(() => {
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
+        console.log('Database initialized successfully');
     })
     .catch(err => {
-        console.error('Failed to initialize database:', err);
-        process.exit(1);
+        console.warn('Database initialization skipped (database may not be available yet):', err.message);
     });
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`);
+});
