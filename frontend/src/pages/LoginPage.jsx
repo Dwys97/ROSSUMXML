@@ -35,14 +35,13 @@ const LoginPage = () => {
                 throw new Error(data.error || 'Failed to log in');
             }
 
-            // Сначала сохраняем данные через контекст
+            // Save auth data
             await login(data.user, data.token);
             
-            // После успешного входа делаем задержку в 100мс 
-            // чтобы дать время на сохранение данных
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Wait for login to complete and state to update
+            await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Перенаправляем пользователя
+            // Navigate to target page
             navigate(from, { replace: true });
 
         } catch (err) {
