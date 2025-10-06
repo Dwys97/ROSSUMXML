@@ -1,15 +1,19 @@
 // backend/index.js
 require('dotenv').config();
-const { Pool } = require('pg');
+const express = require('express');
+const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 const { parseXmlToTree } = require('./services/xmlParser.service');
+const db = require('./db');
+const userService = require('./services/user.service');
 
 // --- Database Connection ---
+const { Pool } = require('pg');
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/rossumxml',
 });
 
 // --- JWT Secret ---
@@ -182,56 +186,156 @@ exports.handler = async (event) => {
 
         const body = (event.body && typeof event.body === 'string') ? JSON.parse(event.body) : event.body || {};
 
-                // --- User Registration Endpoint ---
-        // FIX: Path no longer expects '/api'
+                // --- Authentication Endpoints ---
         if (path.endsWith('/auth/register')) {
-            const { email, password } = body;
-            if (!email || !password) {
-                return createResponse(400, JSON.stringify({ error: 'Email and password are required' }), 'application/json');
+            const { email, fullName, password, enableBilling, billingDetails } = body;
+            
+            if (!email || !fullName || !password) {
+                return createResponse(400, JSON.stringify({
+                    error: 'Email, full name and password are required'
+                }));
             }
 
-            const hashedPassword = await bcrypt.hash(password, 10);
-
             try {
-                const result = await pool.query(
-                    'INSERT INTO users(email, password_hash) VALUES($1, $2) RETURNING id, email',
-                    [email, hashedPassword]
-                );
-                return createResponse(201, JSON.stringify({ user: result.rows[0] }), 'application/json');
-            } catch (dbError) {
-                if (dbError.code === '23505') { // Unique violation
-                    return createResponse(409, JSON.stringify({ error: 'User with this email already exists' }), 'application/json');
+                // Создаем имя пользователя из email
+                const username = email.split('@')[0];
+                
+                // Хэшируем пароль
+                const hashedPassword = await bcrypt.hash(password, 10);
+
+                // Начинаем транзакцию
+                const client = await pool.connect();
+                
+                try {
+                    await client.query('BEGIN');
+
+                    // Проверяем существование пользователя
+                    const userExists = await client.query(
+                        'SELECT id FROM users WHERE email = $1',
+                        [email]
+                    );
+
+                    if (userExists.rows.length > 0) {
+                        throw new Error('User with this email already exists');
+                    }
+
+                    // Создаем пользователя
+                    const userResult = await client.query(
+                        `INSERT INTO users (email, username, full_name, password)
+                        VALUES ($1, $2, $3, $4)
+                        RETURNING id`,
+                        [email, username, fullName, hashedPassword]
+                    );
+
+                    const userId = userResult.rows[0].id;
+
+                    // Создаем начальную подписку (бесплатную)
+                    await client.query(
+                        `INSERT INTO subscriptions (user_id, status, level)
+                        VALUES ($1, 'active', 'free')`,
+                        [userId]
+                    );
+
+                    // Если есть платежные данные, сохраняем их
+                    if (enableBilling && billingDetails) {
+                        const last4 = billingDetails.cardNumber.slice(-4);
+                        await client.query(
+                            `INSERT INTO billing_details (
+                                user_id, card_last4,
+                                billing_address, billing_city,
+                                billing_country, billing_zip
+                            ) VALUES ($1, $2, $3, $4, $5, $6)`,
+                            [
+                                userId,
+                                last4,
+                                billingDetails.address,
+                                billingDetails.city,
+                                billingDetails.country || 'RU',
+                                billingDetails.zip
+                            ]
+                        );
+                    }
+
+                    await client.query('COMMIT');
+                    
+                    return createResponse(201, JSON.stringify({
+                        message: 'Registration successful',
+                        user: { id: userId, email, username }
+                    }));
+
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    throw err;
+                } finally {
+                    client.release();
                 }
-                throw dbError;
+
+            } catch (err) {
+                console.error('Registration error:', err);
+                if (err.code === '23505') { // Unique violation
+                    return createResponse(409, JSON.stringify({
+                        error: 'User with this email already exists'
+                    }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Registration failed',
+                    details: err.message
+                }));
             }
         }
 
-        // --- User Login Endpoint ---
-        // FIX: Path no longer expects '/api'
         if (path.endsWith('/auth/login')) {
             const { email, password } = body;
+
             if (!email || !password) {
-                return createResponse(400, JSON.stringify({ error: 'Email and password are required' }), 'application/json');
+                return createResponse(400, JSON.stringify({
+                    error: 'Email and password are required'
+                }));
             }
 
-            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-            const user = result.rows[0];
+            try {
+                const result = await pool.query(
+                    'SELECT id, email, username, password FROM users WHERE email = $1',
+                    [email]
+                );
 
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Invalid credentials' }), 'application/json');
+                if (result.rows.length === 0) {
+                    return createResponse(401, JSON.stringify({
+                        error: 'Invalid credentials'
+                    }));
+                }
+
+                const user = result.rows[0];
+                const validPassword = await bcrypt.compare(password, user.password);
+
+                if (!validPassword) {
+                    return createResponse(401, JSON.stringify({
+                        error: 'Invalid credentials'
+                    }));
+                }
+
+                const token = jwt.sign(
+                    { id: user.id, email: user.email },
+                    JWT_SECRET,
+                    { expiresIn: '24h' }
+                );
+
+                return createResponse(200, JSON.stringify({
+                    token,
+                    user: {
+                        id: user.id,
+                        email: user.email,
+                        username: user.username
+                    }
+                }));
+
+            } catch (err) {
+                console.error('Login error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Login failed',
+                    details: err.message
+                }));
             }
-
-            const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-            if (!isPasswordValid) {
-                return createResponse(401, JSON.stringify({ error: 'Invalid credentials' }), 'application/json');
-            }
-
-            const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1d' });
-
-            return createResponse(200, JSON.stringify({
-                token,
-                user: { id: user.id, email: user.email }
-            }), 'application/json');
         }
 
         // FIX: Path no longer expects '/api' or '/prod/api'

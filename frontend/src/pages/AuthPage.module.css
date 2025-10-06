@@ -3,8 +3,115 @@
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: #1a1a1a;
-    color: white;
+    padding: 20px;
+}
+
+.stepIndicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding: 0 20px;
+}
+
+.step {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    margin: 0 8px;
+    border-radius: 4px;
+    background: #0d1b2a;
+    color: #a5a9b5;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    background: #1d72f3;
+    color: #ffffff;
+}
+
+.formStep {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.buttonGroup {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.primaryButton {
+    flex: 1;
+    padding: 10px 20px;
+    background: #1d72f3;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.secondaryButton {
+    flex: 1;
+    padding: 10px 20px;
+    background: #3a506b;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.passwordStrength {
+    margin-top: 8px;
+}
+
+.strengthBar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.strengthSegment {
+    flex: 1;
+    height: 4px;
+    background: #3a506b;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.strengthSegment.active {
+    background: #1d72f3;
+}
+
+.strengthChecklist {
+    font-size: 0.75rem;
+    color: #a5a9b5;
+}
+
+.strengthChecklist div {
+    margin: 2px 0;
+}
+
+.strengthChecklist .valid {
+    color: #10b981;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .authBox {
@@ -62,8 +169,212 @@
 }
 
 .switchText {
-    margin-top: 1.5rem;
-    color: #aaa;
+    margin-top: 20px;
+    text-align: center;
+}
+
+.formSection {
+    margin-bottom: 24px;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.inputGroup {
+    margin-bottom: 16px;
+}
+
+.inputGroup label {
+    display: block;
+    margin-bottom: 8px;
+    color: #e2e8f0;
+    font-size: 0.875rem;
+}
+
+.inputGroup input {
+    width: 100%;
+    padding: 8px 12px;
+    background: #1a2234;
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease;
+}
+
+.inputGroup input:focus {
+    outline: none;
+    border-color: #3182ce;
+}
+
+.passwordStrength {
+    margin-top: 8px;
+}
+
+.strengthBar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.strengthSegment {
+    flex: 1;
+    height: 4px;
+    background: #2d3748;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.strengthSegment.active {
+    background: #3182ce;
+}
+
+.strengthSegment.active.weak {
+    background: #e53e3e;
+}
+
+.strengthSegment.active.medium {
+    background: #ecc94b;
+}
+
+.strengthSegment.active.strong {
+    background: #48bb78;
+}
+
+.strengthChecklist {
+    font-size: 0.75rem;
+    color: #718096;
+}
+
+.strengthChecklist div {
+    margin: 2px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.strengthChecklist .valid {
+    color: #48bb78;
+}
+
+.billingToggle {
+    margin: 16px 0;
+    padding: 12px;
+    background: #1a2234;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.billingToggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #e2e8f0;
+    cursor: pointer;
+}
+
+.billingToggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.error {
+    color: #e53e3e;
+    margin: 8px 0;
+    font-size: 0.875rem;
+}
+
+.success {
+    color: #48bb78;
+    margin: 8px 0;
+    font-size: 0.875rem;
+}
+
+.formSection {
+    margin-bottom: 24px;
+}
+
+.passwordStrength {
+    margin-top: 8px;
+}
+
+.strengthBar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.strengthSegment {
+    flex: 1;
+    height: 4px;
+    background: #3a506b;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.strengthSegment.active {
+    background: #1d72f3;
+}
+
+.strengthSegment.active.weak {
+    background: #ef4444;
+}
+
+.strengthSegment.active.medium {
+    background: #f59e0b;
+}
+
+.strengthSegment.active.strong {
+    background: #10b981;
+}
+
+.strengthChecklist {
+    font-size: 0.75rem;
+    color: #a5a9b5;
+    margin-top: 8px;
+}
+
+.strengthChecklist div {
+    margin: 2px 0;
+}
+
+.strengthChecklist .valid {
+    color: #10b981;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.billingToggle {
+    margin: 16px 0;
+    padding: 12px;
+    background: #1e2a3a;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.billingToggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.billingToggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
 }
 
 .switchText a {
