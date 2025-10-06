@@ -11,10 +11,7 @@ const db = require('./db');
 const userService = require('./services/user.service');
 
 // --- Database Connection ---
-const { Pool } = require('pg');
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/rossumxml',
-});
+const pool = require('./db');
 
 // --- JWT Secret ---
 const JWT_SECRET = process.env.JWT_SECRET;

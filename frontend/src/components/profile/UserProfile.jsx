@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/useAuth';
 import styles from './UserProfile.module.css';
 
-function UserProfile({ isOpen, onClose }) {
+function UserProfile({ isOpen = true, onClose = () => {} }) {
+    const navigate = useNavigate();
+    const { logout, user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    
     const [userData, setUserData] = useState({
         username: '',
         email: '',
+        fullName: '',
+        address: '',
+        city: '',
+        country: '',
+        zipCode: '',
+        phone: '',
         created_at: '',
         subscription_status: '',
         subscription_level: '',
@@ -18,13 +31,12 @@ function UserProfile({ isOpen, onClose }) {
         billing_zip: ''
     });
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [passwordForm, setPasswordForm] = useState({
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
     });
+
     const [billingForm, setBillingForm] = useState({
         cardNumber: '',
         cardExpiry: '',
@@ -34,8 +46,13 @@ function UserProfile({ isOpen, onClose }) {
         billingCountry: '',
         billingZip: ''
     });
-
+    
     useEffect(() => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+        
         if (isOpen) {
             setLoading(true);
             fetch('/api/user/profile', {
@@ -43,29 +60,51 @@ function UserProfile({ isOpen, onClose }) {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             })
-                .then(res => {
-                    if (!res.ok) throw new Error('Failed to load profile');
-                    return res.json();
-                })
-                .then(data => {
-                    setUserData(data);
-                    setBillingForm(prev => ({
-                        ...prev,
-                        billingAddress: data.billing_address || '',
-                        billingCity: data.billing_city || '',
-                        billingCountry: data.billing_country || '',
-                        billingZip: data.billing_zip || ''
-                    }));
-                })
-                .catch(err => setError(err.message))
-                .finally(() => setLoading(false));
+            .then(res => res.json())
+            .then(data => {
+                setUserData(data);
+                setBillingForm(prev => ({
+                    ...prev,
+                    billingAddress: data.billing_address || '',
+                    billingCity: data.billing_city || '',
+                    billingCountry: data.billing_country || '',
+                    billingZip: data.billing_zip || ''
+                }));
+                setError(null);
+            })
+            .catch(err => {
+                setError(err.message);
+                console.error('Failed to load profile:', err);
+            })
+            .finally(() => setLoading(false));
         }
-    }, [isOpen]);
+    }, [user, navigate, isOpen]);
+
+    const handleLogout = () => {
+        logout();
+        navigate('/');
+    };
+
+    if (loading) {
+        return <div className={styles.loadingContainer}>Loading...</div>;
+    }
+
+    if (!isOpen || !user || !userData) {
+        return null;
+    }
 
     const handlePasswordChange = async (e) => {
         e.preventDefault();
+        
+        // Validate password requirements
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        if (!passwordRegex.test(passwordForm.newPassword)) {
+            setError('Password must meet all requirements');
+            return;
+        }
+
         if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-            setError('Пароли не совпадают');
+            setError('Passwords do not match');
             return;
         }
         
@@ -83,10 +122,13 @@ function UserProfile({ isOpen, onClose }) {
                 })
             });
             
-            if (!res.ok) throw new Error('Failed to change password');
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || 'Failed to change password');
+            }
             
             setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-            setError('Пароль успешно изменен');
+            setError('Password successfully changed');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -111,7 +153,7 @@ function UserProfile({ isOpen, onClose }) {
             
             const data = await res.json();
             setUserData(prev => ({ ...prev, ...data }));
-            setError('Платежная информация обновлена');
+            setError('Payment information updated');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -132,19 +174,19 @@ function UserProfile({ isOpen, onClose }) {
                             className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
                             onClick={() => setActiveTab('profile')}
                         >
-                            Профиль
+                            Profile
                         </button>
                         <button 
                             className={`${styles.tab} ${activeTab === 'billing' ? styles.active : ''}`}
                             onClick={() => setActiveTab('billing')}
                         >
-                            Оплата
+                            Billing
                         </button>
                         <button 
                             className={`${styles.tab} ${activeTab === 'security' ? styles.active : ''}`}
                             onClick={() => setActiveTab('security')}
                         >
-                            Безопасность
+                            Security
                         </button>
                     </div>
 
@@ -152,46 +194,87 @@ function UserProfile({ isOpen, onClose }) {
 
                     {activeTab === 'profile' && (
                         <div className={styles.tabContent}>
-                            <h2>Информация профиля</h2>
+                            <h2>Profile Information</h2>
                             <div className={styles.profileSection}>
-                                <div className={styles.field}>
-                                    <label>Имя пользователя</label>
-                                    <p>{userData.username}</p>
-                                </div>
-                                <div className={styles.field}>
-                                    <label>Email</label>
-                                    <p>{userData.email}</p>
-                                </div>
-                                <div className={styles.field}>
-                                    <label>Дата регистрации</label>
-                                    <p>{new Date(userData.created_at).toLocaleDateString('ru-RU')}</p>
-                                </div>
-                                <div className={styles.field}>
-                                    <label>Статус подписки</label>
-                                    <p>{userData.subscription_status} ({userData.subscription_level})</p>
-                                </div>
-                                {userData.subscription_expires && (
+                                <div className={styles.fieldGroup}>
+                                    <h3>Account Information</h3>
                                     <div className={styles.field}>
-                                        <label>Действует до</label>
-                                        <p>{new Date(userData.subscription_expires).toLocaleDateString('ru-RU')}</p>
+                                        <label>Username</label>
+                                        <p>{userData.username}</p>
                                     </div>
-                                )}
+                                    <div className={styles.field}>
+                                        <label>Email</label>
+                                        <p>{userData.email}</p>
+                                    </div>
+                                    <div className={styles.field}>
+                                        <label>Full Name</label>
+                                        <p>{userData.fullName}</p>
+                                    </div>
+                                    <div className={styles.field}>
+                                        <label>Phone</label>
+                                        <p>{userData.phone}</p>
+                                    </div>
+                                </div>
+
+                                <div className={styles.fieldGroup}>
+                                    <h3>Address</h3>
+                                    <div className={styles.field}>
+                                        <label>Street Address</label>
+                                        <p>{userData.address}</p>
+                                    </div>
+                                    <div className={styles.field}>
+                                        <label>City</label>
+                                        <p>{userData.city}</p>
+                                    </div>
+                                    <div className={styles.field}>
+                                        <label>Country</label>
+                                        <p>{userData.country}</p>
+                                    </div>
+                                    <div className={styles.field}>
+                                        <label>ZIP Code</label>
+                                        <p>{userData.zipCode}</p>
+                                    </div>
+                                </div>
+
+                                <div className={styles.fieldGroup}>
+                                    <h3>Subscription Details</h3>
+                                    <div className={styles.field}>
+                                        <label>Status</label>
+                                        <p>{userData.subscription_status} ({userData.subscription_level})</p>
+                                    </div>
+                                    {userData.subscription_expires && (
+                                        <div className={styles.field}>
+                                            <label>Valid Until</label>
+                                            <p>{new Date(userData.subscription_expires).toLocaleDateString('en-US')}</p>
+                                        </div>
+                                    )}
+                                    <div className={styles.field}>
+                                        <label>Member Since</label>
+                                        <p>{new Date(userData.created_at).toLocaleDateString('en-US')}</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    className={styles.logoutButton}
+                                    onClick={handleLogout}
+                                >
+                                    Logout
+                                </button>
                             </div>
                         </div>
                     )}
 
                     {activeTab === 'billing' && (
                         <div className={styles.tabContent}>
-                            <h2>Платежная информация</h2>
+                            <h2>Payment Information</h2>
                             {userData.card_last4 && (
                                 <div className={styles.currentCard}>
-                                    <p>Текущая карта: {userData.card_brand} **** **** **** {userData.card_last4}</p>
+                                    <p>Current card: {userData.card_brand} **** **** **** {userData.card_last4}</p>
                                 </div>
                             )}
                             <form onSubmit={handleBillingUpdate} className={styles.form}>
                                 <div className={styles.formRow}>
                                     <div className={styles.formField}>
-                                        <label>Номер карты</label>
+                                        <label>Card Number</label>
                                         <input
                                             type="text"
                                             value={billingForm.cardNumber}
@@ -201,7 +284,7 @@ function UserProfile({ isOpen, onClose }) {
                                         />
                                     </div>
                                     <div className={styles.formField}>
-                                        <label>Срок действия</label>
+                                        <label>Expiry Date</label>
                                         <input
                                             type="text"
                                             value={billingForm.cardExpiry}
@@ -222,7 +305,7 @@ function UserProfile({ isOpen, onClose }) {
                                     </div>
                                 </div>
                                 <div className={styles.formField}>
-                                    <label>Адрес</label>
+                                                                            <label>Address</label>
                                     <input
                                         type="text"
                                         value={billingForm.billingAddress}
@@ -232,7 +315,7 @@ function UserProfile({ isOpen, onClose }) {
                                 </div>
                                 <div className={styles.formRow}>
                                     <div className={styles.formField}>
-                                        <label>Город</label>
+                                        <label>City</label>
                                         <input
                                             type="text"
                                             value={billingForm.billingCity}
@@ -241,7 +324,7 @@ function UserProfile({ isOpen, onClose }) {
                                         />
                                     </div>
                                     <div className={styles.formField}>
-                                        <label>Страна</label>
+                                        <label>Country</label>
                                         <input
                                             type="text"
                                             value={billingForm.billingCountry}
@@ -250,7 +333,7 @@ function UserProfile({ isOpen, onClose }) {
                                         />
                                     </div>
                                     <div className={styles.formField}>
-                                        <label>Индекс</label>
+                                        <label>ZIP Code</label>
                                         <input
                                             type="text"
                                             value={billingForm.billingZip}
@@ -260,7 +343,7 @@ function UserProfile({ isOpen, onClose }) {
                                     </div>
                                 </div>
                                 <button type="submit" className="primary-btn" disabled={loading}>
-                                    {loading ? 'Обновление...' : 'Обновить платежную информацию'}
+                                    {loading ? 'Updating...' : 'Update Payment Information'}
                                 </button>
                             </form>
                         </div>
@@ -268,38 +351,61 @@ function UserProfile({ isOpen, onClose }) {
 
                     {activeTab === 'security' && (
                         <div className={styles.tabContent}>
-                            <h2>Изменение пароля</h2>
+                            <h2>Change Password</h2>
                             <form onSubmit={handlePasswordChange} className={styles.form}>
                                 <div className={styles.formField}>
-                                    <label>Текущий пароль</label>
+                                    <label>Current Password</label>
                                     <input
                                         type="password"
                                         value={passwordForm.currentPassword}
                                         onChange={e => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
                                         required
+                                        minLength={8}
                                     />
                                 </div>
                                 <div className={styles.formField}>
-                                    <label>Новый пароль</label>
+                                    <label>New Password</label>
                                     <input
                                         type="password"
                                         value={passwordForm.newPassword}
                                         onChange={e => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
                                         required
+                                        minLength={8}
+                                        pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+                                        title="Password must contain at least 8 characters, including uppercase, lowercase, numbers and special characters"
                                     />
+                                    <small className={styles.passwordHint}>
+                                        Password must contain at least:
+                                        <ul>
+                                            <li>8 characters long</li>
+                                            <li>One uppercase letter</li>
+                                            <li>One lowercase letter</li>
+                                            <li>One number</li>
+                                            <li>One special character (@$!%*?&)</li>
+                                        </ul>
+                                    </small>
                                 </div>
                                 <div className={styles.formField}>
-                                    <label>Подтвердите новый пароль</label>
+                                    <label>Confirm New Password</label>
                                     <input
                                         type="password"
                                         value={passwordForm.confirmPassword}
                                         onChange={e => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                                         required
+                                        minLength={8}
                                     />
                                 </div>
-                                <button type="submit" className="primary-btn" disabled={loading}>
-                                    {loading ? 'Обновление...' : 'Изменить пароль'}
+                                <button 
+                                    type="submit" 
+                                    className="primary-btn" 
+                                    disabled={loading || !passwordForm.newPassword || 
+                                             passwordForm.newPassword !== passwordForm.confirmPassword}
+                                >
+                                    {loading ? 'Updating...' : 'Change Password'}
                                 </button>
+                                {passwordForm.newPassword !== passwordForm.confirmPassword && (
+                                    <p className={styles.errorMessage}>Passwords do not match</p>
+                                )}
                             </form>
                         </div>
                     )}

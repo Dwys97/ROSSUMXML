@@ -9,8 +9,13 @@ const RegisterPage = () => {
         fullName: '',
         password: '',
         confirmPassword: '',
-        // Опциональные платежные данные
-        addBilling: false, // флаг для добавления платежных данных
+        phone: '',
+        address: '',
+        city: '',
+        country: '',
+        zipCode: '',
+        // Optional billing info
+        addBilling: false,
         cardNumber: '',
         cardExpiry: '',
         cardCvv: '',
@@ -65,31 +70,37 @@ const RegisterPage = () => {
 
         // Валидация данных
         if (formData.password !== formData.confirmPassword) {
-            setError('Пароли не совпадают');
+            setError('Passwords do not match');
             return;
         }
 
         if (passwordStrength.score < 3) {
-            setError('Пароль слишком слабый. Убедитесь, что он соответствует требованиям.');
+            setError('Password is too weak. Please ensure it meets all requirements.');
             return;
         }
 
         const requestData = {
             email: formData.email,
             fullName: formData.fullName,
-            password: formData.password
+            password: formData.password,
+            phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            country: formData.country,
+            zipCode: formData.zipCode
         };
 
-        // Если пользователь решил добавить платежные данные
+        // Add billing information if the user opted in
         if (formData.addBilling) {
-            requestData.billing = {
+            requestData.enableBilling = true;
+            requestData.billingDetails = {
                 cardNumber: formData.cardNumber.replace(/\s/g, ''),
                 cardExpiry: formData.cardExpiry,
                 cardCvv: formData.cardCvv,
-                billingAddress: formData.billingAddress,
-                billingCity: formData.billingCity,
-                billingCountry: formData.billingCountry,
-                billingZip: formData.billingZip
+                address: formData.billingAddress,
+                city: formData.billingCity,
+                country: formData.billingCountry,
+                zip: formData.billingZip
             };
         }
 
@@ -108,7 +119,7 @@ const RegisterPage = () => {
                 throw new Error(data.error || 'Ошибка при регистрации');
             }
 
-            setSuccess('Регистрация успешна! Переход на страницу входа...');
+            setSuccess('Registration successful! Redirecting to login...');
             setTimeout(() => {
                 navigate('/login');
             }, 2000);
@@ -142,215 +153,183 @@ const RegisterPage = () => {
     return (
         <div className={styles.authContainer}>
             <div className={styles.authBox}>
-                <h2>Регистрация</h2>
-                <form onSubmit={handleSubmit}>
-                    {/* Основная информация */}
-                    <div className={styles.formSection}>
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="email">Email *</label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                                required
-                            />
-                        </div>
-
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="fullName">Полное имя *</label>
-                            <input
-                                type="text"
-                                id="fullName"
-                                name="fullName"
-                                value={formData.fullName}
-                                onChange={handleInputChange}
-                                required
-                            />
-                        </div>
-
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="password">Пароль *</label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleInputChange}
-                                required
-                            />
-                            <div className={styles.passwordStrength}>
-                                <div className={styles.strengthBar}>
-                                    {[...Array(5)].map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className={`${styles.strengthSegment} ${
-                                                i < passwordStrength.score ? styles.active : ''
-                                            } ${
-                                                passwordStrength.score <= 2 ? styles.weak :
-                                                passwordStrength.score <= 3 ? styles.medium :
-                                                styles.strong
-                                            }`}
-                                        />
-                                    ))}
-                                </div>
-                                <div className={styles.strengthChecklist}>
-                                    <div className={passwordStrength.hasMinLength ? styles.valid : ''}>
-                                        ✓ Минимум 8 символов
-                                    </div>
-                                    <div className={passwordStrength.hasUppercase ? styles.valid : ''}>
-                                        ✓ Заглавная буква
-                                    </div>
-                                    <div className={passwordStrength.hasLowercase ? styles.valid : ''}>
-                                        ✓ Строчная буква
-                                    </div>
-                                    <div className={passwordStrength.hasNumber ? styles.valid : ''}>
-                                        ✓ Цифра
-                                    </div>
-                                    <div className={passwordStrength.hasSpecialChar ? styles.valid : ''}>
-                                        ✓ Специальный символ
-                                    </div>
-                                </div>
+                <div className={styles.authHeader}>
+                    <img 
+                        src="/src/assets/logo-light.svg" 
+                        alt="Logo" 
+                        className={styles.brandLogo} 
+                    />
+                    <h2>Create Account</h2>
+                </div>
+                
+                <form onSubmit={handleSubmit} className={styles.registrationForm}>
+                    <div className={styles.formColumns}>
+                        {/* Column 1: Basic Information */}
+                        <div className={styles.formColumn}>
+                            <h3>Basic Information</h3>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="email">Email *</label>
+                                <input
+                                    type="email"
+                                    id="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
+                                    required
+                                    placeholder="Enter your email"
+                                />
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="fullName">Full Name *</label>
+                                <input
+                                    type="text"
+                                    id="fullName"
+                                    name="fullName"
+                                    value={formData.fullName}
+                                    onChange={handleInputChange}
+                                    required
+                                    placeholder="Enter your full name"
+                                />
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="phone">Phone Number</label>
+                                <input
+                                    type="tel"
+                                    id="phone"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleInputChange}
+                                    placeholder="+1"
+                                />
                             </div>
                         </div>
 
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="confirmPassword">Подтвердите пароль *</label>
-                            <input
-                                type="password"
-                                id="confirmPassword"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleInputChange}
-                                required
-                            />
+                        {/* Column 2: Address */}
+                        <div className={styles.formColumn}>
+                            <h3>Address</h3>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="country">Country *</label>
+                                <input
+                                    type="text"
+                                    id="country"
+                                    name="country"
+                                    value={formData.country}
+                                    onChange={handleInputChange}
+                                    required
+                                    placeholder="Enter your country"
+                                />
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="city">City *</label>
+                                <input
+                                    type="text"
+                                    id="city"
+                                    name="city"
+                                    value={formData.city}
+                                    onChange={handleInputChange}
+                                    required
+                                    placeholder="Enter your city"
+                                />
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="address">Street Address</label>
+                                <input
+                                    type="text"
+                                    id="address"
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter your street address"
+                                />
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="zipCode">ZIP Code</label>
+                                <input
+                                    type="text"
+                                    id="zipCode"
+                                    name="zipCode"
+                                    value={formData.zipCode}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter ZIP code"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Column 3: Security */}
+                        <div className={styles.formColumn}>
+                            <h3>Security</h3>
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="password">Password *</label>
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleInputChange}
+                                    required
+                                    placeholder="Enter your password"
+                                />
+                                <div className={styles.passwordStrength}>
+                                    <div className={styles.strengthBar}>
+                                        {[...Array(5)].map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className={`${styles.strengthSegment} ${
+                                                    i < passwordStrength.score ? styles.active : ''
+                                                } ${
+                                                    passwordStrength.score <= 2 ? styles.weak :
+                                                    passwordStrength.score <= 3 ? styles.medium :
+                                                    styles.strong
+                                                }`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className={styles.strengthChecklist}>
+                                        <div className={passwordStrength.hasMinLength ? styles.valid : ''}>
+                                            ✓ Minimum 8 characters
+                                        </div>
+                                        <div className={passwordStrength.hasUppercase ? styles.valid : ''}>
+                                            ✓ Uppercase letter
+                                        </div>
+                                        <div className={passwordStrength.hasLowercase ? styles.valid : ''}>
+                                            ✓ Lowercase letter
+                                        </div>
+                                        <div className={passwordStrength.hasNumber ? styles.valid : ''}>
+                                            ✓ Number
+                                        </div>
+                                        <div className={passwordStrength.hasSpecialChar ? styles.valid : ''}>
+                                            ✓ Special character
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="confirmPassword">Confirm Password *</label>
+                                <input
+                                    type="password"
+                                    id="confirmPassword"
+                                    name="confirmPassword"
+                                    value={formData.confirmPassword}
+                                    onChange={handleInputChange}
+                                    required
+                                    placeholder="Confirm your password"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* Переключатель для платежной информации */}
-                    <div className={styles.billingToggle}>
-                        <label>
-                            <input
-                                type="checkbox"
-                                name="addBilling"
-                                checked={formData.addBilling}
-                                onChange={handleInputChange}
-                            />
-                            Добавить платежную информацию
-                        </label>
+                    <div className={styles.formActions}>
+                        {error && <p className={styles.error}>{error}</p>}
+                        {success && <p className={styles.success}>{success}</p>}
+                        <button type="submit" className={styles.authButton}>
+                            Create Account
+                        </button>
+                        <p className={styles.switchText}>
+                            Already have an account? <Link to="/login">Sign in</Link>
+                        </p>
                     </div>
-
-                    {/* Платежная информация (опционально) */}
-                    {formData.addBilling && (
-                        <div className={styles.formSection}>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="cardNumber">Номер карты</label>
-                                <input
-                                    type="text"
-                                    id="cardNumber"
-                                    name="cardNumber"
-                                    value={formData.cardNumber}
-                                    onChange={(e) => {
-                                        const formatted = formatCardNumber(e.target.value);
-                                        setFormData(prev => ({ ...prev, cardNumber: formatted }));
-                                    }}
-                                    maxLength="19"
-                                    placeholder="0000 0000 0000 0000"
-                                />
-                            </div>
-
-                            <div className={styles.formRow}>
-                                <div className={styles.inputGroup}>
-                                    <label htmlFor="cardExpiry">MM/YY</label>
-                                    <input
-                                        type="text"
-                                        id="cardExpiry"
-                                        name="cardExpiry"
-                                        value={formData.cardExpiry}
-                                        onChange={(e) => {
-                                            const formatted = formatExpiry(e.target.value);
-                                            setFormData(prev => ({ ...prev, cardExpiry: formatted }));
-                                        }}
-                                        maxLength="5"
-                                        placeholder="MM/YY"
-                                    />
-                                </div>
-                                <div className={styles.inputGroup}>
-                                    <label htmlFor="cardCvv">CVV</label>
-                                    <input
-                                        type="text"
-                                        id="cardCvv"
-                                        name="cardCvv"
-                                        value={formData.cardCvv}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace(/\D/g, '');
-                                            setFormData(prev => ({ ...prev, cardCvv: value }));
-                                        }}
-                                        maxLength="4"
-                                        placeholder="***"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="billingAddress">Адрес</label>
-                                <input
-                                    type="text"
-                                    id="billingAddress"
-                                    name="billingAddress"
-                                    value={formData.billingAddress}
-                                    onChange={handleInputChange}
-                                />
-                            </div>
-
-                            <div className={styles.formRow}>
-                                <div className={styles.inputGroup}>
-                                    <label htmlFor="billingCity">Город</label>
-                                    <input
-                                        type="text"
-                                        id="billingCity"
-                                        name="billingCity"
-                                        value={formData.billingCity}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                                <div className={styles.inputGroup}>
-                                    <label htmlFor="billingZip">Индекс</label>
-                                    <input
-                                        type="text"
-                                        id="billingZip"
-                                        name="billingZip"
-                                        value={formData.billingZip}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="billingCountry">Страна</label>
-                                <input
-                                    type="text"
-                                    id="billingCountry"
-                                    name="billingCountry"
-                                    value={formData.billingCountry}
-                                    onChange={handleInputChange}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {error && <p className={styles.error}>{error}</p>}
-                    {success && <p className={styles.success}>{success}</p>}
-
-                    <button type="submit" className={styles.authButton}>
-                        Зарегистрироваться
-                    </button>
                 </form>
-
-                <p className={styles.switchText}>
-                    Уже есть аккаунт? <Link to="/login">Войти</Link>
-                </p>
             </div>
         </div>
     );

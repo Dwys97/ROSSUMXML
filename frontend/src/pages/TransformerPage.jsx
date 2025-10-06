@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import FileDropzone from '../components/common/FileDropzone';
 import Footer from '../components/common/Footer';
-import logo from '../assets/logo-light.svg';
+import TopNav from '../components/TopNav';
 
 function TransformerPage() {
     const [sourceFiles, setSourceFiles] = useState([]);
@@ -63,9 +63,7 @@ function TransformerPage() {
 
     return (
         <div className="app-container">
-            <header className="app-header">
-                <img src={logo} alt="SchemaBridge Logo" className="logo" />
-            </header>
+            <TopNav />
 
             <section className="how-to-use">
                 <div className="steps-container">

@@ -5,7 +5,7 @@ import SchemaTree from '../components/editor/SchemaTree';
 import MappingSVG from '../components/editor/MappingSVG';
 import MappingsList from '../components/editor/MappingsList';
 import Footer from '../components/common/Footer';
-import logo from '../assets/logo-light.svg';
+import TopNav from '../components/TopNav';
 import styles from './EditorPage.module.css';
 
 // --- Helper Functions (moved outside the component for clarity) ---
@@ -268,9 +268,7 @@ function EditorPage() {
 
     return (
         <div className="app-container">
-            <header className="app-header">
-                <img src={logo} alt="SchemaBridge Logo" className="logo" />
-            </header>
+            <TopNav />
             <Link to="/transformer" className="home-link">← Back to Transformer</Link>
 
             <div className="upload-section">

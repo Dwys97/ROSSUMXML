@@ -1,17 +1,27 @@
 /* ==========================================================================
    Global Styles
    ========================================================================== */
-body {
+html, body {
+    height: 100%;
     margin: 0;
+}
+
+body {
     background: linear-gradient(180deg, #0d1b2a, #1b263b);
     color: #e0e1dd;
     font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .app-container {
+    flex: 1 0 auto;
     max-width: 1600px;
     margin: 0 auto;
     padding: 20px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 input[type="file"] {
@@ -698,9 +708,14 @@ a.secondary-btn,
    Footer
    ========================================================================== */
 .app-footer {
-    padding-bottom: 20px;
+    flex-shrink: 0;
+    width: 100%;
+    padding: 20px;
     margin-top: 40px;
     color: #a5a9b5;
     font-size: 0.9rem;
     text-align: center;
+    box-sizing: border-box;
+    background: rgba(13, 27, 42, 0.5);
+    border-top: 1px solid rgba(58, 80, 107, 0.2);
 }

@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 const pool = new Pool({
     user: process.env.POSTGRES_USER || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'postgres',
-    host: process.env.POSTGRES_HOST || 'postgres',
+    host: process.env.POSTGRES_HOST || '172.18.0.2',  // IP-адрес контейнера БД
     port: process.env.POSTGRES_PORT || 5432,
     database: process.env.POSTGRES_DB || 'rossumxml'
 });
@@ -29,49 +29,20 @@ async function testConnection() {
     }
 }
 
-// Вызываем проверку при запуске
-testConnection();
-
-module.exports = {
-    /**
-     * Выполняет SQL-запрос с параметрами
-     * @param {string} text - SQL запрос
-     * @param {Array} params - параметры запроса
-     */
-    query: async function(text, params) {
-        const client = await pool.connect();
-        try {
-            return await client.query(text, params);
-        } finally {
-            client.release();
+// Функция для повторных попыток подключения
+async function waitForDatabase(retries = 5, delay = 2000) {
+    for (let i = 0; i < retries; i++) {
+        if (await testConnection()) {
+            return true;
         }
-    },
-
-    /**
-     * Получает клиент из пула для транзакций
-     */
-    getClient: async function() {
-        return await pool.connect();
-    },
-
-    /**
-     * Инициализирует базу данных
-     */
-    initDatabase: async function() {
-        const client = await pool.connect();
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            const initSQL = fs.readFileSync(path.join(__dirname, 'init.sql'), 'utf8');
-            
-            // Выполняем инициализационный скрипт
-            await client.query(initSQL);
-            console.log('Database initialized successfully');
-        } catch (err) {
-            console.error('Error initializing database:', err);
-            throw err;
-        } finally {
-            client.release();
-        }
+        console.log(`Attempt ${i + 1} failed, retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
     }
-};
+    throw new Error('Failed to connect to database after multiple attempts');
+}
+
+// Вызываем проверку при запуске с повторными попытками
+waitForDatabase();
+
+// Экспортируем сам пул и дополнительные методы
+module.exports = pool;

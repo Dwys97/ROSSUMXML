@@ -185,13 +185,140 @@ function detectCardBrand(cardNumber) {
     return 'unknown';
 }
 
-// Экспортируем отдельные обработчики для возможности прямого вызова
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.userId = decoded.id;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
+// Get user profile
+router.get('/profile', verifyToken, async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT 
+                u.id,
+                u.email,
+                u.username,
+                u.full_name,
+                u.created_at,
+                u.phone,
+                u.address,
+                u.city,
+                u.country,
+                u.zip_code,
+                s.status as subscription_status,
+                s.level as subscription_level,
+                s.expires_at as subscription_expires,
+                b.card_last4,
+                b.card_brand,
+                b.billing_address,
+                b.billing_city,
+                b.billing_country,
+                b.billing_zip
+            FROM users u
+            LEFT JOIN subscriptions s ON s.user_id = u.id
+            LEFT JOIN billing_details b ON b.user_id = u.id
+            WHERE u.id = $1
+        `, [req.userId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error fetching user profile:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Update user profile
+router.put('/profile', verifyToken, async (req, res) => {
+    const {
+        fullName,
+        phone,
+        address,
+        city,
+        country,
+        zipCode
+    } = req.body;
+
+    try {
+        const result = await db.query(`
+            UPDATE users
+            SET 
+                full_name = $1,
+                phone = $2,
+                address = $3,
+                city = $4,
+                country = $5,
+                zip_code = $6,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $7
+            RETURNING *
+        `, [fullName, phone, address, city, country, zipCode, req.userId]);
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating user profile:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Change password
+router.post('/change-password', verifyToken, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    try {
+        const user = await db.query('SELECT password FROM users WHERE id = $1', [req.userId]);
+        const validPassword = await bcrypt.compare(currentPassword, user.rows[0].password);
+        
+        if (!validPassword) {
+            return res.status(400).json({ error: 'Current password is incorrect' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await db.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, req.userId]);
+
+        res.json({ message: 'Password updated successfully' });
+    } catch (err) {
+        console.error('Error changing password:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Export handlers for direct invocation
 module.exports = {
     post: (path, req, res) => {
         if (path === '/register') {
             return router.post('/register', req, res);
         } else if (path === '/login') {
             return router.post('/login', req, res);
+        } else if (path === '/profile') {
+            return router.post('/profile', verifyToken, req, res);
+        } else if (path === '/change-password') {
+            return router.post('/change-password', verifyToken, req, res);
+        }
+    },
+    get: (path, req, res) => {
+        if (path === '/profile') {
+            return router.get('/profile', verifyToken, req, res);
+        }
+    },
+    put: (path, req, res) => {
+        if (path === '/profile') {
+            return router.put('/profile', verifyToken, req, res);
         }
     }
 };
