@@ -1,19 +1,21 @@
-// In frontend/vite.config.js
-
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+// frontend/vite.config.js
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  root: '.',          // assume you run 'npm run dev' inside frontend
+  base: '/',          // serve assets relative to /
   server: {
-    // We'll let Vite use its default port (5173)
+    host: true,       // 0.0.0.0
+    port: 5173,
+    strictPort: true, // fail if port busy
+    hmr: false,       // disable HMR for Codespaces
     proxy: {
-      // All requests to /api will be sent to our Python proxy server
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        //rewrite: (path) => path.replace(/^\/api/, ''), // If your backend routes don't start with /api
       },
     },
   },
-})
+});
