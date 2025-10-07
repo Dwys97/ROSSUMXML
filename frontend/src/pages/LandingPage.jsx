@@ -1,15 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import TopNav from '../components/TopNav';
 import Footer from '../components/common/Footer';
 import styles from './LandingPage.module.css';
+import transformerImg from '../assets/transformer.png';
+import editorImg from '../assets/editor.png';
 
 function LandingPage() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  // removed paused state; auto-advance runs when inView and not reduced motion
+  const [inView, setInView] = useState(true);
+  const previewRef = useRef(null);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+
+  const handleTouchStart = (e) => {
+    if (!e.touches || e.touches.length === 0) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current == null || !e.changedTouches || e.changedTouches.length === 0) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      setCurrentSlide((s) => (dx < 0 ? (s + 1) % 2 : (s - 1 + 2) % 2));
+    }
+  };
 
   useEffect(() => {
     setIsLoaded(true);
+    // Optional auto-advance for carousel (respects reduced motion)
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let timer;
+    if (!prefersReduced && inView) {
+      timer = setInterval(() => {
+        setCurrentSlide((prev) => (prev + 1) % 2);
+      }, 6000);
+    }
     
     const handleMouseMove = (e) => {
       setMousePosition({
@@ -19,7 +52,21 @@ function LandingPage() {
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (timer) clearInterval(timer);
+    };
+  }, [inView]);
+
+  // Start auto-advance only when the preview is in viewport
+  useEffect(() => {
+    if (!('IntersectionObserver' in window) || !previewRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      setInView(entry.isIntersecting);
+    }, { threshold: 0.1 });
+    observer.observe(previewRef.current);
+    return () => observer.disconnect();
   }, []);
 
   return (
@@ -40,7 +87,7 @@ function LandingPage() {
           </div>
           
           <div className={styles.heroContent}>
-            <div className={styles.floatingElements}>
+            <div className={styles.floatingElements} aria-hidden="true">
               <div className={styles.floatingXmlTag} data-speed="2">
                 <span className={styles.xmlBracket}>&lt;</span>
                 <span className={styles.xmlTagName}>data</span>
@@ -87,6 +134,67 @@ function LandingPage() {
                 <div className={styles.btnRipple}></div>
               </Link>
             </div>
+
+            <p className={styles.ctaMicrocopy}>No credit card required · Start in minutes</p>
+
+            <div className={styles.trustedBy} aria-label="Trusted by companies">
+              <span className={styles.trustedLabel}>Trusted by</span>
+              <ul className={styles.logoStrip}>
+                <li className={styles.logoItem} aria-hidden="true">Acme</li>
+                <li className={styles.logoItem} aria-hidden="true">Globex</li>
+                <li className={styles.logoItem} aria-hidden="true">Initech</li>
+                <li className={styles.logoItem} aria-hidden="true">Umbrella</li>
+                <li className={styles.logoItem} aria-hidden="true">Stark</li>
+              </ul>
+            </div>
+
+            {/* Hero Product Preview */}
+            <aside className={styles.heroPreview} aria-label="Product previews carousel" role="region">
+              <div
+                className={styles.previewCard}
+                ref={previewRef}
+              >
+                <div className={styles.previewHeader}>
+                  <span className={styles.previewDot}></span>
+                  <span className={styles.previewDot}></span>
+                  <span className={styles.previewDot}></span>
+                </div>
+                <div className={styles.previewBody} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+                  <div className={styles.carouselViewport}>
+                    <div className={styles.carouselTrack} aria-live="polite">
+                      <div className={`${styles.slide} ${currentSlide === 0 ? styles.active : ''}`}>
+                        <img
+                          src={transformerImg}
+                          alt="Transformer page screenshot"
+                          className={styles.previewImage}
+                          loading="lazy"
+                          decoding="async"
+                          aria-hidden={currentSlide !== 0}
+                        />
+                      </div>
+                      <div className={`${styles.slide} ${currentSlide === 1 ? styles.active : ''}`}>
+                        <img
+                          src={editorImg}
+                          alt="Editor page screenshot"
+                          className={styles.previewImage}
+                          loading="lazy"
+                          decoding="async"
+                          aria-hidden={currentSlide !== 1}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Invisible hotspot for keyboard/mouse click to go to next slide */}
+                  <button
+                    type="button"
+                    className={styles.hotspotNext}
+                    aria-label="Next screenshot"
+                    onClick={() => setCurrentSlide((s) => (s + 1) % 2)}
+                  />
+                </div>
+              </div>
+            </aside>
             
             <div className={`${styles.heroStats} ${isLoaded ? styles.loaded : ''}`}>
               <div className={styles.stat}>
@@ -146,7 +254,20 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* Features Section */}
+        {/* Testimonial Section */}
+        <section className={styles.testimonialSection}>
+          <blockquote className={styles.testimonialCard}>
+            <p>
+              “SchemaBridge cut our onboarding from months to days. Our teams ship integrations 10x faster with full auditability.”
+            </p>
+            <footer>
+              <span className={styles.testimonialAuthor}>Alex Morgan</span>
+              <span className={styles.testimonialMeta}>VP Engineering, FreightCo</span>
+            </footer>
+          </blockquote>
+        </section>
+
+  {/* Features Section */}
         <section className={styles.featuresSection}>
             <h2 className={styles.sectionTitle}>Enterprise-Grade Capabilities</h2>
             <div className={styles.featuresGrid}>
@@ -174,31 +295,18 @@ function LandingPage() {
                     <p>Real-time dashboards, comprehensive logging, and advanced analytics for monitoring transformation performance and data quality.</p>
                     <div className={styles.featureGradient}></div>
                 </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>🗺️</div>
-                    <h4>Visual Mapping Editor</h4>
-                    <p>Intuitive drag-and-drop interface for creating complex data transformations without requiring technical expertise or coding.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>🏗️</div>
-                    <h4>Scalable Architecture</h4>
-                    <p>Cloud-native platform with automatic scaling, load balancing, and multi-region deployment options for global enterprise needs.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>📝</div>
-                    <h4>Collaboration & Audit Trails</h4>
-                    <p>Enable team collaboration with role-based permissions, full change history, and exportable audit trails for compliance and transparency.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>✅</div>
-                    <h4>Automated Validation & Error Reporting</h4>
-                    <p>Instantly validate XML and data mappings with automated checks and receive actionable error reports for rapid troubleshooting and compliance.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
+        {/* Removed bottom four cards per request */}
             </div>
+        </section>
+
+        {/* Compliance & Uptime Section */}
+        <section className={styles.complianceSection} aria-label="Compliance and reliability">
+          <ul className={styles.badgeRow}>
+            <li className={styles.badge}>SOC 2 Type II</li>
+            <li className={styles.badge}>GDPR</li>
+            <li className={styles.badge}>ISO 27001</li>
+            <li className={styles.badge}>99.99% Uptime SLA</li>
+          </ul>
         </section>
 
       </div>

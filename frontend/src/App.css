@@ -1,13 +1,25 @@
 /* ==========================================================================
    Global Styles
    ========================================================================== */
+:root {
+    --bg-1: #0d1b2a;
+    --bg-2: #1b263b;
+    --text: #ffffff;
+    --text-muted: #a5a9b5;
+    --accent-green: #43e97b;
+    --accent-teal: #38f9d7;
+    --accent-blue: #1d72f3;
+    --accent-purple: #8b5cf6;
+    --card-bg: rgba(255, 255, 255, 0.04);
+    --border: rgba(255, 255, 255, 0.08);
+}
 html, body {
     height: 100%;
     margin: 0;
 }
 
 body {
-    background: linear-gradient(180deg, #0d1b2a, #1b263b);
+    background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
     color: #e0e1dd;
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
@@ -54,14 +66,14 @@ input[type="file"] {
    ========================================================================== */
 .app-title {
     margin-bottom: 5px;
-    color: #ffffff;
+    color: var(--text);
     font-size: 2rem;
     text-align: center;
 }
 
 .subtitle {
     margin-top: 5px;
-    color: #a5a9b5;
+    color: var(--text-muted);
     text-align: center;
 }
 
@@ -87,11 +99,11 @@ a.secondary-btn,
 
 .primary-btn,
 .cta-btn {
-    background: #28a745;
+    background: var(--accent-green);
 }
 .primary-btn:hover,
 .cta-btn:hover {
-    background: #1d72f3;
+    background: var(--accent-blue);
 }
 
 .secondary-btn {
@@ -104,7 +116,7 @@ a.secondary-btn,
 .btn-ghost {
     background: transparent;
     border: 1px solid #3a506b;
-    color: #a5a9b5;
+    color: var(--text-muted);
 }
 .btn-ghost:hover {
     background: #3a506b;
@@ -719,4 +731,15 @@ a.secondary-btn,
     box-sizing: border-box;
     background: rgba(13, 27, 42, 0.5);
     border-top: 1px solid rgba(58, 80, 107, 0.2);
+}
+
+/* Accessible focus-visible treatment */
+:where(a, button, input, textarea, select, [role="button"])::selection {
+    background: rgba(67, 233, 123, 0.25);
+}
+:where(a, button, input, textarea, select, [role="button"]):focus-visible {
+    outline: 2px solid var(--accent-green);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(67, 233, 123, 0.2);
+    border-radius: 6px;
 }
