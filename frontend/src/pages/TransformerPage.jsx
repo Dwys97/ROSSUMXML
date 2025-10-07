@@ -62,11 +62,10 @@ function TransformerPage() {
     };
 
     return (
-        <div className="app-container">
+        <>
             <TopNav />
-            <div style={{ paddingTop: '2rem' }}></div>
-
-            <section className="how-to-use">
+            <div className="app-container extra-spacing" style={{ paddingTop: '100px' }}>
+                <section className="how-to-use" style={{ marginTop: '0' }}>
                 <div className="steps-container">
                     <div className="step">
                         <div className="step-number">1</div>
@@ -187,9 +186,9 @@ function TransformerPage() {
                     <textarea id="outputXml" className="monospace" readOnly value={outputXml} placeholder="Transformed XML output will appear here..."></textarea>
                 </div>
             </section>
-
+            </div>
             <Footer text="© 2025 SchemaBridge — Built for production · EDI & XML integration" />
-        </div>
+        </>
     );
 }
 

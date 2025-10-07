@@ -282,12 +282,12 @@ function EditorPage() {
     }, [mappings, sourceTree]);
 
     return (
-        <div className="app-container">
+        <>
             <TopNav />
-            <div style={{ paddingTop: '2rem' }}></div>
-            <Link to="/transformer" className="home-link">← Back to Transformer</Link>
+            <div className="app-container extra-spacing" style={{ paddingTop: '100px' }}>
+                <Link to="/transformer" className="home-link" style={{ marginTop: '0' }}>← Back to Transformer</Link>
 
-            <div className="upload-section">
+                <div className="upload-section">
                 <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setSourceTree)}>
                     <div className="icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -402,9 +402,9 @@ function EditorPage() {
                     </div>
                 </div>
             </section>
-            
+            </div>
             <Footer text="Created by Daniils Radionovs" />
-        </div>
+        </>
     );
 }
 

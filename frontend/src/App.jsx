@@ -8,6 +8,10 @@ import TransformerPage from './pages/TransformerPage';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import RequestDemoPage from './pages/RequestDemoPage';
+import SolutionsPage from './pages/SolutionsPage';
+import EnterprisePage from './pages/EnterprisePage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
 import UserProfile from './components/profile/UserProfile';
 import './App.css';
 
@@ -22,6 +26,10 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/request-demo" element={<RequestDemoPage />} />
+            <Route path="/solutions" element={<SolutionsPage />} />
+            <Route path="/enterprise" element={<EnterprisePage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactPage />} />
             
             {/* Защищенные маршруты */}
             <Route 

@@ -170,7 +170,7 @@
 }
 
 .heroTitle {
-    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    font-size: clamp(2.2rem, 6.5vw, 3.8rem);
     font-weight: 800;
     margin-bottom: 2.2rem;
     line-height: 1.1;

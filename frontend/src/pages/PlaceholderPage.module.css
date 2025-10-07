@@ -1,0 +1,86 @@
+.placeholderContainer {
+  min-height: calc(100vh - 200px);
+  padding: 6rem 2rem 4rem;
+  background: linear-gradient(135deg, #0f1419 0%, #1a202c 100%);
+}
+
+.placeholderContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.placeholderTitle {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.placeholderSubtitle {
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  color: #a5a9b5;
+  margin-bottom: 4rem;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.placeholderGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-bottom: 4rem;
+}
+
+.placeholderCard {
+  background: rgba(30, 42, 58, 0.5);
+  border: 1px solid rgba(29, 114, 243, 0.2);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: left;
+  transition: all 0.3s ease;
+}
+
+.placeholderCard:hover {
+  border-color: rgba(29, 114, 243, 0.5);
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(29, 114, 243, 0.15);
+}
+
+.placeholderCard h3 {
+  font-size: 1.5rem;
+  color: #fff;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.placeholderCard p {
+  color: #a5a9b5;
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.contactInfo {
+  color: #1d72f3 !important;
+  font-weight: 600;
+  margin-top: 1rem;
+}
+
+.placeholderCta {
+  padding: 2rem;
+  background: rgba(29, 114, 243, 0.1);
+  border: 1px solid rgba(29, 114, 243, 0.3);
+  border-radius: 12px;
+  margin-top: 3rem;
+}
+
+.placeholderCta p {
+  color: #a5a9b5;
+  font-size: 1.1rem;
+  margin: 0;
+}

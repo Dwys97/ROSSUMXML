@@ -111,11 +111,11 @@ function LandingPage() {
             </div>
             
             <h1 className={`${styles.heroTitle} ${isLoaded ? styles.loaded : ''}`}>
-              <span className={styles.titleWordHighlight}>Effortless</span>
-              <span className={styles.heroSectionTitleWord}>XML</span>
-              <span className={styles.heroSectionTitleWord}>Integration, </span>
-              <span className={styles.titleWordHighlight}>Instant</span>
-              <span className={styles.heroSectionTitleWord}>Results</span>
+              <span className={`${styles.titleWord} ${styles.titleWordHighlight}`} style={{ animationDelay: '0.4s' }}>EFFORTLESS</span>
+              <span className={`${styles.titleWord} ${styles.heroSectionTitleWord}`} style={{ animationDelay: '0.9s' }}>XML</span>
+              <span className={`${styles.titleWord} ${styles.heroSectionTitleWord}`} style={{ animationDelay: '0.9s' }}>INTEGRATION,</span>
+              <span className={`${styles.titleWord} ${styles.titleWordHighlight}`} style={{ animationDelay: '1.4s' }}>INSTANT</span>
+              <span className={`${styles.titleWord} ${styles.heroSectionTitleWord}`} style={{ animationDelay: '1.9s' }}>RESULTS</span>
             </h1>
             
             <p className={`${styles.subtitle} ${isLoaded ? styles.loaded : ''}`}>
