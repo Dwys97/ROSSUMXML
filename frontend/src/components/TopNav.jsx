@@ -8,7 +8,7 @@ import logo from '../assets/logo-light.svg';
 const TopNav = memo(function TopNav() {
     const { user, checkAuth } = useAuth();
     const location = useLocation();
-    const isLandingPage = location.pathname === '/';
+    const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact'].includes(location.pathname);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -74,25 +74,27 @@ const TopNav = memo(function TopNav() {
 
                     {/* Desktop Navigation */}
                     <div className={styles.navLinks}>
-                        {isLandingPage ? (
-                            user ? (
-                                <NavLink 
-                                    to="/transformer" 
-                                    className={`${styles.navLink} ${styles.transformerButton}`}
-                                    onClick={handleNavLinkClick}
-                                >
-                                    Start Transforming
-                                </NavLink>
-                            ) : (
-                                <>
-                                    <NavLink to="/solutions" className={styles.navLink}>Solutions</NavLink>
-                                    <NavLink to="/enterprise" className={styles.navLink}>Enterprise</NavLink>
-                                    <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
-                                    <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
-                                    <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
-                                    <NavLink to="/register" className={styles.loginButton}>Register</NavLink>
-                                </>
-                            )
+                        {isPublicPage ? (
+                            <>
+                                <NavLink to="/solutions" className={styles.navLink}>Solutions</NavLink>
+                                <NavLink to="/enterprise" className={styles.navLink}>Enterprise</NavLink>
+                                <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
+                                <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
+                                {user ? (
+                                    <NavLink 
+                                        to="/transformer" 
+                                        className={`${styles.navLink} ${styles.transformerButton}`}
+                                        onClick={handleNavLinkClick}
+                                    >
+                                        Dashboard
+                                    </NavLink>
+                                ) : (
+                                    <>
+                                        <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
+                                        <NavLink to="/register" className={styles.loginButton}>Register</NavLink>
+                                    </>
+                                )}
+                            </>
                         ) : user ? (
                             <>
                                 <button 
@@ -131,37 +133,39 @@ const TopNav = memo(function TopNav() {
                 {/* Mobile Menu */}
                 {isMobileMenuOpen && (
                     <div className={styles.mobileMenu}>
-                        {isLandingPage ? (
-                            user ? (
-                                <NavLink 
-                                    to="/transformer" 
-                                    className={styles.mobileNavLink}
-                                    onClick={handleNavLinkClick}
-                                >
-                                    Start Transforming
+                        {isPublicPage ? (
+                            <>
+                                <NavLink to="/solutions" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    Solutions
                                 </NavLink>
-                            ) : (
-                                <>
-                                    <NavLink to="/solutions" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                        Solutions
+                                <NavLink to="/enterprise" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    Enterprise
+                                </NavLink>
+                                <NavLink to="/about" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    About Us
+                                </NavLink>
+                                <NavLink to="/contact" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    Contact Us
+                                </NavLink>
+                                {user ? (
+                                    <NavLink 
+                                        to="/transformer" 
+                                        className={styles.mobileNavLink}
+                                        onClick={handleNavLinkClick}
+                                    >
+                                        Dashboard
                                     </NavLink>
-                                    <NavLink to="/enterprise" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                        Enterprise
-                                    </NavLink>
-                                    <NavLink to="/about" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                        About Us
-                                    </NavLink>
-                                    <NavLink to="/contact" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                        Contact Us
-                                    </NavLink>
-                                    <NavLink to="/login" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                        Login
-                                    </NavLink>
-                                    <NavLink to="/register" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                        Register
-                                    </NavLink>
-                                </>
-                            )
+                                ) : (
+                                    <>
+                                        <NavLink to="/login" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            Login
+                                        </NavLink>
+                                        <NavLink to="/register" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            Register
+                                        </NavLink>
+                                    </>
+                                )}
+                            </>
                         ) : user ? (
                             <>
                                 <button 

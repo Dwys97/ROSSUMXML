@@ -1,67 +1,416 @@
-/* Hero Section */
-.hero {
-    text-align: center;
-    padding: 4rem 0;
+/* Main Container - Dark Modern Design */
+.container {
+    background: linear-gradient(135deg, 
+        #0f1419 0%, 
+        #1a1f2e 50%, 
+        #0f1419 100%);
+    min-height: 100vh;
+    color: #ffffff;
+    overflow-x: hidden;
 }
 
-.hero h1 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: #ffffff;
+/* Hero Section - 2025 Modern Design */
+.hero {
+    position: relative;
+    text-align: center;
+    padding: 6rem 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.heroBackground {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: 
+        radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
+            rgba(29, 114, 243, 0.15) 0%, 
+            rgba(139, 92, 246, 0.1) 35%,
+            transparent 70%),
+        linear-gradient(135deg, 
+            rgba(29, 114, 243, 0.05) 0%, 
+            rgba(139, 92, 246, 0.05) 50%, 
+            rgba(236, 72, 153, 0.05) 100%);
+    transition: background 0.3s ease;
+}
+
+.gradientOrb1, .gradientOrb2, .gradientOrb3 {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(40px);
+    pointer-events: none;
+    animation: float 6s ease-in-out infinite;
+}
+
+.gradientOrb1 {
+    width: 250px;
+    height: 250px;
+    background: radial-gradient(circle, rgba(29, 114, 243, 0.15) 0%, transparent 70%);
+    top: 20%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.gradientOrb2 {
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+    top: 60%;
+    right: 15%;
+    animation-delay: 2s;
+}
+
+.gradientOrb3 {
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(236, 72, 153, 0.1) 0%, transparent 70%);
+    bottom: 20%;
+    left: 60%;
+    animation-delay: 4s;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-20px) scale(1.05); }
+}
+
+.heroContent {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.floatingElements {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.floatingIcon {
+    position: absolute;
+    font-size: 1.5rem;
+    opacity: 0.4;
+    animation: floatIcon 12s linear infinite;
+}
+
+.floatingIcon:nth-child(1) { top: 20%; left: 10%; animation-delay: 0s; }
+.floatingIcon:nth-child(2) { top: 30%; right: 15%; animation-delay: 3s; }
+.floatingIcon:nth-child(3) { bottom: 40%; left: 20%; animation-delay: 6s; }
+.floatingIcon:nth-child(4) { bottom: 30%; right: 25%; animation-delay: 9s; }
+
+@keyframes floatIcon {
+    0% { transform: translateY(0px) rotate(0deg); opacity: 0.4; }
+    50% { transform: translateY(-20px) rotate(180deg); opacity: 0.6; }
+    100% { transform: translateY(0px) rotate(360deg); opacity: 0.4; }
+}
+
+.heroTitle {
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 30%, #1d72f3 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.heroTitle.loaded {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.titleWord {
+    display: inline-block;
+    margin-right: 0.3em;
+    animation: wordSlideIn 0.8s ease-out forwards;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.titleWord:nth-child(1) { animation-delay: 0.1s; }
+.titleWord:nth-child(2) { animation-delay: 0.2s; }
+.titleWord:nth-child(3) { animation-delay: 0.3s; }
+.titleWord:nth-child(4) { animation-delay: 0.4s; }
+
+.titleWordHighlight {
+    display: inline-block;
+    margin-right: 0.3em;
+    background: linear-gradient(135deg, #1d72f3 0%, #8b5cf6 50%, #ec4899 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: wordSlideIn 0.8s ease-out forwards, shimmer 3s ease-in-out infinite;
+    opacity: 0;
+    transform: translateY(20px);
+    animation-delay: 0.3s;
+}
+
+@keyframes wordSlideIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
 }
 
 .subtitle {
-    font-size: 1.1rem;
+    font-size: clamp(1.1rem, 3vw, 1.4rem);
     color: #a5a9b5;
-    max-width: 600px;
-    margin: 0 auto 2rem auto;
+    max-width: 700px;
+    margin: 0 auto 3rem auto;
+    line-height: 1.6;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1) 0.3s;
+}
+
+.subtitle.loaded {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.subtitleHighlight {
+    background: linear-gradient(135deg, #1d72f3 0%, #8b5cf6 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 600;
 }
 
 .ctaButtons {
     display: flex;
     justify-content: center;
-    gap: 1rem;
+    gap: 1.5rem;
+    margin-bottom: 4rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1) 0.5s;
 }
 
-/* Workflow Section */
-.workflowSection {
-    padding: 4rem 0;
+.ctaButtons.loaded {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ctaBtn {
+    position: relative;
+    padding: 1rem 2rem;
+    border-radius: 50px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    border: 1px solid transparent;
+}
+
+.primaryBtn {
+    background: linear-gradient(135deg, #1d72f3 0%, #8b5cf6 100%);
+    color: white;
+    box-shadow: 0 8px 32px rgba(29, 114, 243, 0.3);
+}
+
+.primaryBtn:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 12px 48px rgba(29, 114, 243, 0.4);
+}
+
+.btnGlow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.primaryBtn:hover .btnGlow {
+    opacity: 1;
+}
+
+.secondaryBtn {
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(20px);
+}
+
+.secondaryBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-3px) scale(1.02);
+    border-color: rgba(29, 114, 243, 0.5);
+}
+
+.heroStats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1) 0.7s;
+}
+
+.heroStats.loaded {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.stat {
     text-align: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    transition: all 0.3s ease;
+}
+
+.stat:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.statNumber {
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #1d72f3 0%, #8b5cf6 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
+.statLabel {
+    color: #a5a9b5;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Workflow Section - Modern Cards */
+.workflowSection {
+    padding: 6rem 0;
+    position: relative;
+}
+
+.workflowSection::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, 
+        transparent 0%, 
+        rgba(29, 114, 243, 0.3) 20%, 
+        rgba(139, 92, 246, 0.3) 80%, 
+        transparent 100%);
+    z-index: 0;
 }
 
 .workflowSection h2 {
+    text-align: center;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
     margin-bottom: 3rem;
+    background: linear-gradient(135deg, #ffffff 0%, #1d72f3 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    position: relative;
+    z-index: 1;
 }
 
 .stepsGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 2rem;
+    position: relative;
+    z-index: 1;
 }
 
 .step {
-    padding: 1.5rem;
-    background: #1e2a3a;
-    border-radius: 12px;
-    border: 1px solid #3a506b;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2.5rem;
+    text-align: center;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    overflow: hidden;
+}
+
+.step::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, 
+        rgba(29, 114, 243, 0.1) 0%, 
+        rgba(139, 92, 246, 0.05) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+}
+
+.step:hover {
+    transform: translateY(-10px) scale(1.02);
+    border-color: rgba(29, 114, 243, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.step:hover::before {
+    opacity: 1;
 }
 
 .stepNumber {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    background-color: #1d72f3;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #1d72f3 0%, #8b5cf6 100%);
     border-radius: 50%;
-    color: #ffffff;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 8px 32px rgba(29, 114, 243, 0.3);
 }
 
 .step h3 {
-    margin: 0 0 0.5rem 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #ffffff;
 }
 
 .step p {
@@ -69,37 +418,156 @@
     line-height: 1.6;
 }
 
-/* Features Section */
+/* Features Section - Modern Grid */
 .featuresSection {
-    padding: 4rem 0;
-    text-align: center;
+    padding: 6rem 0;
+    background: linear-gradient(135deg, 
+        rgba(29, 114, 243, 0.02) 0%, 
+        rgba(139, 92, 246, 0.02) 50%,
+        rgba(236, 72, 153, 0.02) 100%);
 }
 
 .featuresSection h2 {
+    text-align: center;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
     margin-bottom: 3rem;
+    background: linear-gradient(135deg, #ffffff 0%, #1d72f3 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .featuresGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2.5rem;
     text-align: left;
 }
 
 .featureCard {
-    background: #1e2a3a;
-    padding: 1.5rem;
-    border-radius: 12px;
-    border-left: 3px solid #1d72f3;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 3rem;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.featureCard::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(
+        from 0deg at 50% 50%,
+        transparent 0deg,
+        rgba(29, 114, 243, 0.1) 60deg,
+        rgba(139, 92, 246, 0.1) 120deg,
+        rgba(236, 72, 153, 0.1) 180deg,
+        transparent 240deg
+    );
+    opacity: 0;
+    transition: all 0.6s ease;
+    animation: rotate 10s linear infinite;
+    z-index: -1;
+}
+
+.featureCard:hover::before {
+    opacity: 1;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.featureCard:hover {
+    transform: translateY(-8px);
+    border-color: rgba(29, 114, 243, 0.2);
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+}
+
+.featureCard::after {
+    content: '';
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #1d72f3 0%, #8b5cf6 100%);
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    box-shadow: 0 8px 32px rgba(29, 114, 243, 0.3);
+    transition: all 0.3s ease;
+}
+
+.featureCard:hover::after {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 12px 40px rgba(29, 114, 243, 0.4);
 }
 
 .featureCard h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.1rem;
+    margin: 4rem 0 1rem 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #ffffff;
 }
 
 .featureCard p {
     color: #a5a9b5;
     line-height: 1.6;
     margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .ctaButtons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .stepsGrid,
+    .featuresGrid {
+        grid-template-columns: 1fr;
+    }
+    
+    .heroTitle {
+        font-size: 2.5rem;
+    }
+    
+    .step,
+    .featureCard {
+        padding: 2rem;
+    }
+    
+    .gradientOrb1,
+    .gradientOrb2,
+    .gradientOrb3 {
+        width: 200px;
+        height: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .heroContent {
+        padding: 0 1rem;
+    }
+    
+    .workflowSection,
+    .featuresSection {
+        padding: 4rem 1rem;
+    }
+    
+    .ctaBtn {
+        padding: 0.8rem 1.5rem;
+        font-size: 0.9rem;
+    }
 }

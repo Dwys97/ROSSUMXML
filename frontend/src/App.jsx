@@ -7,6 +7,7 @@ import EditorPage from './pages/EditorPage';
 import TransformerPage from './pages/TransformerPage';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
+import RequestDemoPage from './pages/RequestDemoPage';
 import UserProfile from './components/profile/UserProfile';
 import './App.css';
 
@@ -20,6 +21,7 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/request-demo" element={<RequestDemoPage />} />
             
             {/* Защищенные маршруты */}
             <Route 
