@@ -5,7 +5,7 @@ function FileDropzone({ onFileSelect, children, multiple = false }) {
     const [fileName, setFileName] = useState('');
     const inputRef = useRef(null);
 
-    const processFiles = (files) => {
+    const processFiles = useCallback((files) => {
         if (!files || files.length === 0) return;
 
         const filePromises = Array.from(files).map(file => {
@@ -21,7 +21,7 @@ function FileDropzone({ onFileSelect, children, multiple = false }) {
             onFileSelect(fileData);
             setFileName(fileData.map(f => f.name).join(', '));
         });
-    };
+    }, [onFileSelect]);
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault();
@@ -40,7 +40,7 @@ function FileDropzone({ onFileSelect, children, multiple = false }) {
         e.stopPropagation();
         setIsDragOver(false);
         processFiles(e.dataTransfer.files);
-    }, [onFileSelect]);
+    }, [processFiles]);
 
     const handleChange = (e) => {
         processFiles(e.target.files);
@@ -68,7 +68,8 @@ function FileDropzone({ onFileSelect, children, multiple = false }) {
                 style={{ display: 'none' }}
                 multiple={multiple}
             />
-            {fileName ? <div className="file-name-display">✔ {fileName}</div> : children}
+            {children}
+            {fileName && <div className="file-name-display">✔ {fileName}</div>}
         </div>
     );
 }

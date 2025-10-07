@@ -171,6 +171,18 @@ a.secondary-btn {
     font-size: 0.9rem;
 }
 
+.file-name-display {
+    margin-top: 15px;
+    padding: 10px 15px;
+    background: rgba(40, 167, 69, 0.1);
+    border: 1px solid #28a745;
+    border-radius: 8px;
+    color: #28a745;
+    font-size: 0.9rem;
+    font-weight: 500;
+    word-break: break-all;
+}
+
 .config-card {
     display: flex;
     flex-wrap: wrap;
