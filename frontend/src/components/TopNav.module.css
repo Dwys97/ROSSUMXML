@@ -5,7 +5,7 @@
     right: 0;
     background: rgba(13, 27, 42, 0.95);
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    /* border-bottom removed for flush look */
     z-index: 1000;
 }
 
@@ -19,7 +19,7 @@
 }
 
 .logo {
-    height: 32px;
+    height: 48px;
     width: auto;
 }
 
@@ -251,7 +251,7 @@
     }
 
     .logo {
-        height: 28px;
+        height: 40px;
     }
 
     .mobileMenu {
