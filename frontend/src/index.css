@@ -9,7 +9,7 @@ body {
 }
 
 .app-container {
-    max-width: 1600px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -359,6 +359,13 @@ a.secondary-btn {
 }
 .schema-card h3 {
     margin: 0 0 10px 0;
+}
+
+.mapping-svg-container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
 }
 
 .mapping-svg {

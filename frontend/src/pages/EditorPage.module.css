@@ -2,7 +2,8 @@
     position: relative;
     display: grid;
     /* Updated grid to give a fixed width to the SVG column */
-    grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr) 350px;
-    gap: 20px;
+    grid-template-columns: minmax(0, 1fr) 50px minmax(0, 1fr) 350px;
+    gap: 4px;
+    column-gap: 4px;
     align-items: start;
 }

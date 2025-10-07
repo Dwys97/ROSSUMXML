@@ -4,9 +4,11 @@ const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, t
     const [lines, setLines] = useState([]);
 
     const updateLines = useCallback(() => {
-        if (!editorRef.current) return;
+        if (!editorRef.current || !sourceTreeRef.current || !targetTreeRef.current) return;
 
         const svgRect = editorRef.current.getBoundingClientRect();
+        const sourceTreeRect = sourceTreeRef.current.getBoundingClientRect();
+        const targetTreeRect = targetTreeRef.current.getBoundingClientRect();
         
         const newLines = mappings
             .map(m => {
@@ -22,6 +24,14 @@ const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, t
                 
                 if (sRect.width === 0 || tRect.width === 0) return null;
 
+                // Check if source node is visible within its tree container
+                const sourceVisible = sRect.bottom > sourceTreeRect.top && sRect.top < sourceTreeRect.bottom;
+                // Check if target node is visible within its tree container
+                const targetVisible = tRect.bottom > targetTreeRect.top && tRect.top < targetTreeRect.bottom;
+                
+                // Only draw the line if both endpoints are visible
+                if (!sourceVisible || !targetVisible) return null;
+
                 const x1 = sRect.right - svgRect.left;
                 const y1 = sRect.top + sRect.height / 2 - svgRect.top;
                 const x2 = tRect.left - svgRect.left;
@@ -33,7 +43,7 @@ const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, t
             .filter(Boolean);
         
         setLines(newLines);
-    }, [mappings, nodeRefs, editorRef]);
+    }, [mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef]);
 
     useImperativeHandle(ref, () => ({
         updateLines
@@ -48,8 +58,9 @@ const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, t
         
         // Use ResizeObserver to watch for layout changes within the editor
         const observer = new ResizeObserver(updateLines);
-        if (editorRef.current) {
-            observer.observe(editorRef.current);
+        const editorElement = editorRef.current;
+        if (editorElement) {
+            observer.observe(editorElement);
         }
 
         const sourceTree = sourceTreeRef.current;
@@ -65,8 +76,8 @@ const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, t
         return () => {
             clearTimeout(timeoutId);
             window.removeEventListener('resize', updateLines);
-            if (editorRef.current) {
-               observer.unobserve(editorRef.current);
+            if (editorElement) {
+               observer.unobserve(editorElement);
             }
             if (sourceTree) {
                 sourceTree.removeEventListener('scroll', updateLines);

@@ -64,6 +64,7 @@ function TransformerPage() {
     return (
         <div className="app-container">
             <TopNav />
+            <div style={{ paddingTop: '2rem' }}></div>
 
             <section className="how-to-use">
                 <div className="steps-container">
@@ -94,26 +95,51 @@ function TransformerPage() {
 
             <div className="upload-section">
                 <FileDropzone onFileSelect={(files) => { setSourceFiles(files); setSourceCount(files.length); if (files.length > 0) setInputXml(files[0].content); }}>
-                    <div className="icon"><i className="fa-solid fa-file-code"></i></div>
+                    <div className="icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 12H15M9 16H15M17 21H7C6.46957 21 5.96086 20.7893 5.58579 20.4142C5.21071 20.0391 5 19.5304 5 19V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H12.586C12.8512 3.00006 13.1055 3.10545 13.293 3.293L18.707 8.707C18.8946 8.89449 18.9999 9.1488 19 9.414V19C19 19.5304 18.7893 20.0391 18.4142 20.4142C18.0391 20.7893 17.5304 21 17 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M13 3V7C13 7.53043 13.2107 8.03914 13.5858 8.41421C13.9609 8.78929 14.4696 9 15 9H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
                     <h3>Source XML(s)</h3>
                     <p>Drop XML or ZIP files here</p>
                     <span className="file-count">Selected: <span id="sourceCount">{sourceCount}</span></span>
                 </FileDropzone>
 
                 <FileDropzone onFileSelect={(files) => setDestinationXml(files[0])}>
-                    <div className="icon"><i className="fa-solid fa-file-import"></i></div>
+                    <div className="icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M12 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M9 14L12 17L15 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
                     <h3>Destination Template</h3>
                     <p>Drop a single XML template</p>
                 </FileDropzone>
 
                 <FileDropzone onFileSelect={(files) => setXsdSchema(files[0])}>
-                    <div className="icon"><i className="fa-solid fa-file-circle-check"></i></div>
+                    <div className="icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M9 15L11 17L16 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
                     <h3>XSD Schema</h3>
                     <p>Drop XSD for output validation (Optional)</p>
                 </FileDropzone>
 
                 <FileDropzone onFileSelect={(files) => setMappingJson(files[0])}>
-                    <div className="icon"><i className="fa-solid fa-code-merge"></i></div>
+                    <div className="icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M8 13L10 15L8 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M16 13L14 15L16 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
                     <h3>Mapping JSON</h3>
                     <p>Drop your mapping file</p>
                 </FileDropzone>
