@@ -15,6 +15,7 @@ function LandingPage() {
   const previewRef = useRef(null);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+  const [animatedWords, setAnimatedWords] = useState([false, false, false, false]);
 
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return;
@@ -69,6 +70,22 @@ function LandingPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Animate hero words sequentially
+  useEffect(() => {
+    const delays = [400, 900, 1400, 1900]; // Stagger delays for each word
+    const timers = delays.map((delay, index) => 
+      setTimeout(() => {
+        setAnimatedWords(prev => {
+          const updated = [...prev];
+          updated[index] = true;
+          return updated;
+        });
+      }, delay)
+    );
+    
+    return () => timers.forEach(timer => clearTimeout(timer));
+  }, []);
+
   return (
     <>
       <TopNav />
@@ -111,11 +128,10 @@ function LandingPage() {
             </div>
             
             <h1 className={`${styles.heroTitle} ${isLoaded ? styles.loaded : ''}`}>
-              <span className={styles.titleWordHighlight}>Effortless</span>
-              <span className={styles.heroSectionTitleWord}>XML</span>
-              <span className={styles.heroSectionTitleWord}>Integration</span>
-              <span className={styles.titleWordHighlight}>Instant</span>
-              <span className={styles.heroSectionTitleWord}>Results</span>
+              <span className={`${styles.titleWordHighlight} ${animatedWords[0] ? styles.wordAnimated : styles.wordHidden}`}>Effortless</span>
+              <span className={`${styles.heroSectionTitleWord} ${animatedWords[1] ? styles.wordAnimated : styles.wordHidden}`}>XML Integration</span>
+              <span className={`${styles.titleWordHighlight} ${animatedWords[2] ? styles.wordAnimated : styles.wordHidden}`}>Instant</span>
+              <span className={`${styles.heroSectionTitleWord} ${animatedWords[3] ? styles.wordAnimated : styles.wordHidden}`}>Results</span>
             </h1>
             
             <p className={`${styles.subtitle} ${isLoaded ? styles.loaded : ''}`}>
