@@ -1,0 +1,48 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start Database",
+            "type": "shell",
+            "command": "docker-compose up -d db && docker-compose logs -f db",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "development"
+            }
+        },
+        {
+            "label": "Start Backend",
+            "type": "shell",
+            "command": "cd backend && sam local start-api --docker-network rossumxml_default --port 3000",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "development"
+            }
+        },
+        {
+            "label": "Start Frontend",
+            "type": "shell",
+            "command": "cd frontend && npm run dev",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "development"
+            }
+        },
+        {
+            "label": "Start Development Environment",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "Start Database",
+                "Start Backend",
+                "Start Frontend"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
