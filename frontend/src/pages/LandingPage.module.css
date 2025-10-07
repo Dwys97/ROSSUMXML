@@ -148,6 +148,14 @@
 .floatingXmlTag:nth-child(2) { top: 30%; right: 15%; animation-delay: 3s; }
 .floatingXmlTag:nth-child(3) { bottom: 40%; left: 20%; animation-delay: 6s; }
 .floatingXmlTag:nth-child(4) { bottom: 30%; right: 25%; animation-delay: 9s; }
+.floatingXmlTag:nth-child(5) { top: 15%; right: 8%; animation-delay: 1.5s; }
+.floatingXmlTag:nth-child(6) { top: 45%; left: 5%; animation-delay: 4.5s; }
+.floatingXmlTag:nth-child(7) { bottom: 25%; left: 12%; animation-delay: 7.5s; }
+.floatingXmlTag:nth-child(8) { top: 55%; right: 20%; animation-delay: 2s; }
+.floatingXmlTag:nth-child(9) { bottom: 15%; right: 10%; animation-delay: 5s; }
+.floatingXmlTag:nth-child(10) { top: 65%; left: 15%; animation-delay: 8s; }
+.floatingXmlTag:nth-child(11) { bottom: 50%; right: 5%; animation-delay: 10s; }
+.floatingXmlTag:nth-child(12) { top: 40%; right: 30%; animation-delay: 11s; }
 
 .xmlBracket {
     color: #8b5cf6;
@@ -509,6 +517,7 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-bottom: 0.5rem;
+    white-space: nowrap;
 }
 
 .statLabel {
@@ -759,8 +768,7 @@
     .statNumber {
         font-size: 1.5rem;
     }
-    .floatingXmlTag:nth-child(3),
-    .floatingXmlTag:nth-child(4) {
+    .floatingXmlTag:nth-child(n+3) {
         display: none;
     }
 }
@@ -815,9 +823,7 @@
     .statLabel {
         font-size: 0.8rem;
     }
-    .floatingXmlTag:nth-child(2),
-    .floatingXmlTag:nth-child(3),
-    .floatingXmlTag:nth-child(4) {
+    .floatingXmlTag:nth-child(n+2) {
         display: none;
     }
     .workflowSection,
