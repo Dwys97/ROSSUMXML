@@ -80,16 +80,8 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                 setError(null);
             })
             .catch(err => {
-                // Use fallback user data from AuthContext if API fails
-                console.warn('Profile API not available, using fallback data:', err.message);
-                setUserData(prevData => ({
-                    ...prevData,
-                    username: user.username || 'User',
-                    email: user.email || 'user@example.com',
-                    fullName: user.fullName || user.full_name || 'Unknown User',
-                    created_at: user.created_at || new Date().toISOString()
-                }));
-                setError('Profile features limited - backend API not fully implemented');
+                setError(`Failed to load profile: ${err.message}`);
+                console.error('Failed to load profile:', err);
             })
             .finally(() => setLoading(false));
         }

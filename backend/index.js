@@ -163,6 +163,22 @@ const createResponse = (statusCode, body, contentType = 'application/json') => (
     }
 });
 
+// JWT verification function
+const verifyJWT = (event) => {
+    const authHeader = event.headers?.Authorization || event.headers?.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error('No valid authorization token provided');
+    }
+    
+    const token = authHeader.slice(7); // Remove 'Bearer ' prefix
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        return decoded;
+    } catch (error) {
+        throw new Error('Invalid or expired token');
+    }
+};
+
 exports.handler = async (event) => {
     if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
         return {
@@ -330,6 +346,242 @@ exports.handler = async (event) => {
                 console.error('Login error:', err);
                 return createResponse(500, JSON.stringify({
                     error: 'Login failed',
+                    details: err.message
+                }));
+            }
+        }
+
+        // User Profile Endpoint (GET)
+        if (path.endsWith('/user/profile') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                // Verify JWT token
+                const decoded = verifyJWT(event);
+                const userId = decoded.id;
+
+                // Get user data with subscription and billing info
+                const result = await pool.query(`
+                    SELECT 
+                        u.id,
+                        u.username,
+                        u.email,
+                        u.full_name,
+                        u.phone,
+                        u.address,
+                        u.city,
+                        u.country,
+                        u.zip_code,
+                        u.created_at,
+                        u.updated_at,
+                        s.status as subscription_status,
+                        s.level as subscription_level,
+                        s.expires_at as subscription_expires,
+                        bd.card_last4,
+                        bd.card_brand,
+                        bd.billing_address,
+                        bd.billing_city,
+                        bd.billing_country,
+                        bd.billing_zip
+                    FROM users u
+                    LEFT JOIN subscriptions s ON u.id = s.user_id
+                    LEFT JOIN billing_details bd ON u.id = bd.user_id
+                    WHERE u.id = $1
+                `, [userId]);
+
+                if (result.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({
+                        error: 'User not found'
+                    }));
+                }
+
+                const userData = result.rows[0];
+                
+                // Format the response data
+                const profileData = {
+                    id: userData.id,
+                    username: userData.username,
+                    email: userData.email,
+                    fullName: userData.full_name,
+                    phone: userData.phone || '',
+                    address: userData.address || '',
+                    city: userData.city || '',
+                    country: userData.country || '',
+                    zipCode: userData.zip_code || '',
+                    created_at: userData.created_at,
+                    updated_at: userData.updated_at,
+                    subscription_status: userData.subscription_status || 'inactive',
+                    subscription_level: userData.subscription_level || 'free',
+                    subscription_expires: userData.subscription_expires,
+                    card_last4: userData.card_last4 || '',
+                    card_brand: userData.card_brand || '',
+                    billing_address: userData.billing_address || '',
+                    billing_city: userData.billing_city || '',
+                    billing_country: userData.billing_country || '',
+                    billing_zip: userData.billing_zip || ''
+                };
+
+                return createResponse(200, JSON.stringify(profileData));
+
+            } catch (err) {
+                console.error('User profile error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({
+                        error: 'Unauthorized',
+                        details: err.message
+                    }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch user profile',
+                    details: err.message
+                }));
+            }
+        }
+
+        // Update User Profile Endpoint (POST/PUT)
+        if (path.endsWith('/user/profile/update') && (event.httpMethod === 'POST' || event.httpMethod === 'PUT' || event.requestContext?.http?.method === 'POST' || event.requestContext?.http?.method === 'PUT')) {
+            try {
+                // Verify JWT token
+                const decoded = verifyJWT(event);
+                const userId = decoded.id;
+
+                const { 
+                    fullName, 
+                    phone, 
+                    address, 
+                    city, 
+                    country, 
+                    zipCode 
+                } = body;
+
+                // Validate required fields
+                if (!fullName) {
+                    return createResponse(400, JSON.stringify({
+                        error: 'Full name is required'
+                    }));
+                }
+
+                // Update user profile
+                const result = await pool.query(`
+                    UPDATE users 
+                    SET 
+                        full_name = $1,
+                        phone = $2,
+                        address = $3,
+                        city = $4,
+                        country = $5,
+                        zip_code = $6,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $7
+                    RETURNING id, username, email, full_name, phone, address, city, country, zip_code, updated_at
+                `, [fullName, phone, address, city, country, zipCode, userId]);
+
+                if (result.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({
+                        error: 'User not found'
+                    }));
+                }
+
+                const updatedUser = result.rows[0];
+
+                return createResponse(200, JSON.stringify({
+                    message: 'Profile updated successfully',
+                    user: {
+                        id: updatedUser.id,
+                        username: updatedUser.username,
+                        email: updatedUser.email,
+                        fullName: updatedUser.full_name,
+                        phone: updatedUser.phone || '',
+                        address: updatedUser.address || '',
+                        city: updatedUser.city || '',
+                        country: updatedUser.country || '',
+                        zipCode: updatedUser.zip_code || '',
+                        updated_at: updatedUser.updated_at
+                    }
+                }));
+
+            } catch (err) {
+                console.error('Profile update error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({
+                        error: 'Unauthorized',
+                        details: err.message
+                    }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to update profile',
+                    details: err.message
+                }));
+            }
+        }
+
+        // Change Password Endpoint (POST)
+        if (path.endsWith('/user/change-password') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                // Verify JWT token
+                const decoded = verifyJWT(event);
+                const userId = decoded.id;
+
+                const { currentPassword, newPassword } = body;
+
+                // Validate required fields
+                if (!currentPassword || !newPassword) {
+                    return createResponse(400, JSON.stringify({
+                        error: 'Current password and new password are required'
+                    }));
+                }
+
+                // Validate new password strength
+                if (newPassword.length < 8) {
+                    return createResponse(400, JSON.stringify({
+                        error: 'New password must be at least 8 characters long'
+                    }));
+                }
+
+                // Get current user password
+                const userResult = await pool.query(
+                    'SELECT password FROM users WHERE id = $1',
+                    [userId]
+                );
+
+                if (userResult.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({
+                        error: 'User not found'
+                    }));
+                }
+
+                const user = userResult.rows[0];
+                
+                // Verify current password
+                const validPassword = await bcrypt.compare(currentPassword, user.password);
+                if (!validPassword) {
+                    return createResponse(400, JSON.stringify({
+                        error: 'Current password is incorrect'
+                    }));
+                }
+
+                // Hash new password
+                const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+                // Update password
+                await pool.query(`
+                    UPDATE users 
+                    SET password = $1, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $2
+                `, [hashedNewPassword, userId]);
+
+                return createResponse(200, JSON.stringify({
+                    message: 'Password changed successfully'
+                }));
+
+            } catch (err) {
+                console.error('Password change error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({
+                        error: 'Unauthorized',
+                        details: err.message
+                    }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to change password',
                     details: err.message
                 }));
             }
