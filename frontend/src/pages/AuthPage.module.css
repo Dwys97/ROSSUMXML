@@ -1,3 +1,88 @@
+/* Floating label input group */
+.floatingGroup {
+    position: relative;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    width: 100%;
+}
+.floatingGroup input {
+    flex: 1 1 0%;
+    width: 100%;
+    padding: 1.1rem 2.5rem 0.5rem 1rem;
+    border: 1.5px solid rgba(255,255,255,0.18);
+    border-radius: 12px;
+    background: rgba(13,27,42,0.55);
+    color: #fff;
+    font-size: 1rem;
+    transition: border 0.2s, box-shadow 0.2s;
+    outline: none;
+    box-sizing: border-box;
+}
+.floatingGroup input:focus {
+    border-color: #43e97b;
+    box-shadow: 0 0 0 2px #43e97b33;
+}
+.floatingLabel {
+    position: absolute;
+    left: 1rem;
+    top: 1.1rem;
+    color: #bfc9d8;
+    font-size: 1rem;
+    pointer-events: none;
+    background: transparent;
+    transition: all 0.18s cubic-bezier(.4,0,.2,1);
+    z-index: 2;
+}
+.floatingGroup input:focus + .floatingLabel,
+.floatingGroup input.filled + .floatingLabel {
+    top: -0.7rem;
+    left: 0.8rem;
+    font-size: 0.85rem;
+    color: #43e97b;
+    background: #192132;
+    padding: 0 0.3em;
+    border-radius: 6px;
+}
+.showPasswordBtn {
+    position: absolute;
+    right: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #bfc9d8;
+    font-size: 1.15rem;
+    cursor: pointer;
+    z-index: 3;
+    padding: 0 0.2em;
+    display: flex;
+    align-items: center;
+    height: 2.2rem;
+}
+.showPasswordBtn:focus-visible {
+    outline: 2px solid #43e97b;
+}
+
+/* Form microcopy */
+.formMicrocopy {
+    color: #bfc9d8;
+    font-size: 1.05rem;
+    margin-bottom: 1.5rem;
+    margin-top: -0.5rem;
+}
+
+/* Animated CTA arrow */
+.arrowIcon {
+    display: inline-block;
+    margin-left: 0.5em;
+    font-size: 1.2em;
+    transition: transform 0.18s cubic-bezier(.4,0,.2,1);
+}
+.authButton:hover .arrowIcon {
+    transform: translateX(6px);
+}
 /* Container */
 html, body {
     min-height: 100vh;
@@ -24,7 +109,7 @@ body {
 /* Auth Box */
 .authBox {
     width: 100%;
-    max-width: 1200px;
+    max-width: 1400px;
     background: rgba(13, 27, 42, 0.8);
     backdrop-filter: blur(12px);
     padding: 2.5rem;
@@ -44,16 +129,22 @@ body {
 
 .formColumns {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 2rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(3, minmax(260px, 1fr));
+    gap: 2.5rem;
+    margin-bottom: 1.5rem;
+    align-items: stretch;
 }
 
 .formColumn {
     background: rgba(255, 255, 255, 0.03);
-    padding: 1.5rem;
+    padding: 1.25rem;
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+    justify-content: flex-start;
 }
 
 .formColumn h3 {
@@ -64,6 +155,7 @@ body {
     letter-spacing: -0.02em;
     text-transform: uppercase;
     opacity: 0.9;
+    align-self: flex-start;
 }
 
 .formActions {
@@ -102,35 +194,17 @@ body {
 /* Form Elements */
 .inputGroup {
     text-align: left;
-    margin-bottom: 1rem;
+    margin-bottom: 0.9rem;
 }
 
-.inputGroup label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: #e0e1dd;
-    font-size: 0.875rem;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-}
+.inputGroup label { display: block; margin-bottom: 0.4rem; color: rgba(255,255,255,0.9); font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em; }
 
 .inputGroup input::placeholder {
     color: rgba(255, 255, 255, 0.3);
     font-size: 0.875rem;
 }
 
-.inputGroup input {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 0.625rem;
-    background: rgba(13, 27, 42, 0.5);
-    color: #ffffff;
-    font-size: 1rem;
-    transition: all 0.2s ease-in-out;
-    height: 2.75rem;
-    letter-spacing: 0.01em;
-}
+.inputGroup input { width: 100%; padding: 0.75rem 1rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; background: rgba(13, 27, 42, 0.5); color: #ffffff; font-size: 1rem; transition: all 0.2s ease-in-out; height: 2.9rem; letter-spacing: 0.01em; }
 
 .inputGroup input:focus {
     outline: none;
@@ -394,4 +468,280 @@ body {
     .authButton {
         width: 100%;
     }
+}
+
+/* --- Modern 2025 split-screen additions (override defaults) --- */
+/* Container overrides to add decorative background and spacing for TopNav */
+.authContainer {
+    position: relative;
+    padding: 6rem 1.25rem 3rem 1.25rem;
+    overflow: hidden;
+}
+.authBackground { position: absolute; inset: 0; z-index: 0; }
+.authOverlay { position: absolute; inset: 0; background: rgba(15,20,25,0.55); }
+.gradientOrb1, .gradientOrb2, .gradientOrb3 { position: absolute; border-radius: 50%; filter: blur(40px); pointer-events: none; animation: authFloat 6s ease-in-out infinite; }
+.gradientOrb1 { width: 260px; height: 260px; background: radial-gradient(circle, rgba(29,114,243,0.15) 0%, transparent 70%); top: 12%; left: 8%; }
+.gradientOrb2 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%); bottom: 10%; right: 10%; animation-delay: 2s; }
+.gradientOrb3 { width: 200px; height: 200px; background: radial-gradient(circle, rgba(236,72,153,0.1) 0%, transparent 70%); bottom: 40%; left: 60%; animation-delay: 4s; }
+@keyframes authFloat { 0%,100%{ transform: translateY(0) scale(1);} 50%{ transform: translateY(-16px) scale(1.03);} }
+
+/* Card overrides */
+.authBox {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    padding: 1.25rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+}
+
+/* Split grid */
+.authGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.authSidePanel {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    height: 100%;
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+}
+
+.authFormPanel {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 16px;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+.loginForm {
+    max-width: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.formTitle {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.01em;
+}
+
+.panelTitle {
+    color: #fff;
+    font-size: 1.75rem;
+    font-weight: 800;
+    margin: 0 0 0.75rem 0;
+    text-shadow: 0 2px 12px #1d72f3;
+    line-height: 1.2;
+}
+.panelSubtitle {
+    color: rgba(255,255,255,0.85);
+    margin: 0 0 1.5rem 0;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+.brandLogo {
+    margin-bottom: 1.25rem;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.35));
+    max-width: 180px;
+    height: auto;
+}
+
+/* Quote and features */
+.quote {
+    margin: 0 0 1.5rem 0;
+    padding: 1.25rem;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 12px;
+    color: rgba(255,255,255,0.9);
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+.quoteAuthor {
+    display: block;
+    margin-top: 0.75rem;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+.featureBullets {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem 0;
+    color: rgba(255,255,255,0.9);
+}
+
+.featureBullets li {
+    margin: 0.65rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    line-height: 1.5;
+}
+
+.featureBullets li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: #43e97b;
+    font-weight: bold;
+}
+
+/* Trusted by */
+.trustedBy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: auto;
+    padding-top: 1.5rem;
+}
+
+.trustedLabel {
+    color: rgba(255,255,255,0.65);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.logoStrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    opacity: 0.85;
+}
+
+.logoItem {
+    color: rgba(255,255,255,0.5);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    filter: grayscale(1);
+    font-size: 0.875rem;
+}
+
+/* Buttons and links */
+.authButton { border: 0; border-radius: 12px; background: linear-gradient(135deg, #1d72f3 0%, #8b5cf6 100%); color: #fff; font-weight: 700; margin-top: 1rem; transition: transform 180ms ease, box-shadow 180ms ease; box-shadow: 0 8px 32px rgba(29,114,243,0.35); }
+.authButton:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(29,114,243,0.45); }
+.authButton:focus-visible { outline: 3px solid rgba(29,114,243,0.5); outline-offset: 2px; }
+.authButton:disabled { opacity: 0.6; cursor: not-allowed; }
+.forgotPassword { color: #7fb5ff; }
+.legal { color: rgba(255,255,255,0.6); font-size: 0.8rem; margin-top: 0.75rem; }
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .authGrid { grid-template-columns: 1fr; }
+  .authBox { padding: 1rem; }
+}
+@media (max-width: 900px) {
+  .authBox { padding: 1rem; }
+}
+@media (max-width: 480px) {
+  .authContainer { padding: 5rem 0.75rem 1.25rem 0.75rem; }
+  .authBox { padding: 0.75rem; }
+}
+
+/* Registration form layout overrides */
+.registrationForm {
+    max-width: none;
+    margin: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.registrationForm .formColumns {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    gap: 2rem;
+}
+
+@media (min-width: 1400px) {
+    .registrationForm .formColumns {
+        grid-template-columns: repeat(3, minmax(280px, 1fr));
+    }
+}
+
+/* Registration page specific grid layout */
+.registrationForm ~ .authSidePanel {
+    grid-column: 1 / -1;
+    max-width: 100%;
+    height: auto;
+    min-height: auto;
+}
+
+/* When parent has registration form, stack vertically */
+.authGrid:has(.registrationForm) {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.authGrid:has(.registrationForm) .authFormPanel {
+    width: 100%;
+    max-width: 100%;
+}
+
+.authGrid:has(.registrationForm) .authSidePanel {
+    width: 100%;
+    max-width: 100%;
+    padding: 2rem 2.5rem;
+}
+
+.authGrid:has(.registrationForm) .authSidePanel .panelTitle {
+    text-align: center;
+}
+
+.authGrid:has(.registrationForm) .authSidePanel .panelSubtitle {
+    text-align: center;
+}
+
+.authGrid:has(.registrationForm) .authSidePanel .brandLogo {
+    margin: 0 auto 1.25rem;
+    display: block;
+}
+
+.authGrid:has(.registrationForm) .authSidePanel .quote {
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.authGrid:has(.registrationForm) .authSidePanel .featureBullets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.5rem 2rem;
+    max-width: 900px;
+    margin: 0 auto 1.5rem;
+}
+
+.authGrid:has(.registrationForm) .authSidePanel .trustedBy {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding-top: 1rem;
 }

@@ -39,6 +39,8 @@ const RegisterPage = () => {
 
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     // Проверка силы пароля при каждом изменении
     useEffect(() => {
@@ -146,10 +148,206 @@ const RegisterPage = () => {
                 </div>
                 <div className={styles.authBox} role="main" aria-labelledby="register-heading">
                     <div className={styles.authGrid}>
-                        <aside className={styles.authSidePanel} aria-label="About">
+                        <section className={styles.authFormPanel} aria-label="Registration form">
+                            <h1 className={styles.formTitle}>Create your account</h1>
+                            <p className={styles.formMicrocopy}>Start your free trial. No credit card required. Cancel anytime.</p>
+                            <form onSubmit={handleSubmit} className={styles.registrationForm} noValidate>
+                                <div className={styles.formColumns}>
+                                    {/* Column 1: Basic Information */}
+                                    <div className={styles.formColumn}>
+                                        <h3>Basic Information</h3>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type="email"
+                                                id="email"
+                                                name="email"
+                                                value={formData.email}
+                                                onChange={handleInputChange}
+                                                required
+                                                className={formData.email ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="email" className={styles.floatingLabel}>Email *</label>
+                                        </div>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type="text"
+                                                id="fullName"
+                                                name="fullName"
+                                                value={formData.fullName}
+                                                onChange={handleInputChange}
+                                                required
+                                                className={formData.fullName ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="fullName" className={styles.floatingLabel}>Full Name *</label>
+                                        </div>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type="tel"
+                                                id="phone"
+                                                name="phone"
+                                                value={formData.phone}
+                                                onChange={handleInputChange}
+                                                className={formData.phone ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="phone" className={styles.floatingLabel}>Phone Number</label>
+                                        </div>
+                                    </div>
+
+                                    {/* Column 2: Address */}
+                                    <div className={styles.formColumn}>
+                                        <h3>Address</h3>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type="text"
+                                                id="country"
+                                                name="country"
+                                                value={formData.country}
+                                                onChange={handleInputChange}
+                                                required
+                                                className={formData.country ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="country" className={styles.floatingLabel}>Country *</label>
+                                        </div>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type="text"
+                                                id="city"
+                                                name="city"
+                                                value={formData.city}
+                                                onChange={handleInputChange}
+                                                required
+                                                className={formData.city ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="city" className={styles.floatingLabel}>City *</label>
+                                        </div>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type="text"
+                                                id="address"
+                                                name="address"
+                                                value={formData.address}
+                                                onChange={handleInputChange}
+                                                className={formData.address ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="address" className={styles.floatingLabel}>Street Address</label>
+                                        </div>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type="text"
+                                                id="zipCode"
+                                                name="zipCode"
+                                                value={formData.zipCode}
+                                                onChange={handleInputChange}
+                                                className={formData.zipCode ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="zipCode" className={styles.floatingLabel}>ZIP Code</label>
+                                        </div>
+                                    </div>
+
+                                    {/* Column 3: Security */}
+                                    <div className={styles.formColumn}>
+                                        <h3>Security</h3>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                id="password"
+                                                name="password"
+                                                value={formData.password}
+                                                onChange={handleInputChange}
+                                                required
+                                                className={formData.password ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="password" className={styles.floatingLabel}>Password *</label>
+                                            <button type="button" className={styles.showPasswordBtn} onClick={() => setShowPassword(v => !v)} tabIndex={0} aria-label={showPassword ? "Hide password" : "Show password"}>
+                                                {showPassword ? (
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><path d="M7.5 14.5l7-7" stroke="#bfc9d8" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                                                ) : (
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><circle cx="11" cy="11" r="3" stroke="#bfc9d8" strokeWidth="1.5"/></svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                        <div className={styles.passwordStrength}>
+                                            <div className={styles.strengthBar}>
+                                                {[...Array(5)].map((_, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className={`${styles.strengthSegment} ${
+                                                            i < passwordStrength.score ? styles.active : ''
+                                                        } ${
+                                                            passwordStrength.score <= 2 ? styles.weak :
+                                                            passwordStrength.score <= 3 ? styles.medium :
+                                                            styles.strong
+                                                        }`}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <div className={styles.strengthChecklist}>
+                                                <div className={passwordStrength.hasMinLength ? styles.valid : ''}>
+                                                    ✓ Minimum 8 characters
+                                                </div>
+                                                <div className={passwordStrength.hasUppercase ? styles.valid : ''}>
+                                                    ✓ Uppercase letter
+                                                </div>
+                                                <div className={passwordStrength.hasLowercase ? styles.valid : ''}>
+                                                    ✓ Lowercase letter
+                                                </div>
+                                                <div className={passwordStrength.hasNumber ? styles.valid : ''}>
+                                                    ✓ Number
+                                                </div>
+                                                <div className={passwordStrength.hasSpecialChar ? styles.valid : ''}>
+                                                    ✓ Special character
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className={styles.floatingGroup}>
+                                            <input
+                                                type={showConfirm ? "text" : "password"}
+                                                id="confirmPassword"
+                                                name="confirmPassword"
+                                                value={formData.confirmPassword}
+                                                onChange={handleInputChange}
+                                                required
+                                                className={formData.confirmPassword ? styles.filled : ''}
+                                            />
+                                            <label htmlFor="confirmPassword" className={styles.floatingLabel}>Confirm Password *</label>
+                                            <button type="button" className={styles.showPasswordBtn} onClick={() => setShowConfirm(v => !v)} tabIndex={0} aria-label={showConfirm ? "Hide password" : "Show password"}>
+                                                {showConfirm ? (
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><path d="M7.5 14.5l7-7" stroke="#bfc9d8" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                                                ) : (
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><circle cx="11" cy="11" r="3" stroke="#bfc9d8" strokeWidth="1.5"/></svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className={styles.formActions}>
+                                    {error && <p className={styles.error}>{error}</p>}
+                                    {success && <p className={styles.success}>{success}</p>}
+                                    <button type="submit" className={styles.authButton}>
+                                        <span>Create Account</span>
+                                        <span className={styles.arrowIcon} aria-hidden="true">→</span>
+                                    </button>
+                                    <p className={styles.switchText}>
+                                        Already have an account? <Link to="/login">Sign in</Link>
+                                    </p>
+                                </div>
+                            </form>
+                        </section>
+
+                        <aside className={styles.authSidePanel} aria-label="Customer testimonials and features">
                             <img src={logoLight} alt="SchemaBridge" className={styles.brandLogo} />
-                            <h2 id="register-heading" className={styles.panelTitle}>Create your account</h2>
-                            <p className={styles.panelSubtitle}>Start your free trial. No credit card required. Cancel anytime.</p>
+                            <h2 id="register-heading" className={styles.panelTitle}>Launch faster with less risk</h2>
+                            <p className={styles.panelSubtitle}>Create your workspace and start transforming XML within minutes.</p>
+                            <blockquote className={styles.quote}>
+                                “The visual mapper and validations are a game changer for our partner onboarding.”
+                                <footer className={styles.quoteAuthor}>Priya Patel, Director of Integrations @ ShipLine</footer>
+                            </blockquote>
+                            <ul className={styles.featureBullets}>
+                                <li>Guided setup with secure defaults</li>
+                                <li>Team roles, SSO, and audit trails</li>
+                                <li>API-first with webhooks and SDKs</li>
+                            </ul>
                             <div className={styles.trustedBy} aria-label="Trusted by companies">
                                 <span className={styles.trustedLabel}>Trusted by</span>
                                 <ul className={styles.logoStrip}>
@@ -160,177 +358,6 @@ const RegisterPage = () => {
                                 </ul>
                             </div>
                         </aside>
-
-                        <section className={styles.authFormPanel} aria-label="Registration form">
-                            <form onSubmit={handleSubmit} className={styles.registrationForm} noValidate>
-                    <div className={styles.formColumns}>
-                        {/* Column 1: Basic Information */}
-                        <div className={styles.formColumn}>
-                            <h3>Basic Information</h3>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="email">Email *</label>
-                                <input
-                                    type="email"
-                                    id="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter your email"
-                                />
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="fullName">Full Name *</label>
-                                <input
-                                    type="text"
-                                    id="fullName"
-                                    name="fullName"
-                                    value={formData.fullName}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter your full name"
-                                />
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="phone">Phone Number</label>
-                                <input
-                                    type="tel"
-                                    id="phone"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleInputChange}
-                                    placeholder="+1"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Column 2: Address */}
-                        <div className={styles.formColumn}>
-                            <h3>Address</h3>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="country">Country *</label>
-                                <input
-                                    type="text"
-                                    id="country"
-                                    name="country"
-                                    value={formData.country}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter your country"
-                                />
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="city">City *</label>
-                                <input
-                                    type="text"
-                                    id="city"
-                                    name="city"
-                                    value={formData.city}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter your city"
-                                />
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="address">Street Address</label>
-                                <input
-                                    type="text"
-                                    id="address"
-                                    name="address"
-                                    value={formData.address}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter your street address"
-                                />
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="zipCode">ZIP Code</label>
-                                <input
-                                    type="text"
-                                    id="zipCode"
-                                    name="zipCode"
-                                    value={formData.zipCode}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter ZIP code"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Column 3: Security */}
-                        <div className={styles.formColumn}>
-                            <h3>Security</h3>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="password">Password *</label>
-                                <input
-                                    type="password"
-                                    id="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter your password"
-                                />
-                                <div className={styles.passwordStrength}>
-                                    <div className={styles.strengthBar}>
-                                        {[...Array(5)].map((_, i) => (
-                                            <div
-                                                key={i}
-                                                className={`${styles.strengthSegment} ${
-                                                    i < passwordStrength.score ? styles.active : ''
-                                                } ${
-                                                    passwordStrength.score <= 2 ? styles.weak :
-                                                    passwordStrength.score <= 3 ? styles.medium :
-                                                    styles.strong
-                                                }`}
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className={styles.strengthChecklist}>
-                                        <div className={passwordStrength.hasMinLength ? styles.valid : ''}>
-                                            ✓ Minimum 8 characters
-                                        </div>
-                                        <div className={passwordStrength.hasUppercase ? styles.valid : ''}>
-                                            ✓ Uppercase letter
-                                        </div>
-                                        <div className={passwordStrength.hasLowercase ? styles.valid : ''}>
-                                            ✓ Lowercase letter
-                                        </div>
-                                        <div className={passwordStrength.hasNumber ? styles.valid : ''}>
-                                            ✓ Number
-                                        </div>
-                                        <div className={passwordStrength.hasSpecialChar ? styles.valid : ''}>
-                                            ✓ Special character
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="confirmPassword">Confirm Password *</label>
-                                <input
-                                    type="password"
-                                    id="confirmPassword"
-                                    name="confirmPassword"
-                                    value={formData.confirmPassword}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Confirm your password"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className={styles.formActions}>
-                        {error && <p className={styles.error}>{error}</p>}
-                        {success && <p className={styles.success}>{success}</p>}
-                        <button type="submit" className={styles.authButton}>
-                            Create Account
-                        </button>
-                        <p className={styles.switchText}>
-                            Already have an account? <Link to="/login">Sign in</Link>
-                        </p>
-                    </div>
-                            </form>
-                        </section>
                     </div>
                 </div>
             </div>
