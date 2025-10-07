@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import TopNav from '../components/TopNav';
+import Footer from '../components/common/Footer';
+import logoLight from '../assets/logo-light.svg';
 import styles from './AuthPage.module.css';
 
 const RegisterPage = () => {
@@ -129,40 +132,37 @@ const RegisterPage = () => {
         }
     };
 
-    const formatCardNumber = (value) => {
-        const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-        const matches = v.match(/\d{4,16}/g);
-        const match = matches && matches[0] || '';
-        const parts = [];
-        
-        for (let i = 0, len = match.length; i < len; i += 4) {
-            parts.push(match.substring(i, i + 4));
-        }
-        
-        return parts.join(' ');
-    };
-
-    const formatExpiry = (value) => {
-        const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-        if (v.length >= 2) {
-            return v.slice(0, 2) + '/' + v.slice(2, 4);
-        }
-        return v;
-    };
+    // Removed unused formatting helpers to keep bundle lean
 
     return (
-        <div className={styles.authContainer}>
-            <div className={styles.authBox}>
-                <div className={styles.authHeader}>
-                    <img 
-                        src="/src/assets/logo-light.svg" 
-                        alt="Logo" 
-                        className={styles.brandLogo} 
-                    />
-                    <h2>Create Account</h2>
+        <>
+            <TopNav />
+            <div className={styles.authContainer}>
+                <div className={styles.authBackground} aria-hidden="true">
+                    <div className={styles.gradientOrb1}></div>
+                    <div className={styles.gradientOrb2}></div>
+                    <div className={styles.gradientOrb3}></div>
+                    <div className={styles.authOverlay}></div>
                 </div>
-                
-                <form onSubmit={handleSubmit} className={styles.registrationForm}>
+                <div className={styles.authBox} role="main" aria-labelledby="register-heading">
+                    <div className={styles.authGrid}>
+                        <aside className={styles.authSidePanel} aria-label="About">
+                            <img src={logoLight} alt="SchemaBridge" className={styles.brandLogo} />
+                            <h2 id="register-heading" className={styles.panelTitle}>Create your account</h2>
+                            <p className={styles.panelSubtitle}>Start your free trial. No credit card required. Cancel anytime.</p>
+                            <div className={styles.trustedBy} aria-label="Trusted by companies">
+                                <span className={styles.trustedLabel}>Trusted by</span>
+                                <ul className={styles.logoStrip}>
+                                    <li className={styles.logoItem} aria-hidden="true">Acme</li>
+                                    <li className={styles.logoItem} aria-hidden="true">Globex</li>
+                                    <li className={styles.logoItem} aria-hidden="true">Initech</li>
+                                    <li className={styles.logoItem} aria-hidden="true">Umbrella</li>
+                                </ul>
+                            </div>
+                        </aside>
+
+                        <section className={styles.authFormPanel} aria-label="Registration form">
+                            <form onSubmit={handleSubmit} className={styles.registrationForm} noValidate>
                     <div className={styles.formColumns}>
                         {/* Column 1: Basic Information */}
                         <div className={styles.formColumn}>
@@ -329,9 +329,13 @@ const RegisterPage = () => {
                             Already have an account? <Link to="/login">Sign in</Link>
                         </p>
                     </div>
-                </form>
+                            </form>
+                        </section>
+                    </div>
+                </div>
             </div>
-        </div>
+            <Footer text="© 2025 RossumXML Enterprise Platform" />
+        </>
     );
 };
 
