@@ -36,39 +36,21 @@ function LandingPage() {
             <div className={styles.gradientOrb1}></div>
             <div className={styles.gradientOrb2}></div>
             <div className={styles.gradientOrb3}></div>
-            <div className={styles.heroOverlay}></div>
           </div>
           
           <div className={styles.heroContent}>
             <div className={styles.floatingElements}>
-              <div className={styles.floatingXmlTag} data-speed="2">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>data</span>
-                <span className={styles.xmlBracket}>/&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="3">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>transform</span>
-                <span className={styles.xmlBracket}>&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="1.5">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>schema</span>
-                <span className={styles.xmlBracket}>/&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="2.5">
-                <span className={styles.xmlBracket}>&lt;/</span>
-                <span className={styles.xmlTagName}>xml</span>
-                <span className={styles.xmlBracket}>&gt;</span>
-              </div>
+              <div className={styles.floatingIcon} data-speed="2">�</div>
+              <div className={styles.floatingIcon} data-speed="3">🔒</div>
+              <div className={styles.floatingIcon} data-speed="1.5">🔗</div>
+              <div className={styles.floatingIcon} data-speed="2.5">⚡</div>
             </div>
             
             <h1 className={`${styles.heroTitle} ${isLoaded ? styles.loaded : ''}`}>
-              <span className={styles.titleWordHighlight}>Effortless</span>
-              <span className={styles.heroSectionTitleWord}>XML</span>
-              <span className={styles.heroSectionTitleWord}>Integration</span>
-              <span className={styles.titleWordHighlight}>Instant</span>
-              <span className={styles.heroSectionTitleWord}>Results</span>
+              <span className={styles.titleWord}>Transform</span>
+              <span className={styles.titleWord}>Data</span>
+              <span className={styles.titleWordHighlight}>Instantly</span>
+              <span className={styles.titleWord}>at Scale</span>
             </h1>
             
             <p className={`${styles.subtitle} ${isLoaded ? styles.loaded : ''}`}>
@@ -128,7 +110,7 @@ function LandingPage() {
                 <span>2</span>
                 <div className={styles.stepRing}></div>
               </div>
-              <div className={styles.stepIcon}>⚙️</div>
+              <div className={styles.stepIcon}>�</div>
               <h3>Configuration & Testing</h3>
               <p>Configure transformation rules through our enterprise dashboard with comprehensive validation, testing environments, and rollback capabilities.</p>
               <div className={styles.stepGlow}></div>
@@ -163,7 +145,7 @@ function LandingPage() {
                     <div className={styles.featureGradient}></div>
                 </div>
                 <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>🔗</div>
+                    <div className={styles.featureIcon}>�</div>
                     <h4>Enterprise Integration</h4>
                     <p>RESTful APIs, webhooks, and SDKs for seamless integration with your existing enterprise systems and CI/CD pipelines.</p>
                     <div className={styles.featureGradient}></div>
@@ -175,7 +157,7 @@ function LandingPage() {
                     <div className={styles.featureGradient}></div>
                 </div>
                 <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>🗺️</div>
+                    <div className={styles.featureIcon}>�️</div>
                     <h4>Visual Mapping Editor</h4>
                     <p>Intuitive drag-and-drop interface for creating complex data transformations without requiring technical expertise or coding.</p>
                     <div className={styles.featureGradient}></div>
@@ -184,18 +166,6 @@ function LandingPage() {
                     <div className={styles.featureIcon}>🏗️</div>
                     <h4>Scalable Architecture</h4>
                     <p>Cloud-native platform with automatic scaling, load balancing, and multi-region deployment options for global enterprise needs.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>📝</div>
-                    <h4>Collaboration & Audit Trails</h4>
-                    <p>Enable team collaboration with role-based permissions, full change history, and exportable audit trails for compliance and transparency.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>✅</div>
-                    <h4>Automated Validation & Error Reporting</h4>
-                    <p>Instantly validate XML and data mappings with automated checks and receive actionable error reports for rapid troubleshooting and compliance.</p>
                     <div className={styles.featureGradient}></div>
                 </div>
             </div>
