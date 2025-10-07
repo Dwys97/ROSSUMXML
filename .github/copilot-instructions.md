@@ -28,9 +28,9 @@ The existing XML parsing, transformation, and selector logic is considered stabl
 - **Rule:** Before any change, confirm that the request does not violate the Absolute Constraints (Section B).
 
 ### 2. **Context Refresh Routine (To Preserve Accuracy)**
-- **Rule:** After every **5 prompts** (including the current prompt), Copilot **must** output the following message:
+- **Rule:** After every **5 prompts** (including the current prompt), Copilot **must** summarize context using last 10 prompts, output the following message, and wait for user confirmation before proceeding, once user confirms, continue the conversation picking up from the last prompt using summarized context:
 
-> **[Context Refresh]** I am summarizing the last 5 prompts, resetting my internal context, and re-applying the core project constraints for fresh accuracy. Please confirm to continue the conversation.
+> **[Context Refresh]** I am summarizing the last 10 prompts, resetting my internal context, and re-applying the core project constraints for fresh accuracy. Please confirm to continue the conversation.
 
 ***
 

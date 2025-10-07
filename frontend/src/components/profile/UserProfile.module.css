@@ -47,6 +47,59 @@
     margin-top: 12px;
 }
 
+/* Tab styles */
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #3a506b;
+}
+
+.tab {
+    background: none;
+    border: none;
+    padding: 0.75rem 1rem;
+    color: #a5a9b5;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.tab:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab.active {
+    color: #ffffff;
+    border-bottom-color: #2563eb;
+}
+
+.logoutTab {
+    background: none;
+    border: none;
+    padding: 0.75rem 1rem;
+    color: #ef4444;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.logoutTab:hover {
+    color: #ffffff;
+    background: rgba(239, 68, 68, 0.1);
+    border-bottom-color: #ef4444;
+}
+
+.tabContent {
+    animation: fadeIn 0.3s ease-in;
+}
+
 .content h2 {
     margin: 0 0 24px 0;
     color: #ffffff;

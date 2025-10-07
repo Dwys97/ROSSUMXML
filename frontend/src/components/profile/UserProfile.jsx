@@ -3,12 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import styles from './UserProfile.module.css';
 
-function UserProfile({ isOpen = true, onClose = () => {} }) {
+function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
     const navigate = useNavigate();
-    const { logout, user } = useAuth();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     
     const [userData, setUserData] = useState({
         username: '',
@@ -48,19 +49,25 @@ function UserProfile({ isOpen = true, onClose = () => {} }) {
     });
     
     useEffect(() => {
-        if (!user) {
+        // Don't auto-redirect if parent handles logout
+        if (!user && !isLoggingOut && !onLogout) {
             navigate('/login');
             return;
         }
         
-        if (isOpen) {
+        if (isOpen && user) {
             setLoading(true);
             fetch('/api/user/profile', {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: Profile endpoint not implemented yet`);
+                }
+                return res.json();
+            })
             .then(data => {
                 setUserData(data);
                 setBillingForm(prev => ({
@@ -73,17 +80,22 @@ function UserProfile({ isOpen = true, onClose = () => {} }) {
                 setError(null);
             })
             .catch(err => {
-                setError(err.message);
-                console.error('Failed to load profile:', err);
+                // Use fallback user data from AuthContext if API fails
+                console.warn('Profile API not available, using fallback data:', err.message);
+                setUserData(prevData => ({
+                    ...prevData,
+                    username: user.username || 'User',
+                    email: user.email || 'user@example.com',
+                    fullName: user.fullName || user.full_name || 'Unknown User',
+                    created_at: user.created_at || new Date().toISOString()
+                }));
+                setError('Profile features limited - backend API not fully implemented');
             })
             .finally(() => setLoading(false));
         }
-    }, [user, navigate, isOpen]);
+    }, [user, navigate, isOpen, isLoggingOut, onLogout]);
 
-    const handleLogout = () => {
-        logout();
-        navigate('/');
-    };
+    // Remove the internal handleLogout - always use the parent's onLogout
 
     if (loading) {
         return <div className={styles.loadingContainer}>Loading...</div>;
@@ -188,6 +200,18 @@ function UserProfile({ isOpen = true, onClose = () => {} }) {
                         >
                             Security
                         </button>
+                        {onLogout && (
+                            <button 
+                                className={`${styles.tab} ${styles.logoutTab}`}
+                                onClick={() => {
+                                    setIsLoggingOut(true);
+                                    onClose(); // Close modal first
+                                    setTimeout(() => onLogout(), 50); // Then logout
+                                }}
+                            >
+                                Sign Out
+                            </button>
+                        )}
                     </div>
 
                     {error && <div className={styles.error}>{error}</div>}
@@ -253,12 +277,18 @@ function UserProfile({ isOpen = true, onClose = () => {} }) {
                                         <p>{new Date(userData.created_at).toLocaleDateString('en-US')}</p>
                                     </div>
                                 </div>
-                                <button 
-                                    className={styles.logoutButton}
-                                    onClick={handleLogout}
-                                >
-                                    Logout
-                                </button>
+                                {onLogout && (
+                                    <button 
+                                        className={styles.logoutButton}
+                                        onClick={() => {
+                                            setIsLoggingOut(true);
+                                            onClose(); // Close modal first
+                                            setTimeout(() => onLogout(), 50); // Then logout
+                                        }}
+                                    >
+                                        Logout
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

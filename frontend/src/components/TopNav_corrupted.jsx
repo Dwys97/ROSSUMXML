@@ -1,4 +1,14 @@
-import React, { useState, memo, useEffect } from 'react';
+import React, { useState, memo, useEff    const handleLogout = () => {
+        setIsMobileMenuOpen(false);
+        setIsProfileOpen(false);
+        
+        // Clear auth data first
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Force hard redirect to landing page
+        window.location.href = '/';
+    };eact';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import UserProfile from './profile/UserProfile';
@@ -37,6 +47,7 @@ const TopNav = memo(function TopNav() {
     };
 
     const handleLogout = () => {
+        console.log('🚀 Starting logout process...');
         setIsMobileMenuOpen(false);
         setIsProfileOpen(false);
         
@@ -45,6 +56,7 @@ const TopNav = memo(function TopNav() {
         localStorage.removeItem('user');
         
         // Force hard redirect to landing page
+        console.log('� Force redirecting to landing page...');
         window.location.href = '/';
     };
 
