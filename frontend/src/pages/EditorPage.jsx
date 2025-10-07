@@ -203,6 +203,12 @@ function EditorPage() {
         if (selectedSourceCollection && selectedTargetCollection) {
             const itemCollectionMappings = [];
             mappings.forEach(m => {
+                // Custom elements or elements without a source should go to static mappings
+                if (m.type === 'custom_element' || !m.source) {
+                    staticMappings.push(m);
+                    return;
+                }
+                
                 const isSourceIn = m.source && m.source.startsWith(selectedSourceCollection.path);
                 const isTargetIn = m.target.startsWith(selectedTargetCollection.path);
                 
@@ -214,10 +220,19 @@ function EditorPage() {
             });
 
             const relativeMappings = itemCollectionMappings.map(m => ({
-                source: m.source.substring(selectedSourceCollection.path.length + 3), // +3 for ' > '
+                source: m.source ? m.source.substring(selectedSourceCollection.path.length + 3) : undefined, // +3 for ' > '
                 target: m.target.substring(selectedTargetCollection.path.length + 3), // +3 for ' > '
                 type: m.type,
+                value: m.value
             }));
+
+            // Add line number generation if there are relative mappings
+            if (relativeMappings.length > 0) {
+                relativeMappings.push({
+                    type: "generated_line_number",
+                    target: "LineNo[0]" // Target the LineNo element within each item
+                });
+            }
 
             collectionMappings.push({
                 sourceCollectionPath: selectedSourceCollection.parentPath,

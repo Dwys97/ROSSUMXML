@@ -67,7 +67,7 @@ function TreeNode({
             return false;
         };
         return checkNode(node);
-    }, [node, searchTerm, isSource]);
+    }, [node, searchTerm]);
 
 
     if (!isNodeOrDescendantMatch) {
