@@ -3,12 +3,210 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import styles from './UserProfile.module.css';
 
+const COUNTRIES = [
+    { code: '', name: 'Select Country' },
+    { code: 'AF', name: 'Afghanistan' },
+    { code: 'AL', name: 'Albania' },
+    { code: 'DZ', name: 'Algeria' },
+    { code: 'AR', name: 'Argentina' },
+    { code: 'AM', name: 'Armenia' },
+    { code: 'AU', name: 'Australia' },
+    { code: 'AT', name: 'Austria' },
+    { code: 'AZ', name: 'Azerbaijan' },
+    { code: 'BS', name: 'Bahamas' },
+    { code: 'BH', name: 'Bahrain' },
+    { code: 'BD', name: 'Bangladesh' },
+    { code: 'BB', name: 'Barbados' },
+    { code: 'BY', name: 'Belarus' },
+    { code: 'BE', name: 'Belgium' },
+    { code: 'BZ', name: 'Belize' },
+    { code: 'BJ', name: 'Benin' },
+    { code: 'BT', name: 'Bhutan' },
+    { code: 'BO', name: 'Bolivia' },
+    { code: 'BA', name: 'Bosnia and Herzegovina' },
+    { code: 'BW', name: 'Botswana' },
+    { code: 'BR', name: 'Brazil' },
+    { code: 'BN', name: 'Brunei' },
+    { code: 'BG', name: 'Bulgaria' },
+    { code: 'BF', name: 'Burkina Faso' },
+    { code: 'BI', name: 'Burundi' },
+    { code: 'KH', name: 'Cambodia' },
+    { code: 'CM', name: 'Cameroon' },
+    { code: 'CA', name: 'Canada' },
+    { code: 'CV', name: 'Cape Verde' },
+    { code: 'CF', name: 'Central African Republic' },
+    { code: 'TD', name: 'Chad' },
+    { code: 'CL', name: 'Chile' },
+    { code: 'CN', name: 'China' },
+    { code: 'CO', name: 'Colombia' },
+    { code: 'KM', name: 'Comoros' },
+    { code: 'CG', name: 'Congo' },
+    { code: 'CD', name: 'Congo (Democratic Republic)' },
+    { code: 'CR', name: 'Costa Rica' },
+    { code: 'CI', name: 'Côte d\'Ivoire' },
+    { code: 'HR', name: 'Croatia' },
+    { code: 'CU', name: 'Cuba' },
+    { code: 'CY', name: 'Cyprus' },
+    { code: 'CZ', name: 'Czech Republic' },
+    { code: 'DK', name: 'Denmark' },
+    { code: 'DJ', name: 'Djibouti' },
+    { code: 'DM', name: 'Dominica' },
+    { code: 'DO', name: 'Dominican Republic' },
+    { code: 'EC', name: 'Ecuador' },
+    { code: 'EG', name: 'Egypt' },
+    { code: 'SV', name: 'El Salvador' },
+    { code: 'GQ', name: 'Equatorial Guinea' },
+    { code: 'ER', name: 'Eritrea' },
+    { code: 'EE', name: 'Estonia' },
+    { code: 'SZ', name: 'Eswatini' },
+    { code: 'ET', name: 'Ethiopia' },
+    { code: 'FJ', name: 'Fiji' },
+    { code: 'FI', name: 'Finland' },
+    { code: 'FR', name: 'France' },
+    { code: 'GA', name: 'Gabon' },
+    { code: 'GM', name: 'Gambia' },
+    { code: 'GE', name: 'Georgia' },
+    { code: 'DE', name: 'Germany' },
+    { code: 'GH', name: 'Ghana' },
+    { code: 'GR', name: 'Greece' },
+    { code: 'GD', name: 'Grenada' },
+    { code: 'GT', name: 'Guatemala' },
+    { code: 'GN', name: 'Guinea' },
+    { code: 'GW', name: 'Guinea-Bissau' },
+    { code: 'GY', name: 'Guyana' },
+    { code: 'HT', name: 'Haiti' },
+    { code: 'HN', name: 'Honduras' },
+    { code: 'HU', name: 'Hungary' },
+    { code: 'IS', name: 'Iceland' },
+    { code: 'IN', name: 'India' },
+    { code: 'ID', name: 'Indonesia' },
+    { code: 'IR', name: 'Iran' },
+    { code: 'IQ', name: 'Iraq' },
+    { code: 'IE', name: 'Ireland' },
+    { code: 'IL', name: 'Israel' },
+    { code: 'IT', name: 'Italy' },
+    { code: 'JM', name: 'Jamaica' },
+    { code: 'JP', name: 'Japan' },
+    { code: 'JO', name: 'Jordan' },
+    { code: 'KZ', name: 'Kazakhstan' },
+    { code: 'KE', name: 'Kenya' },
+    { code: 'KI', name: 'Kiribati' },
+    { code: 'KP', name: 'Korea (North)' },
+    { code: 'KR', name: 'Korea (South)' },
+    { code: 'KW', name: 'Kuwait' },
+    { code: 'KG', name: 'Kyrgyzstan' },
+    { code: 'LA', name: 'Laos' },
+    { code: 'LV', name: 'Latvia' },
+    { code: 'LB', name: 'Lebanon' },
+    { code: 'LS', name: 'Lesotho' },
+    { code: 'LR', name: 'Liberia' },
+    { code: 'LY', name: 'Libya' },
+    { code: 'LI', name: 'Liechtenstein' },
+    { code: 'LT', name: 'Lithuania' },
+    { code: 'LU', name: 'Luxembourg' },
+    { code: 'MG', name: 'Madagascar' },
+    { code: 'MW', name: 'Malawi' },
+    { code: 'MY', name: 'Malaysia' },
+    { code: 'MV', name: 'Maldives' },
+    { code: 'ML', name: 'Mali' },
+    { code: 'MT', name: 'Malta' },
+    { code: 'MH', name: 'Marshall Islands' },
+    { code: 'MR', name: 'Mauritania' },
+    { code: 'MU', name: 'Mauritius' },
+    { code: 'MX', name: 'Mexico' },
+    { code: 'FM', name: 'Micronesia' },
+    { code: 'MD', name: 'Moldova' },
+    { code: 'MC', name: 'Monaco' },
+    { code: 'MN', name: 'Mongolia' },
+    { code: 'ME', name: 'Montenegro' },
+    { code: 'MA', name: 'Morocco' },
+    { code: 'MZ', name: 'Mozambique' },
+    { code: 'MM', name: 'Myanmar' },
+    { code: 'NA', name: 'Namibia' },
+    { code: 'NR', name: 'Nauru' },
+    { code: 'NP', name: 'Nepal' },
+    { code: 'NL', name: 'Netherlands' },
+    { code: 'NZ', name: 'New Zealand' },
+    { code: 'NI', name: 'Nicaragua' },
+    { code: 'NE', name: 'Niger' },
+    { code: 'NG', name: 'Nigeria' },
+    { code: 'MK', name: 'North Macedonia' },
+    { code: 'NO', name: 'Norway' },
+    { code: 'OM', name: 'Oman' },
+    { code: 'PK', name: 'Pakistan' },
+    { code: 'PW', name: 'Palau' },
+    { code: 'PS', name: 'Palestine' },
+    { code: 'PA', name: 'Panama' },
+    { code: 'PG', name: 'Papua New Guinea' },
+    { code: 'PY', name: 'Paraguay' },
+    { code: 'PE', name: 'Peru' },
+    { code: 'PH', name: 'Philippines' },
+    { code: 'PL', name: 'Poland' },
+    { code: 'PT', name: 'Portugal' },
+    { code: 'QA', name: 'Qatar' },
+    { code: 'RO', name: 'Romania' },
+    { code: 'RU', name: 'Russia' },
+    { code: 'RW', name: 'Rwanda' },
+    { code: 'KN', name: 'Saint Kitts and Nevis' },
+    { code: 'LC', name: 'Saint Lucia' },
+    { code: 'VC', name: 'Saint Vincent and the Grenadines' },
+    { code: 'WS', name: 'Samoa' },
+    { code: 'SM', name: 'San Marino' },
+    { code: 'ST', name: 'São Tomé and Príncipe' },
+    { code: 'SA', name: 'Saudi Arabia' },
+    { code: 'SN', name: 'Senegal' },
+    { code: 'RS', name: 'Serbia' },
+    { code: 'SC', name: 'Seychelles' },
+    { code: 'SL', name: 'Sierra Leone' },
+    { code: 'SG', name: 'Singapore' },
+    { code: 'SK', name: 'Slovakia' },
+    { code: 'SI', name: 'Slovenia' },
+    { code: 'SB', name: 'Solomon Islands' },
+    { code: 'SO', name: 'Somalia' },
+    { code: 'ZA', name: 'South Africa' },
+    { code: 'SS', name: 'South Sudan' },
+    { code: 'ES', name: 'Spain' },
+    { code: 'LK', name: 'Sri Lanka' },
+    { code: 'SD', name: 'Sudan' },
+    { code: 'SR', name: 'Suriname' },
+    { code: 'SE', name: 'Sweden' },
+    { code: 'CH', name: 'Switzerland' },
+    { code: 'SY', name: 'Syria' },
+    { code: 'TW', name: 'Taiwan' },
+    { code: 'TJ', name: 'Tajikistan' },
+    { code: 'TZ', name: 'Tanzania' },
+    { code: 'TH', name: 'Thailand' },
+    { code: 'TL', name: 'Timor-Leste' },
+    { code: 'TG', name: 'Togo' },
+    { code: 'TO', name: 'Tonga' },
+    { code: 'TT', name: 'Trinidad and Tobago' },
+    { code: 'TN', name: 'Tunisia' },
+    { code: 'TR', name: 'Turkey' },
+    { code: 'TM', name: 'Turkmenistan' },
+    { code: 'TV', name: 'Tuvalu' },
+    { code: 'UG', name: 'Uganda' },
+    { code: 'UA', name: 'Ukraine' },
+    { code: 'AE', name: 'United Arab Emirates' },
+    { code: 'GB', name: 'United Kingdom' },
+    { code: 'US', name: 'United States' },
+    { code: 'UY', name: 'Uruguay' },
+    { code: 'UZ', name: 'Uzbekistan' },
+    { code: 'VU', name: 'Vanuatu' },
+    { code: 'VA', name: 'Vatican City' },
+    { code: 'VE', name: 'Venezuela' },
+    { code: 'VN', name: 'Vietnam' },
+    { code: 'YE', name: 'Yemen' },
+    { code: 'ZM', name: 'Zambia' },
+    { code: 'ZW', name: 'Zimbabwe' }
+];
+
 function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     
     const [userData, setUserData] = useState({
@@ -39,6 +237,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
     });
 
     const [isEditing, setIsEditing] = useState(false);
+    const [formSaved, setFormSaved] = useState(false);
     const [editForm, setEditForm] = useState({
         fullName: '',
         phone: '',
@@ -113,7 +312,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
 
     // Remove the internal handleLogout - always use the parent's onLogout
 
-    if (loading) {
+    if (loading && !userData) {
         return <div className={styles.loadingContainer}>Loading...</div>;
     }
 
@@ -123,6 +322,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
 
     const handlePasswordChange = async (e) => {
         e.preventDefault();
+        clearMessages();
         
         // Validate password requirements
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
@@ -156,7 +356,8 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
             }
             
             setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-            setError('Password successfully changed');
+            setError(null);
+            setSuccess('Password successfully changed');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -167,6 +368,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
     const handleProfileUpdate = async (e) => {
         e.preventDefault();
         setLoading(true);
+        clearMessages();
         try {
             const res = await fetch('/api/user/profile/update', {
                 method: 'POST',
@@ -184,8 +386,14 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
             
             const data = await res.json();
             setUserData(prev => ({ ...prev, ...data.user }));
-            setIsEditing(false);
-            setError('Profile updated successfully');
+            setError(null);
+            setSuccess('Profile updated successfully');
+            setFormSaved(true);
+            
+            // Auto-hide success message after delay but keep form open
+            setTimeout(() => {
+                setSuccess(null);
+            }, 3000);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -193,8 +401,15 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         }
     };
 
+    const clearMessages = () => {
+        setError(null);
+        setSuccess(null);
+    };
+
     const handleEditCancel = () => {
         setIsEditing(false);
+        setFormSaved(false);
+        clearMessages();
         // Reset form to original data
         setEditForm({
             fullName: userData.fullName || '',
@@ -223,6 +438,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
     const handleBillingUpdate = async (e) => {
         e.preventDefault();
         setLoading(true);
+        clearMessages();
         try {
             const res = await fetch('/api/user/billing/update', {
                 method: 'POST',
@@ -250,7 +466,8 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
             
             const data = await res.json();
             setUserData(prev => ({ ...prev, ...data }));
-            setError('Payment information updated successfully');
+            setError(null);
+            setSuccess('Payment information updated successfully');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -269,19 +486,19 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                     <div className={styles.tabs}>
                         <button 
                             className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
-                            onClick={() => setActiveTab('profile')}
+                            onClick={() => { setActiveTab('profile'); clearMessages(); }}
                         >
                             Profile
                         </button>
                         <button 
                             className={`${styles.tab} ${activeTab === 'billing' ? styles.active : ''}`}
-                            onClick={() => setActiveTab('billing')}
+                            onClick={() => { setActiveTab('billing'); clearMessages(); }}
                         >
                             Billing
                         </button>
                         <button 
                             className={`${styles.tab} ${activeTab === 'security' ? styles.active : ''}`}
-                            onClick={() => setActiveTab('security')}
+                            onClick={() => { setActiveTab('security'); clearMessages(); }}
                         >
                             Security
                         </button>
@@ -299,7 +516,10 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                         )}
                     </div>
 
-                    {error && <div className={styles.error}>{error}</div>}
+                    <div className={styles.messageContainer}>
+                        {error && <div className={styles.error}>{error}</div>}
+                        {success && <div className={styles.success}>{success}</div>}
+                    </div>
 
                     {activeTab === 'profile' && (
                         <div className={styles.tabContent}>
@@ -325,6 +545,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                                 type="text"
                                                 value={editForm.fullName}
                                                 onChange={(e) => setEditForm(prev => ({...prev, fullName: e.target.value}))}
+                                                disabled={formSaved || loading}
                                                 required
                                             />
                                         </div>
@@ -334,6 +555,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                                 type="tel"
                                                 value={editForm.phone}
                                                 onChange={(e) => setEditForm(prev => ({...prev, phone: e.target.value}))}
+                                                disabled={formSaved || loading}
                                             />
                                         </div>
                                     </div>
@@ -346,6 +568,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                                 type="text"
                                                 value={editForm.address}
                                                 onChange={(e) => setEditForm(prev => ({...prev, address: e.target.value}))}
+                                                disabled={formSaved || loading}
                                             />
                                         </div>
                                         <div className={styles.formRow}>
@@ -355,6 +578,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                                     type="text"
                                                     value={editForm.city}
                                                     onChange={(e) => setEditForm(prev => ({...prev, city: e.target.value}))}
+                                                    disabled={formSaved || loading}
                                                 />
                                             </div>
                                             <div className={styles.formField}>
@@ -363,25 +587,37 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                                     type="text"
                                                     value={editForm.zipCode}
                                                     onChange={(e) => setEditForm(prev => ({...prev, zipCode: e.target.value}))}
+                                                    disabled={formSaved || loading}
                                                 />
                                             </div>
                                         </div>
                                         <div className={styles.formField}>
                                             <label>Country</label>
-                                            <input
-                                                type="text"
+                                            <select
                                                 value={editForm.country}
                                                 onChange={(e) => setEditForm(prev => ({...prev, country: e.target.value}))}
-                                            />
+                                                disabled={formSaved || loading}
+                                            >
+                                                {COUNTRIES.map(country => (
+                                                    <option key={country.code} value={country.name}>
+                                                        {country.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
 
                                     <div className={styles.formActions}>
-                                        <button type="submit" className={styles.saveButton} disabled={loading}>
-                                            {loading ? 'Saving...' : 'Save Changes'}
+                                        <button 
+                                            type={formSaved ? "button" : "submit"} 
+                                            className={`${formSaved ? styles.editButton : styles.saveButton} ${formSaved ? styles.savedButton : ''}`} 
+                                            disabled={loading}
+                                            onClick={formSaved ? () => setFormSaved(false) : undefined}
+                                        >
+                                            {loading ? 'Saving...' : formSaved ? 'Continue Editing' : 'Save Changes'}
                                         </button>
                                         <button type="button" onClick={handleEditCancel} className={styles.cancelButton}>
-                                            Cancel
+                                            {formSaved ? 'Done' : 'Cancel'}
                                         </button>
                                     </div>
                                 </form>
@@ -581,14 +817,11 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                         disabled={billingForm.usePostalAddress}
                                         required
                                     >
-                                        <option value="">Select Country</option>
-                                        <option value="US">United States</option>
-                                        <option value="CA">Canada</option>
-                                        <option value="UK">United Kingdom</option>
-                                        <option value="DE">Germany</option>
-                                        <option value="FR">France</option>
-                                        <option value="AU">Australia</option>
-                                        <option value="Other">Other</option>
+                                        {COUNTRIES.map(country => (
+                                            <option key={country.code} value={country.name}>
+                                                {country.name}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
 

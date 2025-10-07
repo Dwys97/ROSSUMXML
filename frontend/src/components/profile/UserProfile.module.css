@@ -4,43 +4,49 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(13, 27, 42, 0.8);
+    background: rgba(13, 27, 42, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(12px);
 }
 
 .modal {
-    background: #1e2a3a;
-    border-radius: 12px;
-    border: 1px solid #3a506b;
-    padding: 24px;
+    background: rgba(30, 42, 58, 0.7);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 28px;
     width: 90%;
-    max-width: 600px;
+    max-width: 650px;
     position: relative;
     animation: slideIn 0.3s ease-out;
     max-height: 90vh;
     overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
 }
 
 .closeButton {
     position: absolute;
-    top: 16px;
-    right: 16px;
-    background: none;
-    border: none;
+    top: 18px;
+    right: 18px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 24px;
     color: #a5a9b5;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
 }
 
 .closeButton:hover {
-    background: rgba(165, 169, 181, 0.1);
+    background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(255, 255, 255, 0.1);
 }
 
 .content {
@@ -113,18 +119,21 @@
 }
 
 .fieldGroup {
-    background: #f8f9fa;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 1.5rem;
-    border-radius: 8px;
+    border-radius: 16px;
     margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .fieldGroup h3 {
     margin: 0 0 1rem 0;
-    color: #2c3e50;
+    color: #ffffff;
     font-size: 1.1rem;
     font-weight: 600;
-    border-bottom: 2px solid #e9ecef;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     padding-bottom: 0.5rem;
 }
 
@@ -139,14 +148,14 @@
 .field label {
     display: block;
     margin-bottom: 0.5rem;
-    color: #6c757d;
+    color: #a5a9b5;
     font-size: 0.9rem;
     font-weight: 500;
 }
 
 .field p {
     margin: 0;
-    color: #2c3e50;
+    color: #ffffff;
     font-size: 1rem;
     line-height: 1.5;
 }
@@ -188,30 +197,41 @@
 
 .tabs {
     display: flex;
-    gap: 1px;
-    background: #3a506b;
-    border-radius: 8px;
-    padding: 4px;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 6px;
     margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
 .tab {
     flex: 1;
-    padding: 8px 16px;
+    padding: 12px 20px;
     background: transparent;
     border: none;
-    color: #e0e1dd;
+    color: #a5a9b5;
     cursor: pointer;
-    border-radius: 6px;
-    transition: all 0.2s ease;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    position: relative;
 }
 
 .tab:hover {
-    background: rgba(224, 225, 221, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    transform: translateY(-1px);
 }
 
 .tab.active {
-    background: #1d72f3;
+    background: rgba(29, 114, 243, 0.2);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    box-shadow: 0 4px 20px rgba(29, 114, 243, 0.3);
+    border: 1px solid rgba(29, 114, 243, 0.3);
 }
 
 .tabContent {
@@ -221,7 +241,31 @@
 .form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    animation: slideInForm 0.4s ease-out;
+    will-change: opacity, transform;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.profileSection {
+    animation: slideInForm 0.4s ease-out;
+}
+
+@keyframes slideInForm {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .formRow {
@@ -242,25 +286,53 @@
 }
 
 .formField input {
-    padding: 8px 12px;
-    background: #0d1b2a;
-    border: 1px solid #3a506b;
-    border-radius: 6px;
-    color: #e0e1dd;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    color: #ffffff;
     font-size: 1rem;
+    transition: all 0.3s ease;
 }
 
 .formField input:focus {
     outline: none;
-    border-color: #1d72f3;
+    border-color: rgba(29, 114, 243, 0.6);
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 20px rgba(29, 114, 243, 0.3);
+    transform: translateY(-1px);
+}
+
+.formField input:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .error {
-    padding: 12px;
-    background: rgba(220, 38, 38, 0.1);
-    border: 1px solid rgba(220, 38, 38, 0.2);
-    color: #ef4444;
-    border-radius: 6px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2);
+}
+
+.success {
+    padding: 12px 16px;
+    background: rgba(34, 197, 94, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #86efac;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2);
+}
+
+.messageContainer {
+    min-height: 24px;
     margin-bottom: 16px;
 }
 
@@ -311,9 +383,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin: 24px 0 16px 0;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #3a506b;
+    margin: 24px 0 20px 0;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .sectionHeader h3 {
@@ -337,94 +413,154 @@
 }
 
 .checkboxLabel input[type="checkbox"] {
-    accent-color: #4a90e2;
+    accent-color: #1d72f3;
     margin: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.checkboxLabel input[type="checkbox"]:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(29, 114, 243, 0.3);
 }
 
 .formField select {
-    background: #2a3441;
-    border: 1px solid #3a506b;
-    border-radius: 6px;
-    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 12px 16px;
     color: #ffffff;
-    font-size: 14px;
+    font-size: 1rem;
     width: 100%;
     box-sizing: border-box;
+    transition: all 0.3s ease;
 }
 
 .formField select:focus {
     outline: none;
-    border-color: #4a90e2;
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+    border-color: rgba(29, 114, 243, 0.6);
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 20px rgba(29, 114, 243, 0.3);
+    transform: translateY(-1px);
+}
+
+.formField select:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .formField select option {
-    background: #2a3441;
+    background: rgba(30, 42, 58, 0.95);
+    backdrop-filter: blur(10px);
     color: #ffffff;
+    padding: 8px;
 }
 
 .formField input:disabled,
 .formField select:disabled {
-    background: #1a2431;
-    color: #666;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.05);
     cursor: not-allowed;
     opacity: 0.6;
+    backdrop-filter: blur(5px);
 }
 
 .editButton {
-    background: #4a90e2;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
+    background: rgba(29, 114, 243, 0.2);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    border: 1px solid rgba(29, 114, 243, 0.3);
+    border-radius: 12px;
+    padding: 10px 20px;
     font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(29, 114, 243, 0.2);
 }
 
 .editButton:hover {
-    background: #357abd;
+    background: rgba(29, 114, 243, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(29, 114, 243, 0.3);
 }
 
 .saveButton,
 .cancelButton {
-    padding: 10px 20px;
-    border-radius: 6px;
+    padding: 12px 24px;
+    border-radius: 12px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
-    border: none;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+    backdrop-filter: blur(10px);
 }
 
 .saveButton {
-    background: #28a745;
-    color: white;
+    background: rgba(34, 197, 94, 0.2);
+    color: #ffffff;
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2);
 }
 
 .saveButton:hover {
-    background: #1e7e34;
+    background: rgba(34, 197, 94, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(34, 197, 94, 0.3);
 }
 
 .saveButton:disabled {
-    background: #6c757d;
+    background: rgba(108, 117, 125, 0.2);
+    border-color: rgba(108, 117, 125, 0.3);
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.savedButton {
+    background: rgba(34, 197, 94, 0.3) !important;
+    border-color: rgba(34, 197, 94, 0.5) !important;
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3) !important;
+    animation: pulseGreen 0.6s ease-in-out;
+}
+
+@keyframes pulseGreen {
+    0% {
+        box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2);
+    }
+    50% {
+        box-shadow: 0 6px 24px rgba(34, 197, 94, 0.4);
+        transform: translateY(-1px);
+    }
+    100% {
+        box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+        transform: translateY(0);
+    }
 }
 
 .cancelButton {
-    background: #6c757d;
-    color: white;
+    background: rgba(108, 117, 125, 0.2);
+    color: #ffffff;
+    border-color: rgba(108, 117, 125, 0.3);
     margin-left: 12px;
+    box-shadow: 0 4px 16px rgba(108, 117, 125, 0.2);
 }
 
 .cancelButton:hover {
-    background: #5a6268;
+    background: rgba(108, 117, 125, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(108, 117, 125, 0.3);
 }
 
 .formActions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px solid #3a506b;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
