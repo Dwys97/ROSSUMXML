@@ -37,13 +37,22 @@ CREATE TABLE IF NOT EXISTS billing_details (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
     card_last4 VARCHAR(4),
     card_brand VARCHAR(50),
+    card_expiry VARCHAR(10),
     billing_address TEXT,
+    billing_address2 TEXT,
     billing_city VARCHAR(100),
+    billing_state VARCHAR(100),
     billing_country VARCHAR(100),
     billing_zip VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add missing columns to existing billing_details table
+ALTER TABLE billing_details 
+ADD COLUMN IF NOT EXISTS card_expiry VARCHAR(10),
+ADD COLUMN IF NOT EXISTS billing_address2 TEXT,
+ADD COLUMN IF NOT EXISTS billing_state VARCHAR(100);
 
 -- Триггер для автоматического обновления updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()

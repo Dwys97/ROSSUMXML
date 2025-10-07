@@ -18,6 +18,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('JWT_SECRET environment variable is not set!');
 }
+
+// --- Helper Functions ---
+function getCardBrand(cardNumber) {
+    const num = cardNumber.replace(/\s/g, '');
+    
+    if (/^4/.test(num)) return 'Visa';
+    if (/^5[1-5]/.test(num)) return 'MasterCard';
+    if (/^3[47]/.test(num)) return 'American Express';
+    if (/^6(?:011|5)/.test(num)) return 'Discover';
+    
+    return 'Unknown';
+}
 // ------------------
 // XML Helpers (existing logic preserved)
 // ------------------
@@ -201,7 +213,7 @@ exports.handler = async (event) => {
 
                 // --- Authentication Endpoints ---
         if (path.endsWith('/auth/register')) {
-            const { email, fullName, password, enableBilling, billingDetails } = body;
+            const { email, fullName, password, phone, address, city, country, zipCode, enableBilling, billingDetails } = body;
             
             if (!email || !fullName || !password) {
                 return createResponse(400, JSON.stringify({
@@ -232,12 +244,12 @@ exports.handler = async (event) => {
                         throw new Error('User with this email already exists');
                     }
 
-                    // Создаем пользователя
+                    // Создаем пользователя с полным профилем
                     const userResult = await client.query(
-                        `INSERT INTO users (email, username, full_name, password)
-                        VALUES ($1, $2, $3, $4)
+                        `INSERT INTO users (email, username, full_name, password, phone, address, city, country, zip_code)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                         RETURNING id`,
-                        [email, username, fullName, hashedPassword]
+                        [email, username, fullName, hashedPassword, phone || null, address || null, city || null, country || null, zipCode || null]
                     );
 
                     const userId = userResult.rows[0].id;
@@ -377,8 +389,11 @@ exports.handler = async (event) => {
                         s.expires_at as subscription_expires,
                         bd.card_last4,
                         bd.card_brand,
+                        bd.card_expiry,
                         bd.billing_address,
+                        bd.billing_address2,
                         bd.billing_city,
+                        bd.billing_state,
                         bd.billing_country,
                         bd.billing_zip
                     FROM users u
@@ -413,8 +428,11 @@ exports.handler = async (event) => {
                     subscription_expires: userData.subscription_expires,
                     card_last4: userData.card_last4 || '',
                     card_brand: userData.card_brand || '',
+                    card_expiry: userData.card_expiry || '',
                     billing_address: userData.billing_address || '',
+                    billing_address2: userData.billing_address2 || '',
                     billing_city: userData.billing_city || '',
+                    billing_state: userData.billing_state || '',
                     billing_country: userData.billing_country || '',
                     billing_zip: userData.billing_zip || ''
                 };
@@ -582,6 +600,104 @@ exports.handler = async (event) => {
                 }
                 return createResponse(500, JSON.stringify({
                     error: 'Failed to change password',
+                    details: err.message
+                }));
+            }
+        }
+
+        // Update Billing Information Endpoint (POST)
+        if (path.endsWith('/user/billing/update') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                // Verify JWT token
+                const decoded = verifyJWT(event);
+                const userId = decoded.id;
+
+                const { 
+                    cardNumber, 
+                    cardExpiry, 
+                    cardCvv, 
+                    billingAddress,
+                    billingAddress2,
+                    billingCity,
+                    billingState,
+                    billingCountry,
+                    billingZip 
+                } = body;
+
+                // Validate required fields
+                if (!cardNumber || !cardExpiry || !cardCvv || !billingAddress || !billingCity || !billingCountry || !billingZip) {
+                    return createResponse(400, JSON.stringify({
+                        error: 'All billing fields are required except address line 2 and state'
+                    }));
+                }
+
+                // Extract card brand and last 4 digits
+                const cardBrand = getCardBrand(cardNumber);
+                const cardLast4 = cardNumber.slice(-4);
+
+                // Start transaction
+                const client = await pool.connect();
+                
+                try {
+                    await client.query('BEGIN');
+
+                    // Check if billing details already exist
+                    const existingBilling = await client.query(
+                        'SELECT id FROM billing_details WHERE user_id = $1',
+                        [userId]
+                    );
+
+                    if (existingBilling.rows.length > 0) {
+                        // Update existing billing details
+                        await client.query(`
+                            UPDATE billing_details 
+                            SET 
+                                card_last4 = $1,
+                                card_brand = $2,
+                                card_expiry = $3,
+                                billing_address = $4,
+                                billing_address2 = $5,
+                                billing_city = $6,
+                                billing_state = $7,
+                                billing_country = $8,
+                                billing_zip = $9,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE user_id = $10
+                        `, [cardLast4, cardBrand, cardExpiry, billingAddress, billingAddress2, billingCity, billingState, billingCountry, billingZip, userId]);
+                    } else {
+                        // Insert new billing details
+                        await client.query(`
+                            INSERT INTO billing_details 
+                            (user_id, card_last4, card_brand, card_expiry, billing_address, billing_address2, billing_city, billing_state, billing_country, billing_zip)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                        `, [userId, cardLast4, cardBrand, cardExpiry, billingAddress, billingAddress2, billingCity, billingState, billingCountry, billingZip]);
+                    }
+
+                    await client.query('COMMIT');
+
+                    return createResponse(200, JSON.stringify({
+                        message: 'Billing information updated successfully',
+                        card_last4: cardLast4,
+                        card_brand: cardBrand
+                    }));
+
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    throw err;
+                } finally {
+                    client.release();
+                }
+
+            } catch (err) {
+                console.error('Billing update error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({
+                        error: 'Unauthorized',
+                        details: err.message
+                    }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to update billing information',
                     details: err.message
                 }));
             }

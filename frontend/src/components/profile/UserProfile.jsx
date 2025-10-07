@@ -38,14 +38,27 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         confirmPassword: ''
     });
 
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({
+        fullName: '',
+        phone: '',
+        address: '',
+        city: '',
+        country: '',
+        zipCode: ''
+    });
+
     const [billingForm, setBillingForm] = useState({
         cardNumber: '',
         cardExpiry: '',
         cardCvv: '',
         billingAddress: '',
+        billingAddress2: '',
         billingCity: '',
+        billingState: '',
         billingCountry: '',
-        billingZip: ''
+        billingZip: '',
+        usePostalAddress: false
     });
     
     useEffect(() => {
@@ -70,12 +83,23 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
             })
             .then(data => {
                 setUserData(data);
+                setEditForm({
+                    fullName: data.fullName || '',
+                    phone: data.phone || '',
+                    address: data.address || '',
+                    city: data.city || '',
+                    country: data.country || '',
+                    zipCode: data.zipCode || ''
+                });
                 setBillingForm(prev => ({
                     ...prev,
                     billingAddress: data.billing_address || '',
+                    billingAddress2: data.billing_address2 || '',
                     billingCity: data.billing_city || '',
+                    billingState: data.billing_state || '',
                     billingCountry: data.billing_country || '',
-                    billingZip: data.billing_zip || ''
+                    billingZip: data.billing_zip || '',
+                    cardExpiry: data.card_expiry || ''
                 }));
                 setError(null);
             })
@@ -140,24 +164,93 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         }
     };
 
-    const handleBillingUpdate = async (e) => {
+    const handleProfileUpdate = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch('/api/user/billing', {
+            const res = await fetch('/api/user/profile/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
-                body: JSON.stringify(billingForm)
+                body: JSON.stringify(editForm)
             });
             
-            if (!res.ok) throw new Error('Failed to update billing');
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Failed to update profile');
+            }
+            
+            const data = await res.json();
+            setUserData(prev => ({ ...prev, ...data.user }));
+            setIsEditing(false);
+            setError('Profile updated successfully');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEditCancel = () => {
+        setIsEditing(false);
+        // Reset form to original data
+        setEditForm({
+            fullName: userData.fullName || '',
+            phone: userData.phone || '',
+            address: userData.address || '',
+            city: userData.city || '',
+            country: userData.country || '',
+            zipCode: userData.zipCode || ''
+        });
+    };
+
+    const handleUsePostalAddressForBilling = (e) => {
+        const checked = e.target.checked;
+        setBillingForm(prev => ({
+            ...prev,
+            usePostalAddress: checked,
+            billingAddress: checked ? editForm.address : '',
+            billingAddress2: checked ? '' : prev.billingAddress2,
+            billingCity: checked ? editForm.city : '',
+            billingState: checked ? '' : prev.billingState,
+            billingCountry: checked ? editForm.country : '',
+            billingZip: checked ? editForm.zipCode : ''
+        }));
+    };
+
+    const handleBillingUpdate = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const res = await fetch('/api/user/billing/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    cardNumber: billingForm.cardNumber.replace(/\s/g, ''),
+                    cardExpiry: billingForm.cardExpiry,
+                    cardCvv: billingForm.cardCvv,
+                    billingAddress: billingForm.billingAddress,
+                    billingAddress2: billingForm.billingAddress2,
+                    billingCity: billingForm.billingCity,
+                    billingState: billingForm.billingState,
+                    billingCountry: billingForm.billingCountry,
+                    billingZip: billingForm.billingZip
+                })
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Failed to update billing');
+            }
             
             const data = await res.json();
             setUserData(prev => ({ ...prev, ...data }));
-            setError('Payment information updated');
+            setError('Payment information updated successfully');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -210,78 +303,160 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
 
                     {activeTab === 'profile' && (
                         <div className={styles.tabContent}>
-                            <h2>Profile Information</h2>
-                            <div className={styles.profileSection}>
-                                <div className={styles.fieldGroup}>
-                                    <h3>Account Information</h3>
-                                    <div className={styles.field}>
-                                        <label>Username</label>
-                                        <p>{userData.username}</p>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>Email</label>
-                                        <p>{userData.email}</p>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>Full Name</label>
-                                        <p>{userData.fullName}</p>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>Phone</label>
-                                        <p>{userData.phone}</p>
-                                    </div>
-                                </div>
-
-                                <div className={styles.fieldGroup}>
-                                    <h3>Address</h3>
-                                    <div className={styles.field}>
-                                        <label>Street Address</label>
-                                        <p>{userData.address}</p>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>City</label>
-                                        <p>{userData.city}</p>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>Country</label>
-                                        <p>{userData.country}</p>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>ZIP Code</label>
-                                        <p>{userData.zipCode}</p>
-                                    </div>
-                                </div>
-
-                                <div className={styles.fieldGroup}>
-                                    <h3>Subscription Details</h3>
-                                    <div className={styles.field}>
-                                        <label>Status</label>
-                                        <p>{userData.subscription_status} ({userData.subscription_level})</p>
-                                    </div>
-                                    {userData.subscription_expires && (
-                                        <div className={styles.field}>
-                                            <label>Valid Until</label>
-                                            <p>{new Date(userData.subscription_expires).toLocaleDateString('en-US')}</p>
-                                        </div>
-                                    )}
-                                    <div className={styles.field}>
-                                        <label>Member Since</label>
-                                        <p>{new Date(userData.created_at).toLocaleDateString('en-US')}</p>
-                                    </div>
-                                </div>
-                                {onLogout && (
+                            <div className={styles.sectionHeader}>
+                                <h2>Profile Information</h2>
+                                {!isEditing && (
                                     <button 
-                                        className={styles.logoutButton}
-                                        onClick={() => {
-                                            setIsLoggingOut(true);
-                                            onClose(); // Close modal first
-                                            setTimeout(() => onLogout(), 50); // Then logout
-                                        }}
+                                        onClick={() => setIsEditing(true)}
+                                        className={styles.editButton}
                                     >
-                                        Logout
+                                        Edit Profile
                                     </button>
                                 )}
                             </div>
+
+                            {isEditing ? (
+                                <form onSubmit={handleProfileUpdate} className={styles.form}>
+                                    <div className={styles.fieldGroup}>
+                                        <h3>Personal Information</h3>
+                                        <div className={styles.formField}>
+                                            <label>Full Name *</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.fullName}
+                                                onChange={(e) => setEditForm(prev => ({...prev, fullName: e.target.value}))}
+                                                required
+                                            />
+                                        </div>
+                                        <div className={styles.formField}>
+                                            <label>Phone</label>
+                                            <input
+                                                type="tel"
+                                                value={editForm.phone}
+                                                onChange={(e) => setEditForm(prev => ({...prev, phone: e.target.value}))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.fieldGroup}>
+                                        <h3>Address</h3>
+                                        <div className={styles.formField}>
+                                            <label>Street Address</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.address}
+                                                onChange={(e) => setEditForm(prev => ({...prev, address: e.target.value}))}
+                                            />
+                                        </div>
+                                        <div className={styles.formRow}>
+                                            <div className={styles.formField}>
+                                                <label>City</label>
+                                                <input
+                                                    type="text"
+                                                    value={editForm.city}
+                                                    onChange={(e) => setEditForm(prev => ({...prev, city: e.target.value}))}
+                                                />
+                                            </div>
+                                            <div className={styles.formField}>
+                                                <label>ZIP Code</label>
+                                                <input
+                                                    type="text"
+                                                    value={editForm.zipCode}
+                                                    onChange={(e) => setEditForm(prev => ({...prev, zipCode: e.target.value}))}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className={styles.formField}>
+                                            <label>Country</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.country}
+                                                onChange={(e) => setEditForm(prev => ({...prev, country: e.target.value}))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.formActions}>
+                                        <button type="submit" className={styles.saveButton} disabled={loading}>
+                                            {loading ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                        <button type="button" onClick={handleEditCancel} className={styles.cancelButton}>
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <div className={styles.profileSection}>
+                                    <div className={styles.fieldGroup}>
+                                        <h3>Account Information</h3>
+                                        <div className={styles.field}>
+                                            <label>Username</label>
+                                            <p>{userData.username}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Email</label>
+                                            <p>{userData.email}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Full Name</label>
+                                            <p>{userData.fullName || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Phone</label>
+                                            <p>{userData.phone || 'Not provided'}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.fieldGroup}>
+                                        <h3>Address</h3>
+                                        <div className={styles.field}>
+                                            <label>Street Address</label>
+                                            <p>{userData.address || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>City</label>
+                                            <p>{userData.city || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Country</label>
+                                            <p>{userData.country || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>ZIP Code</label>
+                                            <p>{userData.zipCode || 'Not provided'}</p>
+                                        </div>
+                                    </div>
+                                    <div className={styles.fieldGroup}>
+                                        <h3>Subscription Details</h3>
+                                        <div className={styles.field}>
+                                            <label>Status</label>
+                                            <p>{userData.subscription_status} ({userData.subscription_level})</p>
+                                        </div>
+                                        {userData.subscription_expires && (
+                                            <div className={styles.field}>
+                                                <label>Valid Until</label>
+                                                <p>{new Date(userData.subscription_expires).toLocaleDateString('en-US')}</p>
+                                            </div>
+                                        )}
+                                        <div className={styles.field}>
+                                            <label>Member Since</label>
+                                            <p>{new Date(userData.created_at).toLocaleDateString('en-US')}</p>
+                                        </div>
+                                    </div>
+                                    {onLogout && (
+                                        <button 
+                                            className={styles.logoutButton}
+                                            onClick={() => {
+                                                setIsLoggingOut(true);
+                                                onClose(); // Close modal first
+                                                setTimeout(() => onLogout(), 50); // Then logout
+                                            }}
+                                        >
+                                            Logout
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -294,6 +469,9 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                 </div>
                             )}
                             <form onSubmit={handleBillingUpdate} className={styles.form}>
+                                <div className={styles.sectionHeader}>
+                                    <h3>Payment Details</h3>
+                                </div>
                                 <div className={styles.formRow}>
                                     <div className={styles.formField}>
                                         <label>Card Number</label>
@@ -326,15 +504,43 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                         />
                                     </div>
                                 </div>
+
+                                <div className={styles.sectionHeader}>
+                                    <h3>Billing Address</h3>
+                                    <div className={styles.addressOption}>
+                                        <label className={styles.checkboxLabel}>
+                                            <input
+                                                type="checkbox"
+                                                checked={billingForm.usePostalAddress}
+                                                onChange={handleUsePostalAddressForBilling}
+                                            />
+                                            Use postal address as billing address
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div className={styles.formField}>
-                                                                            <label>Address</label>
+                                    <label>Street Address</label>
                                     <input
                                         type="text"
                                         value={billingForm.billingAddress}
                                         onChange={e => setBillingForm(prev => ({ ...prev, billingAddress: e.target.value }))}
+                                        disabled={billingForm.usePostalAddress}
                                         required
                                     />
                                 </div>
+                                
+                                <div className={styles.formField}>
+                                    <label>Address Line 2 (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={billingForm.billingAddress2 || ''}
+                                        onChange={e => setBillingForm(prev => ({ ...prev, billingAddress2: e.target.value }))}
+                                        disabled={billingForm.usePostalAddress}
+                                        placeholder="Apartment, suite, unit, building, floor, etc."
+                                    />
+                                </div>
+
                                 <div className={styles.formRow}>
                                     <div className={styles.formField}>
                                         <label>City</label>
@@ -342,28 +548,50 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                             type="text"
                                             value={billingForm.billingCity}
                                             onChange={e => setBillingForm(prev => ({ ...prev, billingCity: e.target.value }))}
+                                            disabled={billingForm.usePostalAddress}
                                             required
                                         />
                                     </div>
                                     <div className={styles.formField}>
-                                        <label>Country</label>
+                                        <label>State/Province</label>
                                         <input
                                             type="text"
-                                            value={billingForm.billingCountry}
-                                            onChange={e => setBillingForm(prev => ({ ...prev, billingCountry: e.target.value }))}
-                                            required
+                                            value={billingForm.billingState || ''}
+                                            onChange={e => setBillingForm(prev => ({ ...prev, billingState: e.target.value }))}
+                                            disabled={billingForm.usePostalAddress}
                                         />
                                     </div>
                                     <div className={styles.formField}>
-                                        <label>ZIP Code</label>
+                                        <label>ZIP/Postal Code</label>
                                         <input
                                             type="text"
                                             value={billingForm.billingZip}
                                             onChange={e => setBillingForm(prev => ({ ...prev, billingZip: e.target.value }))}
+                                            disabled={billingForm.usePostalAddress}
                                             required
                                         />
                                     </div>
                                 </div>
+
+                                <div className={styles.formField}>
+                                    <label>Country</label>
+                                    <select
+                                        value={billingForm.billingCountry}
+                                        onChange={e => setBillingForm(prev => ({ ...prev, billingCountry: e.target.value }))}
+                                        disabled={billingForm.usePostalAddress}
+                                        required
+                                    >
+                                        <option value="">Select Country</option>
+                                        <option value="US">United States</option>
+                                        <option value="CA">Canada</option>
+                                        <option value="UK">United Kingdom</option>
+                                        <option value="DE">Germany</option>
+                                        <option value="FR">France</option>
+                                        <option value="AU">Australia</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
                                 <button type="submit" className="primary-btn" disabled={loading}>
                                     {loading ? 'Updating...' : 'Update Payment Information'}
                                 </button>
