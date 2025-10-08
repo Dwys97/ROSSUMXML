@@ -7,10 +7,9 @@ function ContactPage() {
   return (
     <>
       <TopNav />
-      <div className="app-container">
-        <div className={styles.placeholderContainer}>
-          <div className={styles.placeholderContent}>
-            <h1 className={styles.placeholderTitle}>Contact Us</h1>
+      <div className={styles.placeholderContainer}>
+        <div className={styles.placeholderContent}>
+          <h1 className={styles.placeholderTitle}>Contact Us</h1>
             <p className={styles.placeholderSubtitle}>
               Get in touch with our team
             </p>
@@ -46,7 +45,6 @@ function ContactPage() {
             </div>
           </div>
         </div>
-      </div>
       <Footer />
     </>
   );

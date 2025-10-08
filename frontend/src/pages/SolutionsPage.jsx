@@ -7,10 +7,9 @@ function SolutionsPage() {
   return (
     <>
       <TopNav />
-      <div className="app-container">
-        <div className={styles.placeholderContainer}>
-          <div className={styles.placeholderContent}>
-            <h1 className={styles.placeholderTitle}>Solutions</h1>
+      <div className={styles.placeholderContainer}>
+        <div className={styles.placeholderContent}>
+          <h1 className={styles.placeholderTitle}>Solutions</h1>
             <p className={styles.placeholderSubtitle}>
               Discover how our XML integration platform solves your business challenges
             </p>
@@ -42,7 +41,6 @@ function SolutionsPage() {
             </div>
           </div>
         </div>
-      </div>
       <Footer />
     </>
   );

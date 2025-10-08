@@ -130,7 +130,7 @@
     position: absolute;
     font-size: 1rem;
     font-family: 'Courier New', monospace;
-    opacity: 1;
+    opacity: 0.3;
     animation: floatXmlTag 12s linear infinite;
     color: #1d72f3;
     background: none;
@@ -138,18 +138,22 @@
     border-radius: 0;
     backdrop-filter: none;
     border: none;
-    z-index: 0;
-    font-size: 1.35rem;
+    z-index: -1;
+    font-size: 2rem;
     font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', 'Consolas', monospace;
     font-weight: 700;
     letter-spacing: 0.5px;
-    text-shadow: 0 2px 12px #fff, 0 1px 0 #8b5cf6;
+    text-shadow: 0 3px 16px rgba(29, 114, 243, 0.8), 0 2px 8px #fff, 0 1px 0 #8b5cf6;
 }
 
 .floatingXmlTag:nth-child(1) { top: 20%; left: 10%; animation-delay: 0s; }
 .floatingXmlTag:nth-child(2) { top: 30%; right: 15%; animation-delay: 3s; }
 .floatingXmlTag:nth-child(3) { bottom: 40%; left: 20%; animation-delay: 6s; }
 .floatingXmlTag:nth-child(4) { bottom: 30%; right: 25%; animation-delay: 9s; }
+.floatingXmlTag:nth-child(5) { top: 50%; left: 5%; animation-delay: 2s; }
+.floatingXmlTag:nth-child(6) { top: 60%; right: 8%; animation-delay: 5s; }
+.floatingXmlTag:nth-child(7) { bottom: 50%; left: 12%; animation-delay: 7s; }
+.floatingXmlTag:nth-child(8) { bottom: 20%; right: 18%; animation-delay: 4s; }
 
 .xmlBracket {
     color: #8b5cf6;
@@ -611,10 +615,7 @@
 /* Features Section - Modern Grid */
 .featuresSection {
     padding: 6rem 0;
-    background: linear-gradient(135deg, 
-        rgba(29, 114, 243, 0.02) 0%, 
-        rgba(139, 92, 246, 0.02) 50%,
-        rgba(236, 72, 153, 0.02) 100%);
+    background: transparent;
 }
 
 .featuresSection h2 {
@@ -741,7 +742,11 @@
         font-size: 1.5rem;
     }
     .floatingXmlTag:nth-child(3),
-    .floatingXmlTag:nth-child(4) {
+    .floatingXmlTag:nth-child(4),
+    .floatingXmlTag:nth-child(5),
+    .floatingXmlTag:nth-child(6),
+    .floatingXmlTag:nth-child(7),
+    .floatingXmlTag:nth-child(8) {
         display: none;
     }
 }
@@ -798,7 +803,11 @@
     }
     .floatingXmlTag:nth-child(2),
     .floatingXmlTag:nth-child(3),
-    .floatingXmlTag:nth-child(4) {
+    .floatingXmlTag:nth-child(4),
+    .floatingXmlTag:nth-child(5),
+    .floatingXmlTag:nth-child(6),
+    .floatingXmlTag:nth-child(7),
+    .floatingXmlTag:nth-child(8) {
         display: none;
     }
     .workflowSection,

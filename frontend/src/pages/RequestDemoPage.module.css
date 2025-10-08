@@ -1,9 +1,6 @@
 /* Request Demo Page Styles */
 .container {
-    background: linear-gradient(135deg, 
-        #0f1419 0%, 
-        #1a1f2e 50%, 
-        #0f1419 100%);
+    background: linear-gradient(180deg, #0d1b2a, #1b263b);
     min-height: 100vh;
     color: #ffffff;
 }
@@ -11,7 +8,7 @@
 /* Hero Section */
 .heroSection {
     position: relative;
-    padding: 6rem 0 4rem 0;
+    padding: 8rem 0 4rem 0;
     text-align: center;
     overflow: hidden;
 }
@@ -27,26 +24,26 @@
 
 .gradientOrb1 {
     position: absolute;
-    width: 300px;
-    height: 300px;
+    width: 400px;
+    height: 400px;
     background: radial-gradient(circle, rgba(29, 114, 243, 0.15) 0%, transparent 70%);
     border-radius: 50%;
-    filter: blur(40px);
-    top: 20%;
+    filter: blur(60px);
+    top: 10%;
     left: 10%;
-    animation: float 6s ease-in-out infinite;
+    animation: float 8s ease-in-out infinite;
 }
 
 .gradientOrb2 {
     position: absolute;
-    width: 250px;
-    height: 250px;
+    width: 350px;
+    height: 350px;
     background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
     border-radius: 50%;
-    filter: blur(40px);
-    top: 40%;
-    right: 15%;
-    animation: float 6s ease-in-out infinite 2s;
+    filter: blur(60px);
+    top: 30%;
+    right: 10%;
+    animation: float 8s ease-in-out infinite 2s;
 }
 
 @keyframes float {

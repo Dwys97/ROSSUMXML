@@ -388,9 +388,12 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
             setUserData(prev => ({ ...prev, ...data.user }));
             setError(null);
             setSuccess('Profile updated successfully');
-            setFormSaved(true);
             
-            // Auto-hide success message after delay but keep form open
+            // Exit edit mode and show success message
+            setIsEditing(false);
+            setFormSaved(false);
+            
+            // Auto-hide success message after delay
             setTimeout(() => {
                 setSuccess(null);
             }, 3000);
@@ -609,15 +612,14 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
 
                                     <div className={styles.formActions}>
                                         <button 
-                                            type={formSaved ? "button" : "submit"} 
-                                            className={`${formSaved ? styles.editButton : styles.saveButton} ${formSaved ? styles.savedButton : ''}`} 
+                                            type="submit" 
+                                            className={styles.saveButton} 
                                             disabled={loading}
-                                            onClick={formSaved ? () => setFormSaved(false) : undefined}
                                         >
-                                            {loading ? 'Saving...' : formSaved ? 'Continue Editing' : 'Save Changes'}
+                                            {loading ? 'Saving...' : 'Save Changes'}
                                         </button>
                                         <button type="button" onClick={handleEditCancel} className={styles.cancelButton}>
-                                            {formSaved ? 'Done' : 'Cancel'}
+                                            Cancel
                                         </button>
                                     </div>
                                 </form>
@@ -679,18 +681,6 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                             <p>{new Date(userData.created_at).toLocaleDateString('en-US')}</p>
                                         </div>
                                     </div>
-                                    {onLogout && (
-                                        <button 
-                                            className={styles.logoutButton}
-                                            onClick={() => {
-                                                setIsLoggingOut(true);
-                                                onClose(); // Close modal first
-                                                setTimeout(() => onLogout(), 50); // Then logout
-                                            }}
-                                        >
-                                            Logout
-                                        </button>
-                                    )}
                                 </div>
                             )}
                         </div>

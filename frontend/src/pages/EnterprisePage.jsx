@@ -7,10 +7,9 @@ function EnterprisePage() {
   return (
     <>
       <TopNav />
-      <div className="app-container">
-        <div className={styles.placeholderContainer}>
-          <div className={styles.placeholderContent}>
-            <h1 className={styles.placeholderTitle}>Enterprise</h1>
+      <div className={styles.placeholderContainer}>
+        <div className={styles.placeholderContent}>
+          <h1 className={styles.placeholderTitle}>Enterprise</h1>
             <p className={styles.placeholderSubtitle}>
               Scale your XML integrations with enterprise-grade features
             </p>
@@ -42,7 +41,6 @@ function EnterprisePage() {
             </div>
           </div>
         </div>
-      </div>
       <Footer />
     </>
   );

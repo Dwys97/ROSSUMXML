@@ -42,7 +42,7 @@ Resources:
           POSTGRES_DB: "rossumxml"
           POSTGRES_HOST: "172.18.0.2"
           POSTGRES_PORT: "5432"
-          JWT_SECRET: "6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e"
+          JWT_SECRET: "a_secure_secret_key_for_jwt"
       # --- END BLOCK ---
       Events:
         # Define a specific, public endpoint for user registration

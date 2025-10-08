@@ -7,10 +7,9 @@ function AboutPage() {
   return (
     <>
       <TopNav />
-      <div className="app-container">
-        <div className={styles.placeholderContainer}>
-          <div className={styles.placeholderContent}>
-            <h1 className={styles.placeholderTitle}>About Us</h1>
+      <div className={styles.placeholderContainer}>
+        <div className={styles.placeholderContent}>
+          <h1 className={styles.placeholderTitle}>About Us</h1>
             <p className={styles.placeholderSubtitle}>
               Transforming XML integration for modern businesses
             </p>
@@ -42,7 +41,6 @@ function AboutPage() {
             </div>
           </div>
         </div>
-      </div>
       <Footer />
     </>
   );

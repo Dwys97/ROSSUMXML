@@ -108,6 +108,26 @@ function LandingPage() {
                 <span className={styles.xmlTagName}>xml</span>
                 <span className={styles.xmlBracket}>&gt;</span>
               </div>
+              <div className={styles.floatingXmlTag} data-speed="1.8">
+                <span className={styles.xmlBracket}>&lt;</span>
+                <span className={styles.xmlTagName}>mapping</span>
+                <span className={styles.xmlBracket}>/&gt;</span>
+              </div>
+              <div className={styles.floatingXmlTag} data-speed="2.2">
+                <span className={styles.xmlBracket}>&lt;</span>
+                <span className={styles.xmlTagName}>field</span>
+                <span className={styles.xmlBracket}>&gt;</span>
+              </div>
+              <div className={styles.floatingXmlTag} data-speed="2.7">
+                <span className={styles.xmlBracket}>&lt;/</span>
+                <span className={styles.xmlTagName}>node</span>
+                <span className={styles.xmlBracket}>&gt;</span>
+              </div>
+              <div className={styles.floatingXmlTag} data-speed="3.2">
+                <span className={styles.xmlBracket}>&lt;</span>
+                <span className={styles.xmlTagName}>element</span>
+                <span className={styles.xmlBracket}>/&gt;</span>
+              </div>
             </div>
             
             <h1 className={`${styles.heroTitle} ${isLoaded ? styles.loaded : ''}`}>

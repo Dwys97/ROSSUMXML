@@ -178,15 +178,18 @@ const createResponse = (statusCode, body, contentType = 'application/json') => (
 // JWT verification function
 const verifyJWT = (event) => {
     const authHeader = event.headers?.Authorization || event.headers?.authorization;
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new Error('No valid authorization token provided');
     }
     
     const token = authHeader.slice(7); // Remove 'Bearer ' prefix
+    
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
         return decoded;
     } catch (error) {
+        console.error('JWT verification error:', error.message);
         throw new Error('Invalid or expired token');
     }
 };

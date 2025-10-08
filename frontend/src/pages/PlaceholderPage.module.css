@@ -1,13 +1,46 @@
 .placeholderContainer {
   min-height: calc(100vh - 200px);
-  padding: 6rem 2rem 4rem;
-  background: linear-gradient(135deg, #0f1419 0%, #1a202c 100%);
+  padding: 8rem 2rem 4rem;
+  background: linear-gradient(180deg, #0d1b2a, #1b263b);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Add gradient orbs for visual interest */
+.placeholderContainer::before {
+  content: '';
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(29, 114, 243, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(60px);
+  top: 10%;
+  left: 10%;
+  animation: float 8s ease-in-out infinite;
+  z-index: 0;
+}
+
+.placeholderContainer::after {
+  content: '';
+  position: absolute;
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(60px);
+  top: 30%;
+  right: 10%;
+  animation: float 8s ease-in-out infinite 2s;
+  z-index: 0;
 }
 
 .placeholderContent {
   max-width: 1200px;
   margin: 0 auto;
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
 .placeholderTitle {
@@ -83,4 +116,20 @@
   color: #a5a9b5;
   font-size: 1.1rem;
   margin: 0;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+  }
+  50% {
+    transform: translateY(-10px) translateX(-10px);
+  }
+  75% {
+    transform: translateY(-15px) translateX(5px);
+  }
 }

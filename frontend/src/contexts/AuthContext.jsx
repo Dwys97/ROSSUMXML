@@ -12,11 +12,27 @@ export const AuthProvider = ({ children }) => {
         
         if (token && savedUser) {
             try {
-                setUser(JSON.parse(savedUser));
+                // Verify token is still valid by making a test request
+                const response = await fetch('/api/user/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    setUser(JSON.parse(savedUser));
+                } else {
+                    // Token is invalid, clear it
+                    console.log('Token validation failed, clearing auth');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    setUser(null);
+                }
             } catch (error) {
-                console.error('Error parsing saved user:', error);
+                console.error('Error validating token:', error);
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
+                setUser(null);
             }
         }
         setLoading(false);
