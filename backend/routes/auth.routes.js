@@ -123,45 +123,29 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    const client = await db.getClient();
-
     try {
-        await client.query('BEGIN');
-
         // Ищем пользователя
-        const result = await client.query(
+        const result = await db.query(
             'SELECT id, email, username, password FROM users WHERE email = $1',
             [email]
         );
 
         if (result.rows.length === 0) {
-            await client.query('COMMIT');
-            return res.status(401).json({ error: 'Invalid email or password' });
+            throw new Error('Пользователь не найден');
         }
 
         const user = result.rows[0];
 
-        // Check password
+        // Проверяем пароль
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
-            await client.query('COMMIT');
-            return res.status(401).json({ error: 'Invalid email or password' });
-        }
-
-        // Проверяем наличие JWT_SECRET
-        if (!process.env.JWT_SECRET && !require('../env.json')?.TransformFunction?.JWT_SECRET) {
-            throw new Error('JWT_SECRET not configured');
+            throw new Error('Неверный пароль');
         }
 
         // Создаем JWT токен
-        const jwtSecret = process.env.JWT_SECRET || require('../env.json').TransformFunction.JWT_SECRET;
         const token = jwt.sign(
             { id: user.id, email: user.email },
-            jwtSecret,
+            process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
 
@@ -176,39 +160,10 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        if (client) {
-            await client.query('ROLLBACK');
-            client.release();
-        }
-        
         console.error('Login error:', err);
-        
-        if (err.message === 'JWT_SECRET not configured') {
-            return res.status(500).json({
-                error: 'Internal server configuration error'
-            });
-        }
-
-        // Ошибки базы данных
-        if (err.code === '28P01') { // Invalid password
-            return res.status(401).json({
-                error: 'Invalid email or password'
-            });
-        }
-        
-        if (err.code === '3D000') { // Database does not exist
-            return res.status(500).json({
-                error: 'Database connection error'
-            });
-        }
-
-        return res.status(500).json({
-            error: 'Internal server error. Please try again later.'
+        res.status(400).json({
+            error: err.message || 'Ошибка при входе'
         });
-    } finally {
-        if (client) {
-            client.release();
-        }
     }
 });
 
