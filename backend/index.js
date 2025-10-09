@@ -263,7 +263,12 @@ exports.handler = async (event) => {
         // ADD THIS LOGGING LINE:
         console.log(`Received request for path: "${path}"`); 
 
-        const body = (event.body && typeof event.body === 'string') ? JSON.parse(event.body) : event.body || {};
+        // Special handling for /api/webhook/transform - keep body as raw XML string
+        const isWebhookTransformEndpoint = path === '/api/webhook/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST');
+        console.log(`isWebhookTransformEndpoint: ${isWebhookTransformEndpoint}, path: ${path}, method: ${event.httpMethod || event.requestContext?.http?.method}`);
+        const body = isWebhookTransformEndpoint 
+            ? event.body 
+            : ((event.body && typeof event.body === 'string') ? JSON.parse(event.body) : event.body || {});
 
                 // --- Authentication Endpoints ---
         if (path.endsWith('/auth/register')) {
@@ -757,8 +762,10 @@ exports.handler = async (event) => {
             }
         }
 
-        // FIX: Path no longer expects '/api' or '/prod/api'
-        if (path.endsWith('/transform')) {
+        //FIX: Path no longer expects '/api' or '/prod/api'
+        // Note: This endpoint is for the OLD transform (expects JSON body with sourceXml, destinationXml, mappingJson)
+        // The new /api/transform endpoint (with API key auth) is handled separately below
+        if (path === '/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
             if (!sourceXml || !destinationXml || !mappingJson)
                 return createResponse(400, 'Missing required fields', 'application/json');
@@ -767,12 +774,21 @@ exports.handler = async (event) => {
         }
 
         // FIX: Path no longer expects '/api' or '/prod/api'
-        if (path.endsWith('/transform-json')) {
+        if (path === '/transform-json' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
             if (!sourceXml || !destinationXml || !mappingJson)
                 return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
             const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
             return createResponse(200, JSON.stringify({ transformed }), 'application/json');
+        }
+
+        // Frontend Transformer Page endpoint (expects JSON body with sourceXml, destinationXml, mappingJson)
+        if (path === '/api/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
+            if (!sourceXml || !destinationXml || !mappingJson)
+                return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
+            const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
+            return createResponse(200, transformed, 'application/xml');
         }
         
         // FIX: Path no longer expects '/api' or '/prod/api'
@@ -1281,6 +1297,73 @@ exports.handler = async (event) => {
             }
         }
         // *** FIX ENDS HERE ***
+
+        // Transform XML using API key's linked mapping (for webhooks and API integrations)
+        // This is separate from the frontend /api/transform endpoint
+        if (path === '/api/webhook/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                
+                // Get the API key from the Authorization header
+                const authHeader = event.headers?.Authorization || event.headers?.authorization;
+                const apiKey = authHeader.slice(7); // Remove 'Bearer ' prefix
+                
+                // Get source XML from request body (raw XML, not JSON-parsed)
+                const sourceXml = event.body;
+                
+                if (!sourceXml || typeof sourceXml !== 'string') {
+                    return createResponse(400, JSON.stringify({ error: 'Source XML is required in request body' }));
+                }
+                
+                const client = await pool.connect();
+                try {
+                    // Get the API key's linked transformation mapping
+                    const result = await client.query(
+                        `SELECT tm.mapping_json, tm.destination_schema_xml, tm.mapping_name
+                         FROM api_keys ak
+                         JOIN transformation_mappings tm ON tm.id = ak.default_mapping_id
+                         WHERE ak.api_key = $1 AND ak.user_id = $2`,
+                        [apiKey, user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ 
+                            error: 'No transformation mapping linked to this API key. Please configure a mapping in API Settings.' 
+                        }));
+                    }
+                    
+                    const { mapping_json, destination_schema_xml, mapping_name } = result.rows[0];
+                    
+                    if (!destination_schema_xml) {
+                        return createResponse(400, JSON.stringify({ 
+                            error: `Mapping "${mapping_name}" does not have a destination schema configured. Please upload a destination XML schema in API Settings.` 
+                        }));
+                    }
+                    
+                    // Parse mapping_json if it's a string (from database it comes as TEXT)
+                    const mappingObject = typeof mapping_json === 'string' ? JSON.parse(mapping_json) : mapping_json;
+                    
+                    // Perform the transformation
+                    const transformedXml = transformSingleFile(
+                        sourceXml,
+                        destination_schema_xml,
+                        mappingObject,
+                        true // removeEmptyTags
+                    );
+                    
+                    return createResponse(200, transformedXml, 'application/xml');
+                    
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Transformation error:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Transformation failed', 
+                    details: err.message 
+                }));
+            }
+        }
 
         return createResponse(404, JSON.stringify({ error: 'Endpoint not found' }), 'application/json');
 
