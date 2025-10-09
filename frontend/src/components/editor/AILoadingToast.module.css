@@ -59,11 +59,36 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    flex: 1;
 }
 
 .title {
     font-weight: 600;
     font-size: 15px;
+}
+
+.progressInfo {
+    font-size: 12px;
+    opacity: 0.95;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.progressBarContainer {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.progressBar {
+    height: 100%;
+    background: white;
+    border-radius: 2px;
+    transition: width 0.3s ease-out;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .subtitle {

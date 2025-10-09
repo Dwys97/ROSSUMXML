@@ -5,9 +5,6 @@ const SchemaTree = React.forwardRef(({
     title, 
     treeData, 
     isSource, 
-    hasAIAccess,
-    onAISuggest,
-    aiLoading,
     ...props 
 }, ref) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -40,9 +37,6 @@ const SchemaTree = React.forwardRef(({
                             node={treeData} 
                             isSource={isSource} 
                             searchTerm={searchTerm}
-                            hasAIAccess={hasAIAccess}
-                            onAISuggest={onAISuggest}
-                            aiLoading={aiLoading}
                             {...props} 
                         />
                     </ul>

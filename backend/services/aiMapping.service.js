@@ -92,32 +92,77 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
         const sourceValue = extractValue(sourceNode.name);
         const sourceBaseName = sourceNode.name.split(':')[0].trim();
         
-        // Extract base field name without path prefixes for better matching
-        const getFieldName = (fullName) => {
-            // Extract schema_id or last path component
+        // CRITICAL: Extract schema_id AND element name from FULL path
+        const getFieldNameAndSchemaId = (fullName, fullPath) => {
+            // For SOURCE (Rossum): Extract schema_id from the node itself
             const schemaIdMatch = fullName.match(/schema_id="([^"]+)"/);
-            if (schemaIdMatch) return schemaIdMatch[1];
+            if (schemaIdMatch) {
+                return {
+                    schemaId: schemaIdMatch[1],
+                    elementName: schemaIdMatch[1], // Use schema_id as element name
+                    source: 'schema_id'
+                };
+            }
             
-            // Otherwise get last part of path
+            // For TARGET: Extract element name from last part of path
             const parts = fullName.split(' > ');
-            return parts[parts.length - 1].split('[')[0].split(':')[0].trim();
+            const lastPart = parts[parts.length - 1].split('[')[0].split(':')[0].trim();
+            
+            return {
+                schemaId: null,
+                elementName: lastPart,
+                source: 'element_name'
+            };
         };
         
-        // Extract hierarchical context from path (parent elements)
-        const getPathContext = (path) => {
-            if (!path) return [];
+        // Extract hierarchical context from path WITH schema_id extraction
+        const getPathContextWithSchemaIds = (path) => {
+            if (!path) return { elements: [], schemaIds: [] };
+            
             const parts = path.split(' > ');
-            // Return all parent elements for context
-            return parts.map(p => p.split('[')[0].trim());
+            const elements = [];
+            const schemaIds = [];
+            
+            parts.forEach(part => {
+                // Clean part (remove indices)
+                const cleanPart = part.split('[')[0].trim();
+                elements.push(cleanPart);
+                
+                // Extract schema_id if present
+                const schemaMatch = part.match(/schema_id="([^"]+)"/);
+                if (schemaMatch) {
+                    schemaIds.push(schemaMatch[1]);
+                }
+            });
+            
+            return { elements, schemaIds };
         };
         
-        const sourceFieldName = getFieldName(sourceNode.name);
-        const sourcePathContext = getPathContext(sourceNode.path);
+        const sourceFieldInfo = getFieldNameAndSchemaId(sourceNode.name, sourceNode.path);
+        const sourceFieldName = sourceFieldInfo.elementName;
+        const sourceSchemaId = sourceFieldInfo.schemaId;
+        
+        const sourcePathInfo = getPathContextWithSchemaIds(sourceNode.path);
+        const sourcePathContext = sourcePathInfo.elements;
+        const sourceSchemaIds = sourcePathInfo.schemaIds;
         
         // Extract immediate parent for focused context
         const sourceParent = sourcePathContext.length > 1 
             ? sourcePathContext[sourcePathContext.length - 2] 
             : 'root';
+        
+        // Get parent's schema_id if available
+        const sourceParentSchemaId = sourceSchemaIds.length > 1
+            ? sourceSchemaIds[sourceSchemaIds.length - 2]
+            : null;
+        
+        console.log(`\n🔍 SOURCE ANALYSIS:`);
+        console.log(`   Field Name: "${sourceFieldName}"`);
+        console.log(`   Schema ID: "${sourceSchemaId}"`);
+        console.log(`   Parent Element: "${sourceParent}"`);
+        console.log(`   Parent Schema ID: "${sourceParentSchemaId}"`);
+        console.log(`   Full Path: ${sourcePathContext.join(' → ')}`);
+        console.log(`   All Schema IDs in path: [${sourceSchemaIds.join(', ')}]`);
         
         // Extract section type for Rossum data (basic_info, vendor, line_items, etc.)
         const extractSectionType = (path) => {
@@ -133,29 +178,105 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
         
         const sourceSectionType = extractSectionType(sourceNode.path);
         
-        // Normalize field names by removing common prefixes/suffixes
-        const normalizeFieldName = (fieldName) => {
-            let normalized = fieldName.toLowerCase();
+        // Extract semantic tokens from SCHEMA_ID (for source) and ELEMENT NAME + PATH (for both)
+        const extractSemanticTokens = (elementName, pathElements, schemaIds = []) => {
+            const tokens = new Set();
             
-            // Remove common prefixes: Item_, Line_, Field_, Src_, Dest_, Doc_, Inv_, Order_
-            normalized = normalized.replace(/^(item|line|field|src|dest|doc|inv|invoice|order|header|detail|row)_/, '');
+            // CRITICAL: Add schema_id tokens (most important for Rossum source)
+            schemaIds.forEach(schemaId => {
+                if (schemaId) {
+                    const schemaTokens = schemaId
+                        .replace(/([a-z])([A-Z])/g, '$1 $2') // split camelCase
+                        .toLowerCase()
+                        .split(/[_\s-]+/)
+                        .filter(t => t.length > 0);
+                    schemaTokens.forEach(t => tokens.add(t));
+                }
+            });
             
-            // Remove common suffixes: _value, _code, _text, _id, _number
-            normalized = normalized.replace(/_(value|code|text|id|number|num|no)$/, '');
+            // Extract tokens from element name (split by _, -, camelCase)
+            const fieldTokens = elementName
+                .replace(/([a-z])([A-Z])/g, '$1 $2') // split camelCase
+                .toLowerCase()
+                .split(/[_\s-]+/)
+                .filter(t => t.length > 0);
             
-            return normalized;
+            fieldTokens.forEach(t => tokens.add(t));
+            
+            // Extract tokens from path context (all parent elements)
+            pathElements.forEach(parent => {
+                const parentTokens = parent
+                    .replace(/([a-z])([A-Z])/g, '$1 $2')
+                    .toLowerCase()
+                    .split(/[_\s-]+/)
+                    .filter(t => t.length > 0);
+                parentTokens.forEach(t => tokens.add(t));
+            });
+            
+            return Array.from(tokens);
         };
         
-        // Calculate string similarity hints for the AI
+        // Calculate CONTEXT-AWARE similarity using schema_id + full path analysis
+        const calculateContextualSimilarity = (
+            sourceElementName, sourcePathElements, sourceSchemaIds,
+            targetElementName, targetPathElements, targetSchemaIds
+        ) => {
+            // Extract semantic tokens from SCHEMA_IDS + field name + path
+            const sourceTokens = extractSemanticTokens(sourceElementName, sourcePathElements, sourceSchemaIds);
+            const targetTokens = extractSemanticTokens(targetElementName, targetPathElements, targetSchemaIds);
+            
+            // Calculate token overlap
+            const commonTokens = sourceTokens.filter(t => targetTokens.includes(t));
+            const tokenOverlap = commonTokens.length / Math.max(sourceTokens.length, targetTokens.length);
+            
+            // Semantic mapping for business terms
+            const semanticMap = {
+                'item': ['line', 'product', 'goods', 'article'],
+                'description': ['desc', 'name', 'label', 'text'],
+                'value': ['amount', 'total', 'price', 'sum'],
+                'quantity': ['qty', 'count', 'number', 'num'],
+                'invoice': ['doc', 'document', 'bill'],
+                'date': ['dt', 'time', 'timestamp'],
+                'vendor': ['supplier', 'seller', 'exporter'],
+                'customer': ['buyer', 'importer', 'consignee', 'client'],
+                'number': ['no', 'num', 'nbr', 'id'],
+                'code': ['id', 'key', 'reference', 'ref'],
+                'address': ['addr', 'location'],
+                'total': ['sum', 'amount', 'value', 'price']
+            };
+            
+            // Check for semantic matches
+            let semanticMatches = 0;
+            sourceTokens.forEach(srcToken => {
+                targetTokens.forEach(tgtToken => {
+                    if (srcToken === tgtToken) {
+                        semanticMatches += 2; // Exact match worth more
+                    } else {
+                        // Check semantic equivalents
+                        for (const [key, synonyms] of Object.entries(semanticMap)) {
+                            if ((srcToken === key && synonyms.includes(tgtToken)) ||
+                                (tgtToken === key && synonyms.includes(srcToken)) ||
+                                (synonyms.includes(srcToken) && synonyms.includes(tgtToken))) {
+                                semanticMatches += 1;
+                            }
+                        }
+                    }
+                });
+            });
+            
+            const semanticScore = Math.min(100, (semanticMatches / Math.max(sourceTokens.length, targetTokens.length)) * 50);
+            const overlapScore = tokenOverlap * 100;
+            
+            // Combined contextual similarity
+            return Math.round((overlapScore * 0.6) + (semanticScore * 0.4));
+        };
+        
+        // LEGACY: Simple string similarity (for backward compatibility)
         const calculateSimilarity = (str1, str2) => {
-            // Apply normalization FIRST to remove prefixes/suffixes
-            const normalized1 = normalizeFieldName(str1);
-            const normalized2 = normalizeFieldName(str2);
+            const s1 = str1.toLowerCase().replace(/[_\s-]/g, '');
+            const s2 = str2.toLowerCase().replace(/[_\s-]/g, '');
             
-            const s1 = normalized1.replace(/[_\s-]/g, '');
-            const s2 = normalized2.replace(/[_\s-]/g, '');
-            
-            // Exact match (after normalization)
+            // Exact match
             if (s1 === s2) return 100;
             
             // Contains match
@@ -193,28 +314,53 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
             return Math.round((matches / maxLen) * 100);
         };
         
-        // Pre-calculate top candidates with path context analysis
+        // Pre-calculate top candidates with FULL SCHEMA_ID + PATH CONTEXT analysis
         const targetCandidatesWithScores = limitedTargetNodes.map((node, index) => {
-            const targetFieldName = getFieldName(node.name);
-            const targetPathContext = getPathContext(node.path);
+            // Extract TARGET element info with schema_id support
+            const targetFieldInfo = getFieldNameAndSchemaId(node.name, node.path);
+            const targetFieldName = targetFieldInfo.elementName;
+            const targetSchemaId = targetFieldInfo.schemaId;
+            
+            const targetPathInfo = getPathContextWithSchemaIds(node.path);
+            const targetPathContext = targetPathInfo.elements;
+            const targetSchemaIds = targetPathInfo.schemaIds;
+            
             const targetValue = extractValue(node.name);
             const targetParent = targetPathContext.length > 1 
                 ? targetPathContext[targetPathContext.length - 2] 
                 : 'root';
             
-            // Calculate field name similarity (most important)
-            const nameSimilarity = calculateSimilarity(sourceFieldName, targetFieldName);
+            const targetParentSchemaId = targetSchemaIds.length > 1
+                ? targetSchemaIds[targetSchemaIds.length - 2]
+                : null;
             
-            // Log normalization for debugging (only for high similarity matches)
-            if (nameSimilarity >= 70 && index < 10) {
-                console.log(`🔍 Field match: "${sourceFieldName}" → "${targetFieldName}" = ${nameSimilarity}%`);
-                console.log(`   Normalized: "${normalizeFieldName(sourceFieldName)}" → "${normalizeFieldName(targetFieldName)}"`);
-            }
+            // NEW: Calculate CONTEXTUAL similarity using SCHEMA_IDs + FULL path analysis
+            const contextualSimilarity = calculateContextualSimilarity(
+                sourceFieldName, 
+                sourcePathContext,
+                sourceSchemaIds,
+                targetFieldName, 
+                targetPathContext,
+                targetSchemaIds
+            );
+            
+            // LEGACY: Simple field name similarity (for comparison)
+            const nameSimilarity = calculateSimilarity(sourceFieldName, targetFieldName);
             
             // Calculate parent context similarity (immediate parent match is critical)
             const parentSimilarity = calculateSimilarity(sourceParent, targetParent);
             
-            // Calculate full path context similarity (for additional validation)
+            // Log contextual analysis for debugging (top matches only)
+            if (contextualSimilarity >= 60 || nameSimilarity >= 70) {
+                console.log(`\n🔍 Analyzing: "${sourceFieldName}" (${sourceSchemaId || 'no schema_id'}) → "${targetFieldName}" (${targetSchemaId || 'no schema_id'})`);
+                console.log(`   Source tokens: ${extractSemanticTokens(sourceFieldName, sourcePathContext, sourceSchemaIds).join(', ')}`);
+                console.log(`   Target tokens: ${extractSemanticTokens(targetFieldName, targetPathContext, targetSchemaIds).join(', ')}`);
+                console.log(`   Contextual similarity: ${contextualSimilarity}%`);
+                console.log(`   Name similarity (legacy): ${nameSimilarity}%`);
+                console.log(`   Parent similarity: ${parentSimilarity}%`);
+            }
+            
+            // Calculate full path context similarity (for hierarchical validation)
             let pathSimilarity = 0;
             const sourceParents = sourcePathContext.slice(0, -1); // exclude field itself
             const targetParents = targetPathContext.slice(0, -1);
@@ -238,16 +384,16 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
                 valueCompatibility = calculateSimilarity(sourceValue, targetValue);
             }
             
-            // Combined score with updated weights:
-            // - Field name: 60% (most important)
-            // - Immediate parent: 25% (critical for context)
-            // - Full path: 10% (additional validation)
-            // - Value: 5% (data validation)
+            // NEW SCORING: Contextual analysis takes priority
+            // - Contextual similarity: 50% (FULL path + field semantic analysis)
+            // - Parent context: 25% (immediate parent validation)
+            // - Path hierarchy: 15% (structural validation)
+            // - Value compatibility: 10% (data validation)
             const combinedScore = Math.round(
-                (nameSimilarity * 0.60) + 
+                (contextualSimilarity * 0.50) + 
                 (parentSimilarity * 0.25) +
-                (pathSimilarity * 0.10) + 
-                (valueCompatibility * 0.05)
+                (pathSimilarity * 0.15) + 
+                (valueCompatibility * 0.10)
             );
             
             return {
@@ -258,7 +404,8 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
                 path: node.path,
                 pathContext: targetPathContext,
                 parent: targetParent,
-                nameSimilarity,
+                contextualSimilarity,  // NEW: Full context score
+                nameSimilarity,        // LEGACY: Simple name match
                 parentSimilarity,
                 pathSimilarity,
                 valueCompatibility,
@@ -266,13 +413,20 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
             };
         });
         
-        // Sort by combined score to prioritize likely matches
-        const topCandidates = targetCandidatesWithScores
-            .sort((a, b) => b.combinedScore - a.combinedScore)
-            .slice(0, 20); // Show top 20 most similar
+        // CRITICAL: Sort by combined score (highest match first)
+        const sortedCandidates = targetCandidatesWithScores.sort((a, b) => b.combinedScore - a.combinedScore);
         
-        const otherCandidates = targetCandidatesWithScores
-            .filter(c => !topCandidates.includes(c));
+        // Show top 20 most similar (already sorted)
+        const topCandidates = sortedCandidates.slice(0, 20);
+        
+        const otherCandidates = sortedCandidates.slice(20);
+        
+        // Log top 5 matches for debugging
+        console.log(`\n📊 TOP 5 MATCHES for "${sourceFieldName}":`);
+        topCandidates.slice(0, 5).forEach((c, i) => {
+            console.log(`   ${i + 1}. ${c.name} (Score: ${c.combinedScore}%, Context: ${c.contextualSimilarity}%, Parent: ${c.parentSimilarity}%)`);
+            console.log(`      Path: ${c.pathContext.join(' → ')}`);
+        });
         
         // Create a mapping of display index to actual array index for AI response parsing
         // This is needed because we show AI a re-ordered list (top 20 first)
@@ -312,17 +466,19 @@ ${sourcePathContext.includes('section') && !sourcePathContext.includes('multival
 ${sourcePathContext.includes('multivalue') && sourcePathContext.includes('tuple') ? '• ✅ LINE ITEM FIELD (in "multivalue > tuple")' : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 TARGET CANDIDATES (${limitedTargetNodes.length} total, showing top ${topCandidates.length} by score)
+📋 TARGET CANDIDATES (${limitedTargetNodes.length} total, top ${topCandidates.length} by CONTEXTUAL score)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${topCandidates.map(c => {
     const isHeaderLevel = c.pathContext.includes('Header') || c.pathContext.length <= 3;
     const isLineItemLevel = c.pathContext.includes('LineItem') || c.pathContext.includes('Line');
     
-    return `┌─ INDEX ${c.index}: ${c.name} │ SCORE: ${c.combinedScore}% │ Name: ${c.nameSimilarity}% │ Parent: ${c.parentSimilarity}%
-│  ${c.value ? `Sample: "${c.value}"` : 'No sample data'}
-│  Parent: "${c.parent}"
-│  Path: ${c.pathContext.join(' → ')}
+    return `┌─ INDEX ${c.index}: ${c.name} │ TOTAL: ${c.combinedScore}%
+│  📊 Scores: Context=${c.contextualSimilarity}% | Parent=${c.parentSimilarity}% | Path=${c.pathSimilarity}% | Value=${c.valueCompatibility}%
+│  🔍 Legacy Name Match: ${c.nameSimilarity}%
+│  ${c.value ? `📝 Sample: "${c.value}"` : '📝 No sample data'}
+│  👨‍👩‍👧 Parent: "${c.parent}"
+│  🗂️  Path: ${c.pathContext.join(' → ')}
 │  ${isHeaderLevel ? '✅ HEADER-LEVEL' : isLineItemLevel ? '✅ LINE ITEM-LEVEL' : '⚠️  Other level'}
 └─────────────────────────────────────────────────────────────────────────`;
 }).join('\n\n')}
@@ -397,17 +553,35 @@ PARENT EQUIVALENTS:
 "multivalue" ≈ "LineItems", "Items", "Lines" (parent of repeating elements)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔢 CONFIDENCE SCORING
+🔢 SCORING EXPLANATION (NEW CONTEXTUAL ANALYSIS)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-95-100%: Correct level + exact field name + matching parent
-90-94%:  Correct level + near-exact field name (abbreviation)
-80-89%:  Correct level + synonym field name + compatible type
-70-79%:  Correct level + related field name
-<70%:    Wrong hierarchical level OR weak field name match
-<50%:    REJECT - incompatible path structures
+**Context Score (50% weight)**: Analyzes FULL path + field name semantically
+  - Extracts tokens from: field name + ALL parent elements
+  - Example: "Item_value" in "LineItems > tuple" 
+    → tokens: [item, value, lineitems, tuple]
+  - Matches with semantic equivalents: item≈line, value≈total≈amount
+  - This REPLACES simple name normalization with intelligent context!
 
-CRITICAL: If path levels don't match (header vs line item), confidence MUST be <60%!
+**Parent Score (25% weight)**: Immediate parent similarity
+**Path Score (15% weight)**: Hierarchical structure validation  
+**Value Score (10% weight)**: Sample data compatibility
+
+TOTAL = (Context × 0.50) + (Parent × 0.25) + (Path × 0.15) + (Value × 0.10)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 DECISION GUIDELINES (USE CONTEXTUAL SCORES)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+95-100%: High Context score (≥90) + Correct level + Strong parent match
+90-94%:  High Context score (≥80) + Correct level
+80-89%:  Good Context score (≥70) + Correct level  
+70-79%:  Moderate Context score (≥60) + Correct level
+<70%:    Low Context score OR wrong hierarchical level
+<50%:    REJECT - incompatible paths/context
+
+CRITICAL: Candidates are PRE-SORTED by TOTAL score (highest first).
+The TOP candidate is most likely correct - verify level match only!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📤 RESPONSE (JSON ONLY)

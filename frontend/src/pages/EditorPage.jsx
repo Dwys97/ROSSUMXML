@@ -71,6 +71,7 @@ function EditorPage() {
     const [batchLoading, setBatchLoading] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [remainingUnmappedCount, setRemainingUnmappedCount] = useState(0);
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 }); // NEW: Progress tracking
     const processingQueueRef = useRef([]);
     const mappingsRef = useRef(mappings);
     const shouldCancelBatchRef = useRef(false); // Flag to cancel background processing
@@ -480,6 +481,9 @@ function EditorPage() {
             
             const totalUnmapped = unmappedSourceLeaves.length;
             
+            // SET TOTAL PROGRESS
+            setBatchProgress({ current: 0, total: totalUnmapped });
+            
             if (totalUnmapped === 0) {
                 alert('No unmapped elements found. All elements are already mapped!');
                 setShowBatchModal(false);
@@ -516,6 +520,9 @@ function EditorPage() {
             
             const firstResult = await generateBatchAISuggestions(firstMappingRequests);
             setBatchSuggestions(firstResult.suggestions || []);
+            
+            // UPDATE PROGRESS after first batch
+            setBatchProgress({ current: firstBatch.length, total: totalUnmapped });
             setBatchLoading(false);
             
             // NOW show modal with first batch ready
@@ -875,9 +882,6 @@ function EditorPage() {
                     onCollectionSelect={handleCollectionSelect}
                     registerNodeRef={registerNodeRef}
                     targetValueMap={targetValueMap}
-                    hasAIAccess={hasAIAccess}
-                    onAISuggest={handleAISuggest}
-                    aiLoading={aiLoading}
                 />
 
                 <MappingsList
@@ -928,6 +932,8 @@ function EditorPage() {
                 <AILoadingToast
                     message="Generating AI suggestions..."
                     subtitle="Analyzing schemas and creating intelligent mappings"
+                    current={batchProgress.current}
+                    total={batchProgress.total}
                 />
             )}
 

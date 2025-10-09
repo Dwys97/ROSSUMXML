@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { AISuggestionButton } from './AISuggestionButton';
 
 // Regex to find the value part of a node name string, e.g., ': "some value"'
 const valueRegex = /(: ".*?")$/;
@@ -15,9 +14,6 @@ function TreeNode({
     onDrop,
     onCustomValue,
     targetValueMap, // New prop to get the mapped value
-    hasAIAccess,
-    onAISuggest,
-    aiLoading
 }) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const ref = useRef(null);
@@ -132,15 +128,6 @@ function TreeNode({
 
                 {!isSource && !hasChildren && (
                     <div className="node-actions">
-                        {hasAIAccess && onAISuggest && (
-                            <AISuggestionButton
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAISuggest(node);
-                                }}
-                                loading={aiLoading}
-                            />
-                        )}
                         <button 
                             className="custom-value-btn" 
                             title="Set custom value" 
@@ -170,9 +157,6 @@ function TreeNode({
                             onDrop={onDrop}
                             onCustomValue={onCustomValue}
                             targetValueMap={targetValueMap}
-                            hasAIAccess={hasAIAccess}
-                            onAISuggest={onAISuggest}
-                            aiLoading={aiLoading}
                         />
                     ))}
                 </ul>
