@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth.routes');
+const apiSettingsRoutes = require('./routes/api-settings.routes');
 const { parseXmlToTree } = require('./services/xmlParser.service');
 const db = require('./db');
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/api-settings', apiSettingsRoutes);
 
 // XML Transform endpoints
 app.post('/transform', async (req, res) => {

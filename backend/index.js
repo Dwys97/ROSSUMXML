@@ -176,7 +176,7 @@ const createResponse = (statusCode, body, contentType = 'application/json') => (
 });
 
 // JWT verification function
-const verifyJWT = (event) => {
+const verifyJWT = async (event) => {
     const authHeader = event.headers?.Authorization || event.headers?.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -185,12 +185,63 @@ const verifyJWT = (event) => {
     
     const token = authHeader.slice(7); // Remove 'Bearer ' prefix
     
+    // Check if it's an API key (starts with 'rxml_')
+    if (token.startsWith('rxml_')) {
+        return await verifyApiKey(token);
+    }
+    
+    // Otherwise, verify as JWT
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
         return decoded;
     } catch (error) {
         console.error('JWT verification error:', error.message);
         throw new Error('Invalid or expired token');
+    }
+};
+
+// Verify API Key
+const verifyApiKey = async (apiKey) => {
+    const client = await pool.connect();
+    try {
+        const result = await client.query(
+            `SELECT ak.user_id, ak.is_active, ak.expires_at, u.id, u.email, u.username
+             FROM api_keys ak
+             JOIN users u ON u.id = ak.user_id
+             WHERE ak.api_key = $1`,
+            [apiKey]
+        );
+        
+        if (result.rows.length === 0) {
+            throw new Error('Invalid API key');
+        }
+        
+        const keyData = result.rows[0];
+        
+        // Check if key is active
+        if (!keyData.is_active) {
+            throw new Error('API key is disabled');
+        }
+        
+        // Check if key has expired
+        if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+            throw new Error('API key has expired');
+        }
+        
+        // Update last_used_at timestamp
+        await client.query(
+            'UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE api_key = $1',
+            [apiKey]
+        );
+        
+        // Return user info in same format as JWT
+        return {
+            id: keyData.user_id,
+            email: keyData.email,
+            username: keyData.username
+        };
+    } finally {
+        client.release();
     }
 };
 
@@ -743,6 +794,487 @@ exports.handler = async (event) => {
                 return createResponse(200, JSON.stringify({ tree }), 'application/json');
             } catch (err) {
                 return createResponse(400, JSON.stringify({ error: err.message }), 'application/json');
+            }
+        }
+
+        // API Settings - Get API Keys
+        if (path.endsWith('/api-settings/keys') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `SELECT 
+                            ak.id, ak.key_name, ak.api_key, ak.is_active, ak.last_used_at, 
+                            ak.created_at, ak.expires_at, ak.default_mapping_id, ak.auto_transform,
+                            tm.mapping_name as default_mapping_name
+                         FROM api_keys ak
+                         LEFT JOIN transformation_mappings tm ON tm.id = ak.default_mapping_id
+                         WHERE ak.user_id = $1
+                         ORDER BY ak.created_at DESC`,
+                        [user.id]
+                    );
+                    return createResponse(200, JSON.stringify(result.rows));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(401, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Settings - Create API Key
+        if (path.endsWith('/api-settings/keys') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const { keyName, expiresInDays } = body;
+                
+                if (!keyName || keyName.trim() === '') {
+                    return createResponse(400, JSON.stringify({ error: 'Key name is required' }));
+                }
+                
+                const crypto = require('crypto');
+                const apiKey = 'rxml_' + crypto.randomBytes(24).toString('hex');
+                const apiSecret = crypto.randomBytes(32).toString('hex');
+                const hashedSecret = crypto.createHash('sha256').update(apiSecret).digest('hex');
+                
+                let expiresAt = null;
+                if (expiresInDays && expiresInDays > 0) {
+                    expiresAt = new Date();
+                    expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+                }
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `INSERT INTO api_keys (user_id, key_name, api_key, api_secret, expires_at)
+                         VALUES ($1, $2, $3, $4, $5)
+                         RETURNING id, key_name, api_key, is_active, created_at, expires_at`,
+                        [user.id, keyName.trim(), apiKey, hashedSecret, expiresAt]
+                    );
+                    
+                    return createResponse(200, JSON.stringify({
+                        ...result.rows[0],
+                        api_secret: apiSecret,
+                        warning: 'Save the API secret now. You won\'t be able to see it again!'
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                if (err.code === '23505') {
+                    return createResponse(409, JSON.stringify({ error: 'A key with this name already exists' }));
+                }
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Settings - Delete API Key
+        if (path.includes('/api-settings/keys/') && (event.httpMethod === 'DELETE' || event.requestContext?.http?.method === 'DELETE')) {
+            try {
+                const user = await verifyJWT(event);
+                const keyId = path.split('/').pop();
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        'DELETE FROM api_keys WHERE id = $1 AND user_id = $2 RETURNING id',
+                        [keyId, user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'API key not found' }));
+                    }
+                    
+                    return createResponse(200, JSON.stringify({ message: 'API key deleted successfully' }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Settings - Toggle API Key
+        if (path.includes('/api-settings/keys/') && path.endsWith('/toggle') && (event.httpMethod === 'PATCH' || event.requestContext?.http?.method === 'PATCH')) {
+            try {
+                const user = await verifyJWT(event);
+                const keyId = path.split('/')[path.split('/').length - 2];
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `UPDATE api_keys 
+                         SET is_active = NOT is_active
+                         WHERE id = $1 AND user_id = $2
+                         RETURNING id, is_active`,
+                        [keyId, user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'API key not found' }));
+                    }
+                    
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Settings - Get Webhook Settings
+        if (path.endsWith('/api-settings/webhook') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        'SELECT * FROM webhook_settings WHERE user_id = $1',
+                        [user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(200, JSON.stringify({
+                            webhook_url: '',
+                            webhook_secret: '',
+                            is_enabled: false,
+                            events: []
+                        }));
+                    }
+                    
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(401, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Settings - Update Webhook Settings
+        if (path.endsWith('/api-settings/webhook') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const { webhook_url, webhook_secret, is_enabled, events } = body;
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `INSERT INTO webhook_settings (user_id, webhook_url, webhook_secret, is_enabled, events)
+                         VALUES ($1, $2, $3, $4, $5)
+                         ON CONFLICT (user_id) 
+                         DO UPDATE SET
+                            webhook_url = $2,
+                            webhook_secret = $3,
+                            is_enabled = $4,
+                            events = $5,
+                            updated_at = CURRENT_TIMESTAMP
+                         RETURNING *`,
+                        [user.id, webhook_url, webhook_secret, is_enabled, events]
+                    );
+                    
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Settings - Get Output Delivery Settings
+        if (path.endsWith('/api-settings/output-delivery') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        'SELECT * FROM output_delivery_settings WHERE user_id = $1',
+                        [user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(200, JSON.stringify({
+                            delivery_method: 'download',
+                            ftp_host: '',
+                            ftp_port: 21,
+                            ftp_username: '',
+                            ftp_password: '',
+                            ftp_path: '/',
+                            ftp_use_ssl: true,
+                            email_recipients: [],
+                            email_subject: 'XML Transformation Result',
+                            email_include_attachment: true
+                        }));
+                    }
+                    
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(401, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Settings - Update Output Delivery Settings
+        if (path.endsWith('/api-settings/output-delivery') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const {
+                    delivery_method,
+                    ftp_host,
+                    ftp_port,
+                    ftp_username,
+                    ftp_password,
+                    ftp_path,
+                    ftp_use_ssl,
+                    email_recipients,
+                    email_subject,
+                    email_include_attachment
+                } = body;
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `INSERT INTO output_delivery_settings (
+                            user_id, delivery_method, ftp_host, ftp_port, ftp_username, 
+                            ftp_password, ftp_path, ftp_use_ssl, email_recipients, 
+                            email_subject, email_include_attachment
+                         )
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                         ON CONFLICT (user_id) 
+                         DO UPDATE SET
+                            delivery_method = $2,
+                            ftp_host = $3,
+                            ftp_port = $4,
+                            ftp_username = $5,
+                            ftp_password = $6,
+                            ftp_path = $7,
+                            ftp_use_ssl = $8,
+                            email_recipients = $9,
+                            email_subject = $10,
+                            email_include_attachment = $11,
+                            updated_at = CURRENT_TIMESTAMP
+                         RETURNING *`,
+                        [
+                            user.id, delivery_method, ftp_host, ftp_port, ftp_username,
+                            ftp_password, ftp_path, ftp_use_ssl, email_recipients,
+                            email_subject, email_include_attachment
+                        ]
+                    );
+                    
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // Transformation Mappings - Get all mappings for user
+        if (path.endsWith('/api-settings/mappings') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `SELECT id, mapping_name, description, source_schema_type, 
+                                destination_schema_type, is_default, created_at, updated_at
+                         FROM transformation_mappings
+                         WHERE user_id = $1
+                         ORDER BY is_default DESC, created_at DESC`,
+                        [user.id]
+                    );
+                    return createResponse(200, JSON.stringify(result.rows));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(401, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // Transformation Mappings - Get specific mapping (including JSON)
+        if (path.includes('/api-settings/mappings/') && !path.endsWith('/mappings') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const mappingId = path.split('/').pop();
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `SELECT * FROM transformation_mappings
+                         WHERE id = $1 AND user_id = $2`,
+                        [mappingId, user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                    }
+                    
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // Transformation Mappings - Create new mapping
+        if (path.endsWith('/api-settings/mappings') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const { mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default } = body;
+                
+                if (!mapping_name || !mapping_json) {
+                    return createResponse(400, JSON.stringify({ error: 'Mapping name and mapping JSON are required' }));
+                }
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // If this is set as default, unset other defaults
+                    if (is_default) {
+                        await client.query(
+                            'UPDATE transformation_mappings SET is_default = false WHERE user_id = $1',
+                            [user.id]
+                        );
+                    }
+                    
+                    const result = await client.query(
+                        `INSERT INTO transformation_mappings 
+                         (user_id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7)
+                         RETURNING *`,
+                        [user.id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default || false]
+                    );
+                    
+                    await client.query('COMMIT');
+                    return createResponse(201, JSON.stringify(result.rows[0]));
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    throw err;
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                if (err.code === '23505') {
+                    return createResponse(409, JSON.stringify({ error: 'A mapping with this name already exists' }));
+                }
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // Transformation Mappings - Update mapping
+        if (path.includes('/api-settings/mappings/') && !path.endsWith('/mappings') && (event.httpMethod === 'PUT' || event.requestContext?.http?.method === 'PUT')) {
+            try {
+                const user = await verifyJWT(event);
+                const mappingId = path.split('/').pop();
+                const { mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default } = body;
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // If this is set as default, unset other defaults
+                    if (is_default) {
+                        await client.query(
+                            'UPDATE transformation_mappings SET is_default = false WHERE user_id = $1 AND id != $2',
+                            [user.id, mappingId]
+                        );
+                    }
+                    
+                    const result = await client.query(
+                        `UPDATE transformation_mappings
+                         SET mapping_name = COALESCE($1, mapping_name),
+                             description = COALESCE($2, description),
+                             source_schema_type = COALESCE($3, source_schema_type),
+                             destination_schema_type = COALESCE($4, destination_schema_type),
+                             mapping_json = COALESCE($5, mapping_json),
+                             is_default = COALESCE($6, is_default),
+                             updated_at = CURRENT_TIMESTAMP
+                         WHERE id = $7 AND user_id = $8
+                         RETURNING *`,
+                        [mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default, mappingId, user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        await client.query('ROLLBACK');
+                        return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                    }
+                    
+                    await client.query('COMMIT');
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    throw err;
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // Transformation Mappings - Delete mapping
+        if (path.includes('/api-settings/mappings/') && !path.endsWith('/mappings') && (event.httpMethod === 'DELETE' || event.requestContext?.http?.method === 'DELETE')) {
+            try {
+                const user = await verifyJWT(event);
+                const mappingId = path.split('/').pop();
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        'DELETE FROM transformation_mappings WHERE id = $1 AND user_id = $2 RETURNING id',
+                        [mappingId, user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                    }
+                    
+                    return createResponse(200, JSON.stringify({ message: 'Mapping deleted successfully' }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // API Keys - Link mapping to API key
+        if (path.includes('/api-settings/keys/') && path.endsWith('/set-mapping') && (event.httpMethod === 'PATCH' || event.requestContext?.http?.method === 'PATCH')) {
+            try {
+                const user = await verifyJWT(event);
+                const keyId = path.split('/')[path.split('/').length - 2];
+                const { mapping_id, auto_transform } = body;
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `UPDATE api_keys 
+                         SET default_mapping_id = $1, auto_transform = $2
+                         WHERE id = $3 AND user_id = $4
+                         RETURNING id, key_name, default_mapping_id, auto_transform`,
+                        [mapping_id, auto_transform !== undefined ? auto_transform : false, keyId, user.id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'API key not found' }));
+                    }
+                    
+                    return createResponse(200, JSON.stringify(result.rows[0]));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
             }
         }
         // *** FIX ENDS HERE ***

@@ -12,6 +12,7 @@ import SolutionsPage from './pages/SolutionsPage';
 import EnterprisePage from './pages/EnterprisePage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import ApiSettingsPage from './pages/ApiSettingsPage';
 import UserProfile from './components/profile/UserProfile';
 import './App.css';
 
@@ -53,6 +54,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <UserProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/api-settings" 
+              element={
+                <ProtectedRoute>
+                  <ApiSettingsPage />
                 </ProtectedRoute>
               } 
             />
