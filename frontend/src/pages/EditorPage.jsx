@@ -68,6 +68,15 @@ function EditorPage() {
     const [batchSuggestions, setBatchSuggestions] = useState([]);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [batchLoading, setBatchLoading] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [remainingUnmappedCount, setRemainingUnmappedCount] = useState(0);
+    const processingQueueRef = useRef([]);
+    const mappingsRef = useRef(mappings);
+    
+    // Keep mappingsRef in sync with mappings
+    useEffect(() => {
+        mappingsRef.current = mappings;
+    }, [mappings]);
 
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
@@ -373,6 +382,48 @@ function EditorPage() {
 
     // --- BATCH AI SUGGESTION HANDLERS ---
     
+    // Progressive batch processing function
+    const processNextBatch = useCallback(async (remainingSources, targetLeaves) => {
+        const BATCH_SIZE = 5;
+        let currentIndex = 0;
+        
+        while (currentIndex < remainingSources.length) {
+            // Wait a bit before next batch to not overwhelm the server
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const batch = remainingSources.slice(currentIndex, currentIndex + BATCH_SIZE);
+            currentIndex += BATCH_SIZE;
+            
+            try {
+                // Get FRESH context with current mappings (including accepted suggestions)
+                // Use mappingsRef.current to get the latest mappings without recreating this callback
+                const freshContext = {
+                    sourceSchema: sourceTree?.name || 'Unknown',
+                    targetSchema: targetTree?.name || 'Unknown', 
+                    existingMappings: mappingsRef.current.map(m => ({ source: m.source, target: m.target }))
+                };
+                
+                const mappingRequests = batch.map(sourceNode => ({
+                    sourceNode: sourceNode,
+                    targetNodes: targetLeaves.slice(0, 50),
+                    context: freshContext
+                }));
+                
+                const result = await generateBatchAISuggestions(mappingRequests);
+                
+                // Append new suggestions to existing ones
+                setBatchSuggestions(prev => [...prev, ...(result.suggestions || [])]);
+                setRemainingUnmappedCount(prev => Math.max(0, prev - batch.length));
+                
+            } catch (error) {
+                console.error('Error processing batch:', error);
+                // Continue with next batch even if one fails
+            }
+        }
+        
+        setIsLoadingMore(false);
+    }, [sourceTree, targetTree]);
+    
     const handleBatchAISuggest = useCallback(async () => {
         if (!sourceTree || !targetTree || !hasAIAccess) {
             setShowUpgradePrompt(true);
@@ -381,55 +432,69 @@ function EditorPage() {
 
         setBatchLoading(true);
         setShowBatchModal(true);
+        setBatchSuggestions([]); // Clear previous suggestions
         
         try {
             // Get all leaf nodes directly using existing helper functions
-            // These already correctly identify leaf nodes during tree traversal
             const allSourceLeaves = getAllSourceNodes(sourceTree);
-            const allTargetLeaves = getAllSourceNodes(targetTree); // Same logic works for target
+            const allTargetLeaves = getAllSourceNodes(targetTree);
             
             // Filter out already mapped elements BY PATH (not by name)
-            // This allows elements with same name but different paths to still be suggested
             const mappedSources = new Set(mappings.map(m => m.source));
             const mappedTargets = new Set(mappings.map(m => m.target));
             
             const unmappedSourceLeaves = allSourceLeaves.filter(el => !mappedSources.has(el.path));
             const unmappedTargetLeaves = allTargetLeaves.filter(el => !mappedTargets.has(el.path));
             
-            // Limit batch size to prevent Lambda timeout (60s total limit)
-            // Each AI request takes 5-15 seconds, so max 5 elements to stay under 60s
-            const MAX_BATCH_SIZE = 5;
-            if (unmappedSourceLeaves.length > MAX_BATCH_SIZE) {
-                alert(`Found ${unmappedSourceLeaves.length} unmapped leaf elements. Processing first ${MAX_BATCH_SIZE} to stay within 60-second timeout. You can run this again for remaining elements.`);
-            }
-            const sourcesToProcess = unmappedSourceLeaves.slice(0, MAX_BATCH_SIZE);
+            const totalUnmapped = unmappedSourceLeaves.length;
+            setRemainingUnmappedCount(totalUnmapped);
             
-            // Create proper mapping requests structure for each SOURCE element
-            // Each request asks "what target element best matches this source?"
-            // Optimize: only send leaf target nodes to reduce AI processing time
+            if (totalUnmapped === 0) {
+                alert('No unmapped elements found. All elements are already mapped!');
+                setShowBatchModal(false);
+                setBatchLoading(false);
+                return;
+            }
+            
+            // PROGRESSIVE LOADING: Process in batches of 5
+            const BATCH_SIZE = 5;
+            const firstBatch = unmappedSourceLeaves.slice(0, BATCH_SIZE);
+            const remainingBatches = unmappedSourceLeaves.slice(BATCH_SIZE);
+            
+            // Store remaining batches for progressive loading
+            processingQueueRef.current = remainingBatches;
+            
+            // Prepare context
             const optimizedContext = {
                 sourceSchema: sourceTree?.name || 'Unknown',
                 targetSchema: targetTree?.name || 'Unknown', 
                 existingMappings: mappings.map(m => ({ source: m.source, target: m.target }))
             };
             
-            const mappingRequests = sourcesToProcess.map(sourceNode => ({
+            // Generate FIRST BATCH immediately
+            const firstMappingRequests = firstBatch.map(sourceNode => ({
                 sourceNode: sourceNode,
-                targetNodes: unmappedTargetLeaves.slice(0, 50), // Limit to 50 targets per request to reduce payload
+                targetNodes: unmappedTargetLeaves.slice(0, 50),
                 context: optimizedContext
             }));
             
-            const result = await generateBatchAISuggestions(mappingRequests);
+            const firstResult = await generateBatchAISuggestions(firstMappingRequests);
+            setBatchSuggestions(firstResult.suggestions || []);
+            setBatchLoading(false);
             
-            setBatchSuggestions(result.suggestions || []);
+            // Start processing REMAINING BATCHES in background
+            if (remainingBatches.length > 0) {
+                setIsLoadingMore(true);
+                processNextBatch(remainingBatches, unmappedTargetLeaves);
+            }
+            
         } catch (error) {
             console.error('Batch AI suggestion error:', error);
             alert(error.message || 'Failed to generate AI suggestions. Please try again.');
             setShowBatchModal(false);
-        } finally {
             setBatchLoading(false);
         }
-    }, [sourceTree, targetTree, mappings, hasAIAccess, getAllSourceNodes]);
+    }, [sourceTree, targetTree, mappings, hasAIAccess, getAllSourceNodes, processNextBatch]);
 
     const handleAcceptBatchSuggestions = useCallback((selectedSuggestions) => {
         if (!selectedSuggestions.length) return;
@@ -827,6 +892,8 @@ function EditorPage() {
                     onRegenerateOne={handleRegenerateOneSuggestion}
                     onClose={handleCloseBatchModal}
                     loading={batchLoading}
+                    isLoadingMore={isLoadingMore}
+                    remainingCount={remainingUnmappedCount}
                 />
             )}
 

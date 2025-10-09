@@ -12,6 +12,8 @@ import styles from './AIBatchSuggestionModal.module.css';
  * @param {Function} props.onRegenerateOne - Regenerate single suggestion handler
  * @param {Function} props.onClose - Close handler
  * @param {boolean} props.loading - Loading state for regenerate
+ * @param {boolean} props.isLoadingMore - Loading more suggestions in background
+ * @param {number} props.remainingCount - Total unmapped elements remaining
  */
 export function AIBatchSuggestionModal({ 
     suggestions = [], 
@@ -20,7 +22,9 @@ export function AIBatchSuggestionModal({
     onRegenerateAll,
     onRegenerateOne,
     onClose,
-    loading = false 
+    loading = false,
+    isLoadingMore = false,
+    remainingCount = 0
 }) {
     const [selectedSuggestions, setSelectedSuggestions] = useState(new Set());
     const [regeneratingIndex, setRegeneratingIndex] = useState(null);
@@ -127,7 +131,14 @@ export function AIBatchSuggestionModal({
                         <div>
                             <h2>AI Mapping Suggestions</h2>
                             <p className={styles.subtitle}>
-                                {visibleSuggestions.length} suggestions remaining • Avg confidence: {Math.round(averageConfidence)}%
+                                {visibleSuggestions.length} suggestions • Avg confidence: {Math.round(averageConfidence)}%
+                                {isLoadingMore && remainingCount > suggestions.length && (
+                                    <span className={styles.loadingMoreIndicator}>
+                                        {' • '}
+                                        <span className={styles.smallSpinner}></span>
+                                        {' Loading more... (~{remainingCount - suggestions.length} pending)'}
+                                    </span>
+                                )}
                             </p>
                         </div>
                     </div>
