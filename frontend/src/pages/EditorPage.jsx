@@ -123,45 +123,70 @@ function EditorPage() {
         try {
             const imported = JSON.parse(content);
             setHistory([]);
+            
+            // Reset collections first
             setSelectedSourceCollection(null);
             setSelectedTargetCollection(null);
 
             const staticMappings = imported.staticMappings || [];
+            const allCollectionMappings = [];
             
-            const collectionMappings = (imported.collectionMappings || []).flatMap(cm => {
+            // Store collections temporarily (will use the last one for now, but can be extended)
+            let lastSourceCollection = null;
+            let lastTargetCollection = null;
+            
+            // Process each collection mapping
+            (imported.collectionMappings || []).forEach(cm => {
+                // Track collection info
                 if (cm.sourceItemElementName) {
                     const srcName = cm.sourceItemElementName.split('[')[0];
-                    setSelectedSourceCollection({
+                    lastSourceCollection = {
                         path: `${cm.sourceCollectionPath} > ${srcName}[0]`,
                         name: cm.sourceItemElementName,
                         parentPath: cm.sourceCollectionPath,
-                    });
+                    };
                 }
-                 if (cm.targetItemElementName) {
+                if (cm.targetItemElementName) {
                     const tgtName = cm.targetItemElementName.split('[')[0];
-                    setSelectedTargetCollection({
+                    lastTargetCollection = {
                         path: `${cm.targetCollectionPath} > ${tgtName}[0]`,
                         name: cm.targetItemElementName,
                         parentPath: cm.targetCollectionPath
-                    });
+                    };
                 }
 
-                return (cm.mappings || []).map(m => {
-                    const sourceItemName = (cm.sourceItemElementName || '').split('[')[0];
-                    const targetItemName = (cm.targetItemElementName || '').split('[')[0];
-                    return {
-                        source: m.source ? `${cm.sourceCollectionPath} > ${sourceItemName}[0] > ${m.source}` : undefined,
-                        target: m.target ? `${cm.targetCollectionPath} > ${targetItemName}[0] > ${m.target}` : undefined,
-                        type: m.type || 'element',
-                        value: m.value
-                    };
-                }).filter(m => m.target); // Ensure mappings have a target
+                // Process mappings within this collection
+                const mappingsInCollection = (cm.mappings || [])
+                    .filter(m => m.type !== 'generated_line_number') // Skip auto-generated entries
+                    .map(m => {
+                        const sourceItemName = (cm.sourceItemElementName || '').split('[')[0];
+                        const targetItemName = (cm.targetItemElementName || '').split('[')[0];
+                        return {
+                            source: m.source ? `${cm.sourceCollectionPath} > ${sourceItemName}[0] > ${m.source}` : undefined,
+                            target: m.target ? `${cm.targetCollectionPath} > ${targetItemName}[0] > ${m.target}` : undefined,
+                            type: m.type || 'element',
+                            value: m.value
+                        };
+                    })
+                    .filter(m => m.target); // Ensure mappings have a target
+                
+                allCollectionMappings.push(...mappingsInCollection);
             });
-            setMappings([...staticMappings, ...collectionMappings]);
+            
+            // Set collections (currently uses the last one, but this allows for future multi-collection support)
+            if (lastSourceCollection) {
+                setSelectedSourceCollection(lastSourceCollection);
+            }
+            if (lastTargetCollection) {
+                setSelectedTargetCollection(lastTargetCollection);
+            }
+            
+            // Combine static and collection mappings
+            setMappings([...staticMappings, ...allCollectionMappings]);
             setIsMappingFileLoaded(true);
         } catch (error) {
             console.error('Invalid mapping JSON:', error);
-            alert('Failed to parse mapping file.');
+            alert(`Failed to parse mapping file: ${error.message}`);
         }
     };
 
