@@ -1,6 +1,6 @@
 import React from 'react';
 
-function MappingsList({ mappings, onUpdateMappings, onSave, onUndo, canUndo }) {
+function MappingsList({ mappings, onUpdateMappings, onSave, onSaveToApi, onUndo, canUndo, saveStatus }) {
 
     const handleRemove = (index) => {
         const newMappings = [...mappings];
@@ -50,6 +50,21 @@ function MappingsList({ mappings, onUpdateMappings, onSave, onUndo, canUndo }) {
             <div className="mapping-buttons">
                 <button id="undoBtn" className="secondary-btn" onClick={onUndo} disabled={!canUndo}>↩ Undo Last Action</button>
                 <button id="saveMappingsBtn" className="primary-btn" onClick={onSave}>⬇ Download Mappings</button>
+            </div>
+            
+            <div className="mapping-buttons" style={{ marginTop: '10px' }}>
+                <button 
+                    className="primary-btn" 
+                    onClick={onSaveToApi}
+                    style={{ 
+                        width: '100%',
+                        background: saveStatus ? '#27ae60' : '#3498db',
+                        cursor: saveStatus === 'Saving...' ? 'wait' : 'pointer'
+                    }}
+                    disabled={saveStatus === 'Saving...'}
+                >
+                    {saveStatus === 'Saving...' ? '⏳ Saving...' : saveStatus === 'Saved!' ? '✓ Saved to API Settings!' : '💾 Save to API Settings'}
+                </button>
             </div>
         </div>
     );

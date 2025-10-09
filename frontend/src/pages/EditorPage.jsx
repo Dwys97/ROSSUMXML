@@ -49,6 +49,9 @@ function EditorPage() {
     const [selectedSourceCollection, setSelectedSourceCollection] = useState(null);
     const [selectedTargetCollection, setSelectedTargetCollection] = useState(null);
     const [isMappingFileLoaded, setIsMappingFileLoaded] = useState(false);
+    const [sourceXmlContent, setSourceXmlContent] = useState(null);
+    const [targetXmlContent, setTargetXmlContent] = useState(null);
+    const [saveStatus, setSaveStatus] = useState(null);
 
 
     const nodeRefs = useRef(new Map());
@@ -89,8 +92,16 @@ function EditorPage() {
     };
 
     // --- FILE HANDLERS ---
-    const handleFile = async (content, setTree) => {
+    const handleFile = async (content, setTree, isSource = null) => {
         if (!content) return;
+        
+        // Store the raw XML content
+        if (isSource === true) {
+            setSourceXmlContent(content);
+        } else if (isSource === false) {
+            setTargetXmlContent(content);
+        }
+        
         try {
             const response = await fetch('/api/schema/parse', {
                 method: 'POST',
@@ -261,6 +272,98 @@ function EditorPage() {
         URL.revokeObjectURL(a.href);
     };
 
+    const handleSaveToApiSettings = async () => {
+        // Check if we have both target XML and mappings
+        if (!targetXmlContent) {
+            alert('Please upload a target XML schema first.');
+            return;
+        }
+        
+        if (mappings.length === 0) {
+            alert('Please create at least one mapping before saving.');
+            return;
+        }
+
+        // Prepare the mapping JSON (same as download)
+        const staticMappings = [];
+        const collectionMappings = [];
+
+        if (selectedSourceCollection && selectedTargetCollection) {
+            const relativeMappings = mappings.map(m => ({
+                source: m.source ? m.source.substring(selectedSourceCollection.path.length + 3) : undefined,
+                target: m.target.substring(selectedTargetCollection.path.length + 3),
+                type: m.type,
+                value: m.value
+            }));
+
+            if (relativeMappings.length > 0) {
+                relativeMappings.push({
+                    type: "generated_line_number",
+                    target: "LineNo[0]"
+                });
+            }
+
+            collectionMappings.push({
+                sourceCollectionPath: selectedSourceCollection.parentPath,
+                targetCollectionPath: selectedTargetCollection.parentPath,
+                sourceItemElementName: selectedSourceCollection.name,
+                targetItemElementName: selectedTargetCollection.name,
+                mappings: relativeMappings,
+            });
+        } else {
+            mappings.forEach(m => staticMappings.push(m));
+        }
+
+        const mappingJson = {
+            rootElement: targetTree ? targetTree.pathName : "root",
+            staticMappings,
+            collectionMappings,
+        };
+
+        // Prompt for mapping name
+        const mappingName = prompt('Enter a name for this mapping configuration:');
+        if (!mappingName || mappingName.trim() === '') {
+            return;
+        }
+
+        const description = prompt('Enter a description (optional):') || '';
+
+        setSaveStatus('Saving...');
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/api-settings/mappings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    mapping_name: mappingName.trim(),
+                    description: description.trim(),
+                    mapping_json: mappingJson,
+                    destination_schema_xml: targetXmlContent,
+                    is_default: false
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to save mapping');
+            }
+
+            setSaveStatus('Saved!');
+            alert(`Mapping "${mappingName}" has been saved to API Settings!`);
+            
+            // Clear status after 3 seconds
+            setTimeout(() => setSaveStatus(null), 3000);
+        } catch (error) {
+            console.error('Error saving mapping:', error);
+            setSaveStatus(null);
+            alert(`Failed to save mapping: ${error.message}`);
+        }
+    };
+
     const mappedSourcePaths = useMemo(() => new Set(mappings.filter(m => m.source).map(m => m.source)), [mappings]);
     const mappedTargetPaths = useMemo(() => new Set(mappings.map(m => m.target)), [mappings]);
 
@@ -288,7 +391,7 @@ function EditorPage() {
                 <Link to="/transformer" className="home-link" style={{ marginTop: '0' }}>← Back to Transformer</Link>
 
                 <div className="upload-section">
-                <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setSourceTree)}>
+                <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setSourceTree, true)}>
                     <div className="icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -300,7 +403,7 @@ function EditorPage() {
                     <h3>Source XML</h3>
                     <p>Upload your source XML schema</p>
                 </FileDropzone>
-                <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setTargetTree)}>
+                <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setTargetTree, false)}>
                     <div className="icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -371,8 +474,10 @@ function EditorPage() {
                     mappings={mappings}
                     onUpdateMappings={updateMappings}
                     onSave={handleSaveMappings}
+                    onSaveToApi={handleSaveToApiSettings}
                     onUndo={handleUndo}
                     canUndo={history.length > 0}
+                    saveStatus={saveStatus}
                 />
             </div>
             
