@@ -42,6 +42,7 @@ const ApiSettingsPage = () => {
         source_schema_type: 'ROSSUM-EXPORT',
         destination_schema_type: 'CWEXP',
         mapping_json: '',
+        destination_schema_xml: '',
         is_default: false
     });
     
@@ -253,6 +254,7 @@ const ApiSettingsPage = () => {
                 source_schema_type: mapping.source_schema_type || 'ROSSUM-EXPORT',
                 destination_schema_type: mapping.destination_schema_type || 'CWEXP',
                 mapping_json: mapping.mapping_json || '',
+                destination_schema_xml: mapping.destination_schema_xml || '',
                 is_default: mapping.is_default || false
             });
         } else {
@@ -263,10 +265,64 @@ const ApiSettingsPage = () => {
                 source_schema_type: 'ROSSUM-EXPORT',
                 destination_schema_type: 'CWEXP',
                 mapping_json: '',
+                destination_schema_xml: '',
                 is_default: false
             });
         }
         setShowMappingModal(true);
+    };
+
+    const handleJsonFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (!file.name.endsWith('.json')) {
+            setMessage({ type: 'error', text: 'Please upload a .json file' });
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const jsonContent = event.target.result;
+                // Validate it's valid JSON
+                JSON.parse(jsonContent);
+                setMappingForm({ ...mappingForm, mapping_json: jsonContent });
+                setMessage({ type: 'success', text: 'JSON file loaded successfully' });
+                setTimeout(() => setMessage(null), 3000);
+            } catch {
+                setMessage({ type: 'error', text: 'Invalid JSON file format' });
+            }
+        };
+        reader.readAsText(file);
+        // Reset file input
+        e.target.value = '';
+    };
+
+    const handleXmlFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (!file.name.endsWith('.xml')) {
+            setMessage({ type: 'error', text: 'Please upload an .xml file' });
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const xmlContent = event.target.result;
+            // Basic XML validation - check if it starts with < and contains valid XML structure
+            if (xmlContent.trim().startsWith('<') && xmlContent.trim().endsWith('>')) {
+                setMappingForm({ ...mappingForm, destination_schema_xml: xmlContent });
+                setMessage({ type: 'success', text: 'Destination schema XML loaded successfully' });
+                setTimeout(() => setMessage(null), 3000);
+            } else {
+                setMessage({ type: 'error', text: 'Invalid XML file format' });
+            }
+        };
+        reader.readAsText(file);
+        // Reset file input
+        e.target.value = '';
     };
 
     const saveMappingForm = async (e) => {
@@ -855,6 +911,11 @@ const ApiSettingsPage = () => {
                                             <span className={styles.schemaType}>{mapping.source_schema_type}</span>
                                             <span className={styles.arrow}>→</span>
                                             <span className={styles.schemaType}>{mapping.destination_schema_type}</span>
+                                            {mapping.has_destination_schema && (
+                                                <span className={styles.schemaIndicator} title="Destination schema uploaded">
+                                                    📄 XML
+                                                </span>
+                                            )}
                                         </div>
                                         
                                         <div className={styles.mappingMeta}>
@@ -864,6 +925,11 @@ const ApiSettingsPage = () => {
                                             <span className={styles.metaItem}>
                                                 Updated: {formatDate(mapping.updated_at)}
                                             </span>
+                                            {mapping.has_destination_schema && (
+                                                <span className={styles.metaItem} style={{ color: '#10b981' }}>
+                                                    ✓ Destination schema included
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -915,38 +981,27 @@ const ApiSettingsPage = () => {
                                 />
                             </div>
 
-                            <div className={styles.formRow}>
-                                <div className={styles.inputGroup}>
-                                    <label className={styles.inputLabel}>Source Schema</label>
-                                    <select
-                                        className={styles.select}
-                                        value={mappingForm.source_schema_type}
-                                        onChange={(e) => setMappingForm({ ...mappingForm, source_schema_type: e.target.value })}
-                                    >
-                                        <option value="ROSSUM-EXPORT">ROSSUM-EXPORT</option>
-                                        <option value="ROSSUM-IMPORT">ROSSUM-IMPORT</option>
-                                        <option value="CWEXP">CWEXP</option>
-                                        <option value="CWIMP">CWIMP</option>
-                                    </select>
-                                </div>
-
-                                <div className={styles.inputGroup}>
-                                    <label className={styles.inputLabel}>Destination Schema</label>
-                                    <select
-                                        className={styles.select}
-                                        value={mappingForm.destination_schema_type}
-                                        onChange={(e) => setMappingForm({ ...mappingForm, destination_schema_type: e.target.value })}
-                                    >
-                                        <option value="CWEXP">CWEXP</option>
-                                        <option value="CWIMP">CWIMP</option>
-                                        <option value="ROSSUM-EXPORT">ROSSUM-EXPORT</option>
-                                        <option value="ROSSUM-IMPORT">ROSSUM-IMPORT</option>
-                                    </select>
-                                </div>
-                            </div>
-
                             <div className={styles.inputGroup}>
                                 <label className={styles.inputLabel}>Mapping JSON *</label>
+                                <div className={styles.fileUploadSection}>
+                                    <input
+                                        type="file"
+                                        id="jsonFileUpload"
+                                        accept=".json"
+                                        style={{ display: 'none' }}
+                                        onChange={handleJsonFileUpload}
+                                    />
+                                    <button
+                                        type="button"
+                                        className={`${styles.button} ${styles.buttonSecondary}`}
+                                        onClick={() => document.getElementById('jsonFileUpload').click()}
+                                    >
+                                        📁 Upload JSON File
+                                    </button>
+                                    <small style={{ color: '#666', marginLeft: '10px' }}>
+                                        or type/paste JSON below
+                                    </small>
+                                </div>
                                 <textarea
                                     className={`${styles.textarea} ${styles.jsonEditor}`}
                                     value={mappingForm.mapping_json}
@@ -957,6 +1012,32 @@ const ApiSettingsPage = () => {
                                     style={{ fontFamily: 'monospace', fontSize: '13px' }}
                                 />
                                 <small style={{ color: '#666' }}>Enter valid JSON for the transformation mapping</small>
+                            </div>
+
+                            <div className={styles.inputGroup}>
+                                <label className={styles.inputLabel}>Destination Schema XML *</label>
+                                <div className={styles.fileUploadSection}>
+                                    <input
+                                        type="file"
+                                        id="xmlFileUpload"
+                                        accept=".xml"
+                                        style={{ display: 'none' }}
+                                        onChange={handleXmlFileUpload}
+                                    />
+                                    <button
+                                        type="button"
+                                        className={`${styles.button} ${styles.buttonSecondary}`}
+                                        onClick={() => document.getElementById('xmlFileUpload').click()}
+                                    >
+                                        📄 Upload Destination Schema
+                                    </button>
+                                    <small style={{ color: '#666', marginLeft: '10px' }}>
+                                        {mappingForm.destination_schema_xml ? '✓ Schema uploaded' : 'Required for API transformations'}
+                                    </small>
+                                </div>
+                                <small style={{ color: '#999', fontSize: '12px' }}>
+                                    Upload the destination XML schema template. Source schema will be provided via API/webhook call.
+                                </small>
                             </div>
 
                             <div className={styles.checkboxGroup}>

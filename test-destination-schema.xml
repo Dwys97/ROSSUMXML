@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CWExport>
+    <Header>
+        <DocNumber></DocNumber>
+        <DocDate></DocDate>
+        <VendorName></VendorName>
+        <VendorAddress></VendorAddress>
+        <TotalAmount></TotalAmount>
+        <Currency></Currency>
+    </Header>
+    <LineItems>
+        <LineItem>
+            <Description></Description>
+            <Qty></Qty>
+            <UnitPrice></UnitPrice>
+            <LineTotal></LineTotal>
+        </LineItem>
+    </LineItems>
+</CWExport>

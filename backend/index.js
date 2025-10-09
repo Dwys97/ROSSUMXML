@@ -1083,7 +1083,9 @@ exports.handler = async (event) => {
                 try {
                     const result = await client.query(
                         `SELECT id, mapping_name, description, source_schema_type, 
-                                destination_schema_type, is_default, created_at, updated_at
+                                destination_schema_type, 
+                                CASE WHEN destination_schema_xml IS NOT NULL THEN true ELSE false END as has_destination_schema,
+                                is_default, created_at, updated_at
                          FROM transformation_mappings
                          WHERE user_id = $1
                          ORDER BY is_default DESC, created_at DESC`,
@@ -1129,7 +1131,7 @@ exports.handler = async (event) => {
         if (path.endsWith('/api-settings/mappings') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
                 const user = await verifyJWT(event);
-                const { mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default } = body;
+                const { mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml, is_default } = body;
                 
                 if (!mapping_name || !mapping_json) {
                     return createResponse(400, JSON.stringify({ error: 'Mapping name and mapping JSON are required' }));
@@ -1149,10 +1151,10 @@ exports.handler = async (event) => {
                     
                     const result = await client.query(
                         `INSERT INTO transformation_mappings 
-                         (user_id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default)
-                         VALUES ($1, $2, $3, $4, $5, $6, $7)
+                         (user_id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml, is_default)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                          RETURNING *`,
-                        [user.id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default || false]
+                        [user.id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml || null, is_default || false]
                     );
                     
                     await client.query('COMMIT');
@@ -1176,7 +1178,7 @@ exports.handler = async (event) => {
             try {
                 const user = await verifyJWT(event);
                 const mappingId = path.split('/').pop();
-                const { mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default } = body;
+                const { mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml, is_default } = body;
                 
                 const client = await pool.connect();
                 try {
@@ -1197,11 +1199,12 @@ exports.handler = async (event) => {
                              source_schema_type = COALESCE($3, source_schema_type),
                              destination_schema_type = COALESCE($4, destination_schema_type),
                              mapping_json = COALESCE($5, mapping_json),
-                             is_default = COALESCE($6, is_default),
+                             destination_schema_xml = COALESCE($6, destination_schema_xml),
+                             is_default = COALESCE($7, is_default),
                              updated_at = CURRENT_TIMESTAMP
-                         WHERE id = $7 AND user_id = $8
+                         WHERE id = $8 AND user_id = $9
                          RETURNING *`,
-                        [mapping_name, description, source_schema_type, destination_schema_type, mapping_json, is_default, mappingId, user.id]
+                        [mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml, is_default, mappingId, user.id]
                     );
                     
                     if (result.rows.length === 0) {
