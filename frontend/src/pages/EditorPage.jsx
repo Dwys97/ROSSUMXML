@@ -6,6 +6,7 @@ import MappingSVG from '../components/editor/MappingSVG';
 import MappingsList from '../components/editor/MappingsList';
 import { AISuggestionModal } from '../components/editor/AISuggestionModal';
 import { AIBatchSuggestionModal } from '../components/editor/AIBatchSuggestionModal';
+import { AILoadingToast } from '../components/editor/AILoadingToast';
 import { UpgradePrompt } from '../components/editor/UpgradePrompt';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
@@ -72,6 +73,7 @@ function EditorPage() {
     const [remainingUnmappedCount, setRemainingUnmappedCount] = useState(0);
     const processingQueueRef = useRef([]);
     const mappingsRef = useRef(mappings);
+    const shouldCancelBatchRef = useRef(false); // Flag to cancel background processing
     
     // Keep mappingsRef in sync with mappings
     useEffect(() => {
@@ -305,14 +307,15 @@ function EditorPage() {
                 return;
             }
 
-            // Prepare context for AI
+            // Prepare enhanced context for AI with UK customs domain
             const context = {
-                sourceSchema: sourceTree.name || 'Source Schema',
-                targetSchema: targetTree.name || 'Target Schema',
+                sourceSchema: sourceTree.name || 'UK Customs Export/Import Data',
+                targetSchema: targetTree.name || 'UK Customs Software System',
                 existingMappings: mappings.map(m => ({
                     source: m.source,
                     target: m.target
-                }))
+                })),
+                domain: 'UK Customs and International Trade'
             };
 
             // Call AI service - Note: We're finding best SOURCE for a given TARGET
@@ -388,19 +391,37 @@ function EditorPage() {
         let currentIndex = 0;
         
         while (currentIndex < remainingSources.length) {
+            // Check if processing should be cancelled (modal closed)
+            if (shouldCancelBatchRef.current) {
+                console.log('Background batch processing cancelled by user');
+                setIsLoadingMore(false);
+                setRemainingUnmappedCount(0);
+                return;
+            }
+            
             // Wait a bit before next batch to not overwhelm the server
             await new Promise(resolve => setTimeout(resolve, 2000));
             
+            // Check again after delay in case modal was closed during wait
+            if (shouldCancelBatchRef.current) {
+                console.log('Background batch processing cancelled by user');
+                setIsLoadingMore(false);
+                setRemainingUnmappedCount(0);
+                return;
+            }
+            
             const batch = remainingSources.slice(currentIndex, currentIndex + BATCH_SIZE);
+            const remainingAfterThisBatch = remainingSources.length - (currentIndex + BATCH_SIZE);
             currentIndex += BATCH_SIZE;
             
             try {
                 // Get FRESH context with current mappings (including accepted suggestions)
                 // Use mappingsRef.current to get the latest mappings without recreating this callback
                 const freshContext = {
-                    sourceSchema: sourceTree?.name || 'Unknown',
-                    targetSchema: targetTree?.name || 'Unknown', 
-                    existingMappings: mappingsRef.current.map(m => ({ source: m.source, target: m.target }))
+                    sourceSchema: sourceTree?.name || 'UK Customs Export/Import Data',
+                    targetSchema: targetTree?.name || 'UK Customs Software System', 
+                    existingMappings: mappingsRef.current.map(m => ({ source: m.source, target: m.target })),
+                    domain: 'UK Customs and International Trade'
                 };
                 
                 const mappingRequests = batch.map(sourceNode => ({
@@ -413,7 +434,14 @@ function EditorPage() {
                 
                 // Append new suggestions to existing ones
                 setBatchSuggestions(prev => [...prev, ...(result.suggestions || [])]);
-                setRemainingUnmappedCount(prev => Math.max(0, prev - batch.length));
+                
+                // Update remaining count with elements still in queue
+                setRemainingUnmappedCount(Math.max(0, remainingAfterThisBatch));
+                
+                // Hide loading if this was the last batch
+                if (remainingAfterThisBatch <= 0) {
+                    setIsLoadingMore(false);
+                }
                 
             } catch (error) {
                 console.error('Error processing batch:', error);
@@ -421,6 +449,7 @@ function EditorPage() {
             }
         }
         
+        // Ensure loading indicator is off when done
         setIsLoadingMore(false);
     }, [sourceTree, targetTree]);
     
@@ -430,8 +459,11 @@ function EditorPage() {
             return;
         }
 
+        // Reset cancellation flag when starting new batch
+        shouldCancelBatchRef.current = false;
+        
         setBatchLoading(true);
-        setShowBatchModal(true);
+        // Don't show modal yet - wait until first batch is ready
         setBatchSuggestions([]); // Clear previous suggestions
         
         try {
@@ -447,7 +479,6 @@ function EditorPage() {
             const unmappedTargetLeaves = allTargetLeaves.filter(el => !mappedTargets.has(el.path));
             
             const totalUnmapped = unmappedSourceLeaves.length;
-            setRemainingUnmappedCount(totalUnmapped);
             
             if (totalUnmapped === 0) {
                 alert('No unmapped elements found. All elements are already mapped!');
@@ -464,11 +495,16 @@ function EditorPage() {
             // Store remaining batches for progressive loading
             processingQueueRef.current = remainingBatches;
             
-            // Prepare context
+            // Set remaining count to elements NOT in first batch (i.e., in queue)
+            setRemainingUnmappedCount(remainingBatches.length);
+            
+            // Prepare enhanced context with UK customs domain information
             const optimizedContext = {
-                sourceSchema: sourceTree?.name || 'Unknown',
-                targetSchema: targetTree?.name || 'Unknown', 
-                existingMappings: mappings.map(m => ({ source: m.source, target: m.target }))
+                sourceSchema: sourceTree?.name || 'UK Customs Export/Import Data',
+                targetSchema: targetTree?.name || 'UK Customs Software System', 
+                existingMappings: mappings.map(m => ({ source: m.source, target: m.target })),
+                domain: 'UK Customs and International Trade',
+                standards: ['CDS', 'CHIEF', 'HMRC', 'EDIFACT']
             };
             
             // Generate FIRST BATCH immediately
@@ -482,17 +518,28 @@ function EditorPage() {
             setBatchSuggestions(firstResult.suggestions || []);
             setBatchLoading(false);
             
-            // Start processing REMAINING BATCHES in background
+            // NOW show modal with first batch ready
+            setShowBatchModal(true);
+            
+            // Start processing REMAINING BATCHES in background (only if there are any)
             if (remainingBatches.length > 0) {
+                // Set isLoadingMore BEFORE starting background processing
                 setIsLoadingMore(true);
                 processNextBatch(remainingBatches, unmappedTargetLeaves);
+            } else {
+                // No more batches, ensure loading is off
+                setIsLoadingMore(false);
+                setRemainingUnmappedCount(0);
             }
             
         } catch (error) {
             console.error('Batch AI suggestion error:', error);
             alert(error.message || 'Failed to generate AI suggestions. Please try again.');
+            // Ensure loading states are reset on error
             setShowBatchModal(false);
             setBatchLoading(false);
+            setIsLoadingMore(false);
+            setRemainingUnmappedCount(0);
         }
     }, [sourceTree, targetTree, mappings, hasAIAccess, getAllSourceNodes, processNextBatch]);
 
@@ -516,8 +563,13 @@ function EditorPage() {
     }, [mappings, sourceTree, targetTree, updateMappings]);
 
     const handleCloseBatchModal = useCallback(() => {
+        // Signal background processing to stop
+        shouldCancelBatchRef.current = true;
+        
         setShowBatchModal(false);
         setBatchSuggestions([]);
+        setIsLoadingMore(false);
+        setRemainingUnmappedCount(0);
     }, []);
 
     const handleRegenerateBatchSuggestions = useCallback(async () => {
@@ -535,9 +587,10 @@ function EditorPage() {
             const unmappedTargetLeaves = allTargetLeaves.filter(el => !mappedTargets.has(el.path));
             
             const optimizedContext = {
-                sourceSchema: sourceTree?.name || 'Unknown',
-                targetSchema: targetTree?.name || 'Unknown', 
-                existingMappings: mappings.map(m => ({ source: m.source, target: m.target }))
+                sourceSchema: sourceTree?.name || 'UK Customs Export/Import Data',
+                targetSchema: targetTree?.name || 'UK Customs Software System', 
+                existingMappings: mappings.map(m => ({ source: m.source, target: m.target })),
+                domain: 'UK Customs and International Trade'
             };
             
             const mappingRequest = {
@@ -869,6 +922,14 @@ function EditorPage() {
             </section>
             </div>
             <Footer text="Created by Daniils Radionovs" />
+
+            {/* AI Loading Toast - Shown while initial batch is being generated */}
+            {batchLoading && !showBatchModal && (
+                <AILoadingToast
+                    message="Generating AI suggestions..."
+                    subtitle="Analyzing schemas and creating intelligent mappings"
+                />
+            )}
 
             {/* AI Suggestion Modal */}
             {aiSuggestion && (

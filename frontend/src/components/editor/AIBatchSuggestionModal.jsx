@@ -132,11 +132,11 @@ export function AIBatchSuggestionModal({
                             <h2>AI Mapping Suggestions</h2>
                             <p className={styles.subtitle}>
                                 {visibleSuggestions.length} suggestions • Avg confidence: {Math.round(averageConfidence)}%
-                                {isLoadingMore && remainingCount > suggestions.length && (
+                                {isLoadingMore && remainingCount > 0 && (
                                     <span className={styles.loadingMoreIndicator}>
                                         {' • '}
                                         <span className={styles.smallSpinner}></span>
-                                        {' Loading more... (~{remainingCount - suggestions.length} pending)'}
+                                        {' Loading more... ({remainingCount} in queue)'}
                                     </span>
                                 )}
                             </p>
