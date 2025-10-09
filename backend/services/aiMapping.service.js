@@ -1,12 +1,34 @@
 // backend/services/aiMapping.service.js
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Initialize Gemini AI
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-let genAI = null;
 
-if (GEMINI_API_KEY && GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY_HERE') {
-    genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Direct REST API approach using fetch to bypass v1beta issue
+async function makeDirectGeminiRequest(prompt, apiKey) {
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            contents: [{
+                parts: [{
+                    text: prompt
+                }]
+            }]
+        })
+    });
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gemini API error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
 }
 
 /**
@@ -16,88 +38,127 @@ if (GEMINI_API_KEY && GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY_HERE') {
  * @param {Object} context - Additional context (existing mappings, schema info)
  * @returns {Promise<Object>} Suggestion with confidence score and reasoning
  */
-async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) {
-    if (!genAI) {
+async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) {    
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
         throw new Error('Gemini API is not configured. Please set GEMINI_API_KEY in env.json');
     }
 
     try {
-        // Use Gemini 1.5 Flash for fast, free-tier responses
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
+        console.log('🔧 Using direct REST API approach with Gemini 2.5 Flash...');
+        
         // Craft a highly specific prompt for XML schema mapping
         const prompt = `You are an expert in XML schema mapping and data transformation. Your task is to suggest the best target element for mapping a source XML element.
 
-**Source Element:**
-- Name: ${sourceNode.name}
-- Path: ${sourceNode.path}
-- Type: ${sourceNode.type || 'element'}
-- Sample Value: ${sourceNode.sampleValue || 'N/A'}
-- Parent Context: ${sourceNode.parentPath || 'N/A'}
+SOURCE ELEMENT TO MAP:
+Name: ${sourceNode.name}
+Path: ${sourceNode.path}
+Type: ${sourceNode.type || 'element'}
 
-**Available Target Elements:**
-${targetNodes.map((node, idx) => `${idx + 1}. Name: ${node.name}
-   Path: ${node.path}
-   Type: ${node.type || 'element'}
-   Parent: ${node.parentPath || 'N/A'}`).join('\n\n')}
+AVAILABLE TARGET ELEMENTS (ZERO-BASED INDEXING):
+${targetNodes.map((node, index) => `${index}. ${node.name} (Path: ${node.path})`).join('\n')}
 
-**Additional Context:**
-- Source Schema Type: ${context.sourceSchemaType || 'Unknown'}
-- Target Schema Type: ${context.targetSchemaType || 'Unknown'}
-- Existing Mappings: ${context.existingMappingsCount || 0} mappings created
-- Business Domain: ${context.domain || 'General data transformation'}
+CONTEXT:
+- Source Schema: ${context.sourceSchema || 'Unknown'}
+- Target Schema: ${context.targetSchema || 'Unknown'}
+- Existing Mappings: ${context.existingMappings ? context.existingMappings.length : 0} mappings already created
 
-**Instructions:**
-1. Analyze the source element name, path, and context
-2. Compare against each target element
-3. Consider semantic similarity, naming conventions, data types, and hierarchical structure
-4. Select the BEST matching target element
-5. Provide a confidence score (0-100)
-6. Explain your reasoning in 1-2 sentences
+TASK:
+Analyze the source element "${sourceNode.name}" and suggest the BEST target element to map to. Consider:
+1. Semantic similarity (meaning and purpose)
+2. Data type compatibility
+3. Naming conventions and patterns
+4. Business logic relationships
+5. Existing mapping context
 
-**Response Format (JSON only):**
+RESPONSE FORMAT (JSON):
 {
-  "targetIndex": <index of best match from the list above (0-based)>,
-  "confidence": <score from 0-100>,
-  "reasoning": "<brief explanation>",
-  "alternative": {
-    "targetIndex": <index of second-best option or null>,
-    "confidence": <score or null>
-  }
+  "targetElementIndex": <number 0-${targetNodes.length - 1}>,
+  "confidence": <number 0-100>,
+  "reasoning": "<explanation>",
+  "dataTypeMatch": "<high|medium|low>",
+  "semanticMatch": "<high|medium|low>"
 }
 
-Respond with ONLY the JSON object, no additional text.`;
+CRITICAL INDEXING RULES:
+- targetElementIndex MUST be between 0 and ${targetNodes.length - 1} (inclusive)
+- The target elements are numbered starting from 0 (ZERO-BASED)
+- Element 0 is the first element, element ${targetNodes.length - 1} is the last element
+- DO NOT use 1-based indexing or indices beyond ${targetNodes.length - 1}
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+Choose the SINGLE best match and respond ONLY with valid JSON.`;
 
-        // Parse the JSON response
+        console.log('📤 Requesting AI mapping suggestion...');
+        const aiResponse = await makeDirectGeminiRequest(prompt, GEMINI_API_KEY);
+        console.log('📥 Received response from Gemini API');
+
+        // Parse the AI response
         let suggestion;
         try {
-            // Try to extract JSON from markdown code blocks if present
-            const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-            const jsonText = jsonMatch ? jsonMatch[1] : text;
-            suggestion = JSON.parse(jsonText.trim());
+            const cleanResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
+            suggestion = JSON.parse(cleanResponse);
+            console.log('✅ Successfully parsed AI response:', JSON.stringify(suggestion, null, 2));
         } catch (parseError) {
-            console.error('Failed to parse AI response:', text);
-            throw new Error('AI response was not in valid JSON format');
+            console.log('Failed to parse AI response as JSON, using fallback parsing...');
+            console.log('Raw AI Response:', aiResponse);
+            
+            // Fallback: extract information from natural language response
+            const targetElementMatch = aiResponse.match(/targetElementIndex['":\s]*(\d+)/i);
+            const confidenceMatch = aiResponse.match(/confidence['":\s]*(\d+)/i);
+            const reasoningMatch = aiResponse.match(/reasoning['":\s]*["']([^"']+)["']/i);
+            
+            suggestion = {
+                targetElementIndex: targetElementMatch ? parseInt(targetElementMatch[1]) : 0,
+                confidence: confidenceMatch ? parseInt(confidenceMatch[1]) : 50,
+                reasoning: reasoningMatch ? reasoningMatch[1] : 'AI provided suggestion without structured reasoning',
+                dataTypeMatch: 'medium',
+                semanticMatch: 'medium'
+            };
+            console.log('📝 Fallback parsed suggestion:', JSON.stringify(suggestion, null, 2));
         }
 
-        // Validate the suggestion
-        if (typeof suggestion.targetIndex !== 'number' || suggestion.targetIndex < 0 || suggestion.targetIndex >= targetNodes.length) {
-            throw new Error('Invalid target index in AI suggestion');
+        console.log(`🔍 Available target nodes count: ${targetNodes.length}`);
+        console.log(`🎯 AI suggested target index: ${suggestion.targetElementIndex}`);
+
+        // Validate and auto-correct common AI indexing errors
+        if (suggestion.targetElementIndex < 0 || suggestion.targetElementIndex >= targetNodes.length) {
+            console.log(`❌ Invalid target index ${suggestion.targetElementIndex}, available indices: 0-${targetNodes.length - 1}`);
+            
+            // Try to correct common off-by-one errors
+            if (suggestion.targetElementIndex === targetNodes.length) {
+                console.log('🔧 Correcting off-by-one error: reducing index from', suggestion.targetElementIndex, 'to', targetNodes.length - 1);
+                suggestion.targetElementIndex = targetNodes.length - 1;
+            } else if (suggestion.targetElementIndex > targetNodes.length) {
+                console.log('🔧 Correcting 1-based indexing error: setting index to', targetNodes.length - 1);
+                suggestion.targetElementIndex = targetNodes.length - 1;
+            } else if (suggestion.targetElementIndex < 0) {
+                console.log('🔧 Correcting negative index: setting to 0');
+                suggestion.targetElementIndex = 0;
+            } else {
+                throw new Error('AI suggested an invalid target element index');
+            }
         }
 
-        // Add the actual target node to the suggestion
-        suggestion.targetNode = targetNodes[suggestion.targetIndex];
-        
-        // Add alternative if present
-        if (suggestion.alternative && suggestion.alternative.targetIndex !== null) {
-            suggestion.alternative.targetNode = targetNodes[suggestion.alternative.targetIndex];
+        // Validate and return the suggestion
+        const selectedTarget = targetNodes[suggestion.targetElementIndex];
+        if (!selectedTarget) {
+            console.log(`❌ Still invalid target index ${suggestion.targetElementIndex} after correction, available indices: 0-${targetNodes.length - 1}`);
+            throw new Error('AI suggested an invalid target element index');
         }
 
-        return suggestion;
+        return {
+            suggestion: {
+                sourceElement: sourceNode,
+                targetElement: selectedTarget,
+                confidence: Math.min(100, Math.max(0, suggestion.confidence || 50)),
+                reasoning: suggestion.reasoning || 'AI analysis completed',
+                metadata: {
+                    aiModel: 'gemini-2.5-flash',
+                    timestamp: new Date().toISOString(),
+                    dataTypeMatch: suggestion.dataTypeMatch || 'unknown',
+                    semanticMatch: suggestion.semanticMatch || 'unknown'
+                }
+            }
+        };
 
     } catch (error) {
         console.error('Gemini API error:', error);
@@ -106,53 +167,85 @@ Respond with ONLY the JSON object, no additional text.`;
 }
 
 /**
- * Generate multiple mapping suggestions for batch processing
- * @param {Array} sourceMappingRequests - Array of {sourceNode, targetNodes, context}
- * @returns {Promise<Array>} Array of suggestions
+ * Generate batch mapping suggestions for multiple target elements
+ * @param {Array} sourceNodes - Array of source XML schema nodes  
+ * @param {Array} targetNodes - Array of potential target nodes
+ * @param {Object} context - Additional context (existing mappings, schema info)
+ * @returns {Promise<Array>} Array of suggestions with confidence scores
  */
-async function generateBatchMappingSuggestions(sourceMappingRequests) {
-    if (!genAI) {
-        throw new Error('Gemini API is not configured. Please set GEMINI_API_KEY in env.json');
+async function generateBatchMappingSuggestions(sourceNodes, targetNodes, context = {}) {
+    try {
+        const suggestions = [];
+        
+        // Process in smaller batches to avoid API limits
+        const batchSize = 5;
+        for (let i = 0; i < sourceNodes.length; i += batchSize) {
+            const batch = sourceNodes.slice(i, i + batchSize);
+            const batchPromises = batch.map(sourceNode => 
+                generateMappingSuggestion(sourceNode, targetNodes, context)
+                    .catch(error => ({
+                        error: error.message,
+                        sourceNode: sourceNode
+                    }))
+            );
+            
+            const batchResults = await Promise.all(batchPromises);
+            suggestions.push(...batchResults);
+            
+            // Add a small delay between batches to respect API limits
+            if (i + batchSize < sourceNodes.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        
+        return suggestions;
+    } catch (error) {
+        console.error('Batch mapping error:', error);
+        throw new Error(`Batch mapping failed: ${error.message}`);
     }
-
-    // Process in parallel (Gemini free tier allows multiple requests)
-    const suggestions = await Promise.all(
-        sourceMappingRequests.map(req => 
-            generateMappingSuggestion(req.sourceNode, req.targetNodes, req.context)
-                .catch(error => ({
-                    error: error.message,
-                    sourceNode: req.sourceNode
-                }))
-        )
-    );
-
-    return suggestions;
 }
 
 /**
- * Check if user has access to AI features (Pro or Enterprise subscription)
- * @param {Object} pool - Database connection pool
- * @param {String} userId - User ID
- * @returns {Promise<Boolean>} True if user has access
+ * Check if user has access to AI features based on subscription level
+ * @param {string} userEmail - User email to check subscription
+ * @returns {Promise<Object>} Access information and subscription details
  */
-async function checkAIFeatureAccess(pool, userId) {
+async function checkAIFeatureAccess(userEmail) {
+    const db = require('../db');
+    
     try {
-        const result = await pool.query(
-            `SELECT level, status 
-             FROM subscriptions 
-             WHERE user_id = $1 AND status = 'active'`,
-            [userId]
-        );
-
+        const result = await db.query(`
+            SELECT u.email, s.level, s.status, s.features
+            FROM users u
+            JOIN subscriptions s ON u.id = s.user_id
+            WHERE u.email = $1 AND s.status = 'active'
+        `, [userEmail]);
+        
         if (result.rows.length === 0) {
-            return false; // No active subscription
+            return {
+                hasAccess: false,
+                reason: 'No active subscription found',
+                currentLevel: 'free'
+            };
         }
-
-        const level = result.rows[0].level.toLowerCase();
-        return level === 'pro' || level === 'enterprise';
+        
+        const subscription = result.rows[0];
+        const hasAIAccess = ['pro', 'enterprise'].includes(subscription.level.toLowerCase());
+        
+        return {
+            hasAccess: hasAIAccess,
+            currentLevel: subscription.level,
+            features: subscription.features || [],
+            reason: hasAIAccess ? null : 'AI features require Pro or Enterprise subscription'
+        };
+        
     } catch (error) {
-        console.error('Error checking AI feature access:', error);
-        return false;
+        console.error('Subscription check error:', error);
+        return {
+            hasAccess: false,
+            reason: 'Error checking subscription status',
+            currentLevel: 'unknown'
+        };
     }
 }
 

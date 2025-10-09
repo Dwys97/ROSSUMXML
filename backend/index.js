@@ -1423,7 +1423,31 @@ exports.handler = async (event) => {
                     }));
                 }
 
-                const suggestions = await generateBatchMappingSuggestions(mappingRequests);
+                console.log('Received mappingRequests:', JSON.stringify(mappingRequests[0], null, 2));
+
+                // Process each mapping request
+                const suggestions = [];
+                for (const request of mappingRequests) {
+                    try {
+                        console.log('Processing request for sourceNode:', request.sourceNode?.name, 'with', request.targetNodes?.length, 'target nodes');
+                        const suggestion = await generateMappingSuggestion(
+                            request.sourceNode, 
+                            request.targetNodes, 
+                            request.context || {}
+                        );
+                        suggestions.push(suggestion);
+                    } catch (error) {
+                        console.error('Individual suggestion error:', error);
+                        // Add a failed suggestion with error info
+                        suggestions.push({
+                            sourceElement: request.sourceNode,
+                            targetElement: null,
+                            confidence: 0,
+                            reasoning: `Error: ${error.message}`,
+                            error: true
+                        });
+                    }
+                }
 
                 return createResponse(200, JSON.stringify({ suggestions }));
 

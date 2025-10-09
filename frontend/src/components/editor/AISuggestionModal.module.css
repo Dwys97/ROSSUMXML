@@ -132,6 +132,18 @@
     line-height: 1.5;
 }
 
+.elementName {
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.elementPathText {
+    font-size: 11px;
+    color: #6b7280;
+    font-style: italic;
+}
+
 .arrow {
     flex-shrink: 0;
     color: #667eea;

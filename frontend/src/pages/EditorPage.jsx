@@ -5,10 +5,11 @@ import SchemaTree from '../components/editor/SchemaTree';
 import MappingSVG from '../components/editor/MappingSVG';
 import MappingsList from '../components/editor/MappingsList';
 import { AISuggestionModal } from '../components/editor/AISuggestionModal';
+import { AIBatchSuggestionModal } from '../components/editor/AIBatchSuggestionModal';
 import { UpgradePrompt } from '../components/editor/UpgradePrompt';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
-import { useAIFeatures, generateAISuggestion } from '../hooks/useAIFeatures';
+import { useAIFeatures, generateAISuggestion, generateBatchAISuggestions } from '../hooks/useAIFeatures';
 import styles from './EditorPage.module.css';
 
 // --- Helper Functions (moved outside the component for clarity) ---
@@ -62,6 +63,11 @@ function EditorPage() {
     const [aiLoading, setAiLoading] = useState(false);
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [currentAITarget, setCurrentAITarget] = useState(null);
+    
+    // --- BATCH AI STATE ---
+    const [batchSuggestions, setBatchSuggestions] = useState([]);
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batchLoading, setBatchLoading] = useState(false);
 
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
@@ -246,13 +252,15 @@ function EditorPage() {
         const nodes = [];
         
         const traverse = (node) => {
-            if (node.type === 'element' && !node.children?.length) {
+            // Check for leaf nodes (no children) regardless of type
+            if (!node.children || node.children.length === 0) {
                 nodes.push({
                     name: node.name,
                     path: node.path,
-                    type: node.type
+                    type: node.type || 'element'
                 });
             }
+            
             if (node.children) {
                 node.children.forEach(child => traverse(child));
             }
@@ -319,8 +327,8 @@ function EditorPage() {
 
         // Create mapping just like manual drag-and-drop
         const newMapping = {
-            source: aiSuggestion.sourceElement,
-            target: aiSuggestion.targetElement,
+            source: aiSuggestion.sourceElement?.path || aiSuggestion.sourceElement,
+            target: currentAITarget.path || currentAITarget,
             type: 'element'
         };
 
@@ -361,6 +369,113 @@ function EditorPage() {
         setAiSuggestion(null);
         await handleAISuggest(currentAITarget);
     }, [currentAITarget, handleAISuggest]);
+
+    // --- BATCH AI SUGGESTION HANDLERS ---
+    
+    // Helper function to collect all elements from a tree
+    const collectAllElements = useCallback((tree) => {
+        const elements = [];
+        
+        const traverse = (node) => {
+            if (node) {
+                elements.push({
+                    name: node.name,
+                    path: node.path,
+                    type: node.type
+                });
+                
+                if (node.children) {
+                    node.children.forEach(traverse);
+                }
+            }
+        };
+        
+        traverse(tree);
+        return elements;
+    }, []);
+    
+    const handleBatchAISuggest = useCallback(async () => {
+        if (!sourceTree || !targetTree || !hasAIAccess) {
+            setShowUpgradePrompt(true);
+            return;
+        }
+
+        setBatchLoading(true);
+        setShowBatchModal(true);
+        
+        try {
+            // Collect all unmapped source and target nodes
+            const sourceElements = collectAllElements(sourceTree);
+            const targetElements = collectAllElements(targetTree);
+            
+            // Filter out already mapped elements
+            const mappedSources = new Set(mappings.map(m => m.source));
+            const mappedTargets = new Set(mappings.map(m => m.target));
+            
+            const unmappedSources = sourceElements.filter(el => !mappedSources.has(el.path));
+            const unmappedTargets = targetElements.filter(el => !mappedTargets.has(el.path));
+            
+            // Limit batch size to prevent timeout issues (Lambda has 30s limit, each AI request takes ~10s)
+            const MAX_BATCH_SIZE = 3;
+            if (unmappedSources.length > MAX_BATCH_SIZE) {
+                alert(`Found ${unmappedSources.length} unmapped elements. Processing first ${MAX_BATCH_SIZE} to stay within server timeout limits (each AI request takes ~10 seconds). You can run this again to process remaining elements.`);
+            }
+            const sourcesToProcess = unmappedSources.slice(0, MAX_BATCH_SIZE);
+            
+            // Create proper mapping requests structure for each source element
+            // Optimize context to avoid sending large tree objects repeatedly
+            const optimizedContext = {
+                sourceSchema: sourceTree?.name || 'Unknown',
+                targetSchema: targetTree?.name || 'Unknown', 
+                existingMappings: mappings.map(m => ({ source: m.source, target: m.target }))
+            };
+            
+            const mappingRequests = sourcesToProcess.map(sourceNode => ({
+                sourceNode: sourceNode,
+                targetNodes: unmappedTargets,
+                context: optimizedContext
+            }));
+            
+            const result = await generateBatchAISuggestions(mappingRequests);
+            
+            setBatchSuggestions(result.suggestions || []);
+        } catch (error) {
+            console.error('Batch AI suggestion error:', error);
+            alert(error.message || 'Failed to generate AI suggestions. Please try again.');
+            setShowBatchModal(false);
+        } finally {
+            setBatchLoading(false);
+        }
+    }, [sourceTree, targetTree, mappings, hasAIAccess, collectAllElements]);
+
+    const handleAcceptBatchSuggestions = useCallback((selectedSuggestions) => {
+        if (!selectedSuggestions.length) return;
+
+        const newMappings = selectedSuggestions.map(suggestion => ({
+            id: Date.now() + Math.random(),
+            source: suggestion.sourceElement?.path || suggestion.sourceElement,
+            target: suggestion.targetElement?.path || suggestion.targetElement,
+            sourceValue: getNodeValue(
+                findNodeByPath(sourceTree, suggestion.sourceElement?.path || suggestion.sourceElement)?.name || ''
+            ),
+            targetValue: getNodeValue(
+                findNodeByPath(targetTree, suggestion.targetElement?.path || suggestion.targetElement)?.name || ''
+            )
+        }));
+
+        updateMappings([...mappings, ...newMappings]);
+        setShowBatchModal(false);
+        setBatchSuggestions([]);
+    }, [mappings, sourceTree, targetTree, updateMappings]);
+
+    const handleCloseBatchModal = useCallback(() => {
+        setShowBatchModal(false);
+        setBatchSuggestions([]);
+    }, []);
+
+    const handleRegenerateBatchSuggestions = useCallback(async () => {
+        await handleBatchAISuggest();
+    }, [handleBatchAISuggest]);
 
     // --- SAVE LOGIC ---
     const handleSaveMappings = () => {
@@ -637,6 +752,9 @@ function EditorPage() {
                     onUndo={handleUndo}
                     canUndo={history.length > 0}
                     saveStatus={saveStatus}
+                    hasAIAccess={hasAIAccess}
+                    onAISuggestAll={handleBatchAISuggest}
+                    aiLoading={batchLoading}
                 />
             </div>
             
@@ -678,6 +796,17 @@ function EditorPage() {
                     onRegenerate={handleRegenerateAISuggestion}
                     onClose={handleRejectAISuggestion}
                     loading={aiLoading}
+                />
+            )}
+
+            {/* AI Batch Suggestion Modal */}
+            {showBatchModal && (
+                <AIBatchSuggestionModal
+                    suggestions={batchSuggestions}
+                    onAcceptSelected={handleAcceptBatchSuggestions}
+                    onClose={handleCloseBatchModal}
+                    onRegenerate={handleRegenerateBatchSuggestions}
+                    loading={batchLoading}
                 />
             )}
 

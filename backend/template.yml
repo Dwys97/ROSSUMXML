@@ -7,7 +7,7 @@ Description: >
 
 Globals:
   Function:
-    Timeout: 30 # Set a global timeout for all functions
+    Timeout: 60 # Increased timeout for AI batch processing (each AI request takes ~10 seconds)
     MemorySize: 128
   Api:
     # Apply a global CORS configuration to the entire API
@@ -43,6 +43,7 @@ Resources:
           POSTGRES_HOST: "172.18.0.2"
           POSTGRES_PORT: "5432"
           JWT_SECRET: "a_secure_secret_key_for_jwt"
+          GEMINI_API_KEY: "AIzaSyDGoYZ0PkpEAtW2G7Y6YkobU3jGR8XKo28"
       # --- END BLOCK ---
       Events:
         # Define a specific, public endpoint for user registration

@@ -118,7 +118,13 @@ export async function generateBatchAISuggestions(mappingRequests) {
             const data = await response.json();
             throw new Error(data.error || 'AI features require Pro or Enterprise subscription');
         }
-        throw new Error('Failed to generate AI suggestions');
+        if (response.status === 413) {
+            throw new Error('Request too large. Try reducing the number of elements or break into smaller batches.');
+        }
+        if (response.status === 401) {
+            throw new Error('Authentication failed. Please log in again.');
+        }
+        throw new Error(`Server error (${response.status}). Please try again.`);
     }
 
     return await response.json();

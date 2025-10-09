@@ -52,7 +52,12 @@ export function AISuggestionModal({
                     <div className={styles.mappingItem}>
                         <label>Source Element</label>
                         <div className={styles.elementPath}>
-                            {suggestion.sourceElement}
+                            <div className={styles.elementName}>
+                                {suggestion.sourceElement?.name || 'Unknown'}
+                            </div>
+                            <div className={styles.elementPathText}>
+                                {suggestion.sourceElement?.path || 'Unknown path'}
+                            </div>
                         </div>
                     </div>
                     
@@ -65,7 +70,12 @@ export function AISuggestionModal({
                     <div className={styles.mappingItem}>
                         <label>Target Element</label>
                         <div className={styles.elementPath}>
-                            {suggestion.targetElement}
+                            <div className={styles.elementName}>
+                                {suggestion.targetElement?.name || 'Unknown'}
+                            </div>
+                            <div className={styles.elementPathText}>
+                                {suggestion.targetElement?.path || 'Unknown path'}
+                            </div>
                         </div>
                     </div>
                 </div>
