@@ -306,9 +306,10 @@ function EditorPage() {
                 }))
             };
 
-            // Call AI service
+            // Call AI service - Note: We're finding best SOURCE for a given TARGET
+            // So we pass ALL source nodes and the single target node
             const result = await generateAISuggestion(
-                { name: targetNode.name, path: targetNode.path, type: 'element' },
+                targetNode,
                 sourceNodes,
                 context
             );
@@ -372,28 +373,6 @@ function EditorPage() {
 
     // --- BATCH AI SUGGESTION HANDLERS ---
     
-    // Helper function to collect all elements from a tree
-    const collectAllElements = useCallback((tree) => {
-        const elements = [];
-        
-        const traverse = (node) => {
-            if (node) {
-                elements.push({
-                    name: node.name,
-                    path: node.path,
-                    type: node.type
-                });
-                
-                if (node.children) {
-                    node.children.forEach(traverse);
-                }
-            }
-        };
-        
-        traverse(tree);
-        return elements;
-    }, []);
-    
     const handleBatchAISuggest = useCallback(async () => {
         if (!sourceTree || !targetTree || !hasAIAccess) {
             setShowUpgradePrompt(true);
@@ -404,26 +383,30 @@ function EditorPage() {
         setShowBatchModal(true);
         
         try {
-            // Collect all unmapped source and target nodes
-            const sourceElements = collectAllElements(sourceTree);
-            const targetElements = collectAllElements(targetTree);
+            // Get all leaf nodes directly using existing helper functions
+            // These already correctly identify leaf nodes during tree traversal
+            const allSourceLeaves = getAllSourceNodes(sourceTree);
+            const allTargetLeaves = getAllSourceNodes(targetTree); // Same logic works for target
             
-            // Filter out already mapped elements
+            // Filter out already mapped elements BY PATH (not by name)
+            // This allows elements with same name but different paths to still be suggested
             const mappedSources = new Set(mappings.map(m => m.source));
             const mappedTargets = new Set(mappings.map(m => m.target));
             
-            const unmappedSources = sourceElements.filter(el => !mappedSources.has(el.path));
-            const unmappedTargets = targetElements.filter(el => !mappedTargets.has(el.path));
+            const unmappedSourceLeaves = allSourceLeaves.filter(el => !mappedSources.has(el.path));
+            const unmappedTargetLeaves = allTargetLeaves.filter(el => !mappedTargets.has(el.path));
             
-            // Limit batch size to prevent timeout issues (Lambda has 30s limit, each AI request takes ~10s)
-            const MAX_BATCH_SIZE = 3;
-            if (unmappedSources.length > MAX_BATCH_SIZE) {
-                alert(`Found ${unmappedSources.length} unmapped elements. Processing first ${MAX_BATCH_SIZE} to stay within server timeout limits (each AI request takes ~10 seconds). You can run this again to process remaining elements.`);
+            // Limit batch size to prevent Lambda timeout (60s total limit)
+            // Each AI request takes 5-15 seconds, so max 5 elements to stay under 60s
+            const MAX_BATCH_SIZE = 5;
+            if (unmappedSourceLeaves.length > MAX_BATCH_SIZE) {
+                alert(`Found ${unmappedSourceLeaves.length} unmapped leaf elements. Processing first ${MAX_BATCH_SIZE} to stay within 60-second timeout. You can run this again for remaining elements.`);
             }
-            const sourcesToProcess = unmappedSources.slice(0, MAX_BATCH_SIZE);
+            const sourcesToProcess = unmappedSourceLeaves.slice(0, MAX_BATCH_SIZE);
             
-            // Create proper mapping requests structure for each source element
-            // Optimize context to avoid sending large tree objects repeatedly
+            // Create proper mapping requests structure for each SOURCE element
+            // Each request asks "what target element best matches this source?"
+            // Optimize: only send leaf target nodes to reduce AI processing time
             const optimizedContext = {
                 sourceSchema: sourceTree?.name || 'Unknown',
                 targetSchema: targetTree?.name || 'Unknown', 
@@ -432,7 +415,7 @@ function EditorPage() {
             
             const mappingRequests = sourcesToProcess.map(sourceNode => ({
                 sourceNode: sourceNode,
-                targetNodes: unmappedTargets,
+                targetNodes: unmappedTargetLeaves.slice(0, 50), // Limit to 50 targets per request to reduce payload
                 context: optimizedContext
             }));
             
@@ -446,7 +429,7 @@ function EditorPage() {
         } finally {
             setBatchLoading(false);
         }
-    }, [sourceTree, targetTree, mappings, hasAIAccess, collectAllElements]);
+    }, [sourceTree, targetTree, mappings, hasAIAccess, getAllSourceNodes]);
 
     const handleAcceptBatchSuggestions = useCallback((selectedSuggestions) => {
         if (!selectedSuggestions.length) return;
@@ -464,8 +447,7 @@ function EditorPage() {
         }));
 
         updateMappings([...mappings, ...newMappings]);
-        setShowBatchModal(false);
-        setBatchSuggestions([]);
+        // Don't close modal or clear suggestions - let user continue
     }, [mappings, sourceTree, targetTree, updateMappings]);
 
     const handleCloseBatchModal = useCallback(() => {
@@ -476,6 +458,42 @@ function EditorPage() {
     const handleRegenerateBatchSuggestions = useCallback(async () => {
         await handleBatchAISuggest();
     }, [handleBatchAISuggest]);
+
+    const handleRegenerateOneSuggestion = useCallback(async (suggestion, index) => {
+        // Regenerate AI suggestion for this specific source node
+        try {
+            const sourceNode = suggestion.sourceElement;
+            const allTargetLeaves = getAllSourceNodes(targetTree);
+            
+            // Filter out already mapped targets
+            const mappedTargets = new Set(mappings.map(m => m.target));
+            const unmappedTargetLeaves = allTargetLeaves.filter(el => !mappedTargets.has(el.path));
+            
+            const optimizedContext = {
+                sourceSchema: sourceTree?.name || 'Unknown',
+                targetSchema: targetTree?.name || 'Unknown', 
+                existingMappings: mappings.map(m => ({ source: m.source, target: m.target }))
+            };
+            
+            const mappingRequest = {
+                sourceNode: sourceNode,
+                targetNodes: unmappedTargetLeaves.slice(0, 50),
+                context: optimizedContext
+            };
+            
+            const result = await generateBatchAISuggestions([mappingRequest]);
+            
+            // Replace the suggestion at this index
+            if (result.suggestions && result.suggestions.length > 0) {
+                const newSuggestions = [...batchSuggestions];
+                newSuggestions[index] = result.suggestions[0];
+                setBatchSuggestions(newSuggestions);
+            }
+        } catch (error) {
+            console.error('Failed to regenerate suggestion:', error);
+            alert('Failed to regenerate suggestion. Please try again.');
+        }
+    }, [sourceTree, targetTree, mappings, batchSuggestions, getAllSourceNodes]);
 
     // --- SAVE LOGIC ---
     const handleSaveMappings = () => {
@@ -803,9 +821,11 @@ function EditorPage() {
             {showBatchModal && (
                 <AIBatchSuggestionModal
                     suggestions={batchSuggestions}
-                    onAcceptSelected={handleAcceptBatchSuggestions}
+                    onAcceptSuggestion={handleAcceptBatchSuggestions}
+                    onAcceptAll={handleAcceptBatchSuggestions}
+                    onRegenerateAll={handleRegenerateBatchSuggestions}
+                    onRegenerateOne={handleRegenerateOneSuggestion}
                     onClose={handleCloseBatchModal}
-                    onRegenerate={handleRegenerateBatchSuggestions}
                     loading={batchLoading}
                 />
             )}

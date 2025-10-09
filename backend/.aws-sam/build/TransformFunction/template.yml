@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  rossumxml
+
+  Sample SAM Template for rossumxml
+
+Globals:
+  Function:
+    Timeout: 60 # Increased timeout for AI batch processing (each AI request takes ~10 seconds)
+    MemorySize: 128
+  Api:
+    # Apply a global CORS configuration to the entire API
+    Cors:
+      AllowOrigins:
+        - "'http://localhost:5173'"
+        - "'https://*.app.github.dev'"
+      AllowHeaders:
+        - "'Content-Type'"
+        - "'X-Amz-Date'"
+        - "'Authorization'"
+        - "'X-Api-Key'"
+        - "'X-Amz-Security-Token'"
+      AllowMethods:
+        - "'GET,POST,OPTIONS'"
+      MaxAge: "'600'"
+
+Resources:
+  TransformFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+        # --- ADD THIS BLOCK ---
+      Environment:
+        Variables:
+          POSTGRES_USER: "postgres"
+          POSTGRES_PASSWORD: "postgres"
+          POSTGRES_DB: "rossumxml"
+          POSTGRES_HOST: "172.18.0.2"
+          POSTGRES_PORT: "5432"
+          JWT_SECRET: "a_secure_secret_key_for_jwt"
+          GEMINI_API_KEY: "AIzaSyDGoYZ0PkpEAtW2G7Y6YkobU3jGR8XKo28"
+      # --- END BLOCK ---
+      Events:
+        # Define a specific, public endpoint for user registration
+        RegisterApi:
+          Type: Api
+          Properties:
+            Path: /api/auth/register
+            Method: POST
+
+        # Define a specific, public endpoint for user login
+        LoginApi:
+          Type: Api
+          Properties:
+            Path: /api/auth/login
+            Method: POST
+
+        # This is the catch-all for all other API requests
+        ProxyApi:
+          Type: Api
+          Properties:
+            Path: /api/{proxy+}
+            Method: ANY
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/"
+  TransformFunction:
+    Description: "Transform Function ARN"
+    Value: !GetAtt TransformFunction.Arn
+  TransformFunctionIamRole:
+    Description: "Implicit IAM Role created for Transform function"
+    Value: !GetAtt TransformFunctionRole.Arn
