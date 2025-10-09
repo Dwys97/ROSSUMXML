@@ -4,8 +4,11 @@ import FileDropzone from '../components/common/FileDropzone';
 import SchemaTree from '../components/editor/SchemaTree';
 import MappingSVG from '../components/editor/MappingSVG';
 import MappingsList from '../components/editor/MappingsList';
+import { AISuggestionModal } from '../components/editor/AISuggestionModal';
+import { UpgradePrompt } from '../components/editor/UpgradePrompt';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
+import { useAIFeatures, generateAISuggestion } from '../hooks/useAIFeatures';
 import styles from './EditorPage.module.css';
 
 // --- Helper Functions (moved outside the component for clarity) ---
@@ -53,6 +56,12 @@ function EditorPage() {
     const [targetXmlContent, setTargetXmlContent] = useState(null);
     const [saveStatus, setSaveStatus] = useState(null);
 
+    // --- AI FEATURE STATE ---
+    const { hasAccess: hasAIAccess, loading: aiAccessLoading } = useAIFeatures();
+    const [aiSuggestion, setAiSuggestion] = useState(null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [currentAITarget, setCurrentAITarget] = useState(null);
 
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
@@ -79,10 +88,10 @@ function EditorPage() {
         }
     }, []);
 
-    const updateMappings = (newMappings) => {
+    const updateMappings = useCallback((newMappings) => {
         setHistory(prevHistory => [...prevHistory, mappings]);
         setMappings(newMappings);
-    };
+    }, [mappings]);
 
     const handleUndo = () => {
         if (history.length === 0) return;
@@ -230,6 +239,128 @@ function EditorPage() {
             setSelectedTargetCollection(collection);
         }
     };
+
+    // --- AI SUGGESTION HANDLERS ---
+    const getAllSourceNodes = useCallback((tree) => {
+        if (!tree) return [];
+        const nodes = [];
+        
+        const traverse = (node) => {
+            if (node.type === 'element' && !node.children?.length) {
+                nodes.push({
+                    name: node.name,
+                    path: node.path,
+                    type: node.type
+                });
+            }
+            if (node.children) {
+                node.children.forEach(child => traverse(child));
+            }
+        };
+        
+        traverse(tree);
+        return nodes;
+    }, []);
+
+    const handleAISuggest = useCallback(async (targetNode) => {
+        // Check if user has AI access
+        if (!hasAIAccess) {
+            setShowUpgradePrompt(true);
+            return;
+        }
+
+        // Check if both trees are loaded
+        if (!sourceTree || !targetTree) {
+            alert('Please upload both Source and Target XML files first.');
+            return;
+        }
+
+        setCurrentAITarget(targetNode);
+        setAiLoading(true);
+
+        try {
+            // Get all source nodes as potential mapping candidates
+            const sourceNodes = getAllSourceNodes(sourceTree);
+            
+            if (sourceNodes.length === 0) {
+                alert('No source elements found to map from.');
+                setAiLoading(false);
+                return;
+            }
+
+            // Prepare context for AI
+            const context = {
+                sourceSchema: sourceTree.name || 'Source Schema',
+                targetSchema: targetTree.name || 'Target Schema',
+                existingMappings: mappings.map(m => ({
+                    source: m.source,
+                    target: m.target
+                }))
+            };
+
+            // Call AI service
+            const result = await generateAISuggestion(
+                { name: targetNode.name, path: targetNode.path, type: 'element' },
+                sourceNodes,
+                context
+            );
+
+            setAiSuggestion(result.suggestion);
+        } catch (error) {
+            console.error('AI suggestion error:', error);
+            alert(error.message || 'Failed to generate AI suggestion. Please try again.');
+        } finally {
+            setAiLoading(false);
+        }
+    }, [hasAIAccess, sourceTree, targetTree, mappings, getAllSourceNodes]);
+
+    const handleAcceptAISuggestion = useCallback(() => {
+        if (!aiSuggestion || !currentAITarget) return;
+
+        // Create mapping just like manual drag-and-drop
+        const newMapping = {
+            source: aiSuggestion.sourceElement,
+            target: aiSuggestion.targetElement,
+            type: 'element'
+        };
+
+        const existingIndex = mappings.findIndex(m => m.target === newMapping.target);
+        let newMappings = [...mappings];
+
+        if (existingIndex !== -1) {
+            // Replace existing mapping
+            newMappings[existingIndex] = newMapping;
+        } else {
+            // Add new mapping
+            newMappings.push(newMapping);
+        }
+
+        updateMappings(newMappings);
+        
+        // Close modal and reset
+        setAiSuggestion(null);
+        setCurrentAITarget(null);
+
+        // Trigger SVG line update
+        setTimeout(() => {
+            if (mappingSVGRef.current) {
+                mappingSVGRef.current.updateLines();
+            }
+        }, 100);
+    }, [aiSuggestion, currentAITarget, mappings, updateMappings]);
+
+    const handleRejectAISuggestion = useCallback(() => {
+        setAiSuggestion(null);
+        setCurrentAITarget(null);
+    }, []);
+
+    const handleRegenerateAISuggestion = useCallback(async () => {
+        if (!currentAITarget) return;
+        
+        // Close current suggestion and regenerate
+        setAiSuggestion(null);
+        await handleAISuggest(currentAITarget);
+    }, [currentAITarget, handleAISuggest]);
 
     // --- SAVE LOGIC ---
     const handleSaveMappings = () => {
@@ -493,6 +624,9 @@ function EditorPage() {
                     onCollectionSelect={handleCollectionSelect}
                     registerNodeRef={registerNodeRef}
                     targetValueMap={targetValueMap}
+                    hasAIAccess={hasAIAccess}
+                    onAISuggest={handleAISuggest}
+                    aiLoading={aiLoading}
                 />
 
                 <MappingsList
@@ -534,6 +668,23 @@ function EditorPage() {
             </section>
             </div>
             <Footer text="Created by Daniils Radionovs" />
+
+            {/* AI Suggestion Modal */}
+            {aiSuggestion && (
+                <AISuggestionModal
+                    suggestion={aiSuggestion}
+                    onAccept={handleAcceptAISuggestion}
+                    onReject={handleRejectAISuggestion}
+                    onRegenerate={handleRegenerateAISuggestion}
+                    onClose={handleRejectAISuggestion}
+                    loading={aiLoading}
+                />
+            )}
+
+            {/* Upgrade Prompt for Free Tier Users */}
+            {showUpgradePrompt && (
+                <UpgradePrompt onClose={() => setShowUpgradePrompt(false)} />
+            )}
         </>
     );
 }

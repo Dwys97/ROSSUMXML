@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 const { parseXmlToTree } = require('./services/xmlParser.service');
+const { generateMappingSuggestion, generateBatchMappingSuggestions, checkAIFeatureAccess } = require('./services/aiMapping.service');
 const db = require('./db');
 const userService = require('./services/user.service');
 
@@ -1360,6 +1361,98 @@ exports.handler = async (event) => {
                 console.error('Transformation error:', err);
                 return createResponse(500, JSON.stringify({ 
                     error: 'Transformation failed', 
+                    details: err.message 
+                }));
+            }
+        }
+
+        // AI Mapping Suggestion - Generate single mapping suggestion
+        if (path === '/api/ai/suggest-mapping' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                
+                // Check if user has Pro or Enterprise subscription
+                const hasAccess = await checkAIFeatureAccess(pool, user.id);
+                if (!hasAccess) {
+                    return createResponse(403, JSON.stringify({ 
+                        error: 'AI features are only available for Pro and Enterprise subscribers',
+                        upgradeUrl: '/pricing'
+                    }));
+                }
+
+                const { sourceNode, targetNodes, context } = body;
+
+                if (!sourceNode || !targetNodes || !Array.isArray(targetNodes)) {
+                    return createResponse(400, JSON.stringify({ 
+                        error: 'Missing required fields: sourceNode and targetNodes (array)' 
+                    }));
+                }
+
+                const suggestion = await generateMappingSuggestion(sourceNode, targetNodes, context);
+
+                return createResponse(200, JSON.stringify(suggestion));
+
+            } catch (err) {
+                console.error('AI suggestion error:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to generate AI suggestion', 
+                    details: err.message 
+                }));
+            }
+        }
+
+        // AI Mapping Suggestion - Generate batch suggestions
+        if (path === '/api/ai/suggest-mappings-batch' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                
+                // Check if user has Pro or Enterprise subscription
+                const hasAccess = await checkAIFeatureAccess(pool, user.id);
+                if (!hasAccess) {
+                    return createResponse(403, JSON.stringify({ 
+                        error: 'AI features are only available for Pro and Enterprise subscribers',
+                        upgradeUrl: '/pricing'
+                    }));
+                }
+
+                const { mappingRequests } = body;
+
+                if (!mappingRequests || !Array.isArray(mappingRequests)) {
+                    return createResponse(400, JSON.stringify({ 
+                        error: 'Missing required field: mappingRequests (array)' 
+                    }));
+                }
+
+                const suggestions = await generateBatchMappingSuggestions(mappingRequests);
+
+                return createResponse(200, JSON.stringify({ suggestions }));
+
+            } catch (err) {
+                console.error('AI batch suggestion error:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to generate AI suggestions', 
+                    details: err.message 
+                }));
+            }
+        }
+
+        // Check AI Feature Access - Frontend can check if user has access
+        if (path === '/api/ai/check-access' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const hasAccess = await checkAIFeatureAccess(pool, user.id);
+
+                return createResponse(200, JSON.stringify({ 
+                    hasAccess,
+                    message: hasAccess 
+                        ? 'AI features are available' 
+                        : 'Upgrade to Pro or Enterprise to access AI features'
+                }));
+
+            } catch (err) {
+                console.error('AI access check error:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to check AI access', 
                     details: err.message 
                 }));
             }

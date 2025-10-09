@@ -1,0 +1,148 @@
+/* frontend/src/components/editor/UpgradePrompt.module.css */
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal {
+    background: white;
+    border-radius: 16px;
+    max-width: 480px;
+    width: 90%;
+    padding: 40px 32px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+    text-align: center;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Icon */
+.iconContainer {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lockIcon {
+    width: 40px;
+    height: 40px;
+    stroke: white;
+    stroke-width: 2;
+}
+
+/* Header */
+.title {
+    margin: 0 0 12px 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.subtitle {
+    margin: 0 0 32px 0;
+    font-size: 15px;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+/* Features */
+.features {
+    text-align: left;
+    margin-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.feature {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: #374151;
+}
+
+.feature svg {
+    width: 20px;
+    height: 20px;
+    stroke: #10b981;
+    stroke-width: 2.5;
+    flex-shrink: 0;
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.actions button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cancelButton {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.cancelButton:hover {
+    background: #e5e7eb;
+    color: #4b5563;
+}
+
+.upgradeButton {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.upgradeButton:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+.upgradeButton:active {
+    transform: translateY(0);
+}

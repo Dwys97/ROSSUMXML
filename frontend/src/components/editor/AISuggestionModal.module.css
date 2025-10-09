@@ -1,0 +1,298 @@
+/* frontend/src/components/editor/AISuggestionModal.module.css */
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px 12px 0 0;
+}
+
+.headerContent {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.headerContent h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.aiIcon {
+    width: 28px;
+    height: 28px;
+    stroke-width: 2;
+}
+
+.closeButton {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.closeButton:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.closeButton svg {
+    width: 20px;
+    height: 20px;
+    stroke: white;
+}
+
+/* Mapping Display */
+.mappingDisplay {
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #f9fafb;
+}
+
+.mappingItem {
+    flex: 1;
+}
+
+.mappingItem label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.elementPath {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #1f2937;
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.arrow {
+    flex-shrink: 0;
+    color: #667eea;
+    margin-top: 20px;
+}
+
+.arrow svg {
+    width: 32px;
+    height: 32px;
+    stroke-width: 2.5;
+}
+
+/* Confidence Section */
+.confidenceSection {
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.confidenceSection label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 10px;
+}
+
+.confidenceBar {
+    height: 32px;
+    background: #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+}
+
+.confidenceFill {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+    transition: width 0.5s ease;
+    border-radius: 16px;
+}
+
+.confidenceFill.high {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.confidenceFill.medium {
+    background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+.confidenceFill.low {
+    background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+}
+
+.confidenceText {
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Reasoning Section */
+.reasoningSection {
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.reasoningSection label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 10px;
+}
+
+.reasoningText {
+    background: #f9fafb;
+    border-left: 3px solid #667eea;
+    padding: 14px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #4b5563;
+    font-style: italic;
+}
+
+/* Actions */
+.actions {
+    padding: 20px 24px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.actions button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.actions button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.actions button svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+}
+
+.rejectButton {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.rejectButton:hover:not(:disabled) {
+    background: #e5e7eb;
+    color: #4b5563;
+}
+
+.regenerateButton {
+    background: #f59e0b;
+    color: white;
+}
+
+.regenerateButton:hover:not(:disabled) {
+    background: #d97706;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.acceptButton {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.acceptButton:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
