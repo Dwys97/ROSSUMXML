@@ -425,8 +425,8 @@ exports.handler = async (event) => {
         // User Profile Endpoint (GET)
         if (path.endsWith('/user/profile') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             try {
-                // Verify JWT token
-                const decoded = verifyJWT(event);
+                // Verify JWT token or API key
+                const decoded = await verifyJWT(event);
                 const userId = decoded.id;
 
                 // Get user data with subscription and billing info
