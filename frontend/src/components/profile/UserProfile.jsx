@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
+import { tokenStorage } from '../../utils/tokenStorage';
 import styles from './UserProfile.module.css';
 
 const COUNTRIES = [
@@ -271,7 +272,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
             setLoading(true);
             fetch('/api/user/profile', {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${tokenStorage.getToken()}`
                 }
             })
             .then(res => {
@@ -342,7 +343,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${tokenStorage.getToken()}`
                 },
                 body: JSON.stringify({
                     currentPassword: passwordForm.currentPassword,
@@ -374,7 +375,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${tokenStorage.getToken()}`
                 },
                 body: JSON.stringify(editForm)
             });
@@ -447,7 +448,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${tokenStorage.getToken()}`
                 },
                 body: JSON.stringify({
                     cardNumber: billingForm.cardNumber.replace(/\s/g, ''),

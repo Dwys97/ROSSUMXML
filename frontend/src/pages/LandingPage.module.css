@@ -615,7 +615,10 @@
 /* Features Section - Modern Grid */
 .featuresSection {
     padding: 6rem 0;
-    background: transparent;
+    background: linear-gradient(135deg, 
+        rgba(29, 114, 243, 0.02) 0%, 
+        rgba(139, 92, 246, 0.02) 50%,
+        rgba(236, 72, 153, 0.02) 100%);
 }
 
 .featuresSection h2 {
