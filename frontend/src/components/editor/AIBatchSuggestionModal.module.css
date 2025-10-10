@@ -486,3 +486,76 @@ button:disabled {
         flex-wrap: wrap;
     }
 }
+/* Loading More Indicator */
+.loadingMoreIndicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+    border-radius: 8px;
+    margin-top: 16px;
+    font-size: 14px;
+    color: #667eea;
+    font-weight: 500;
+    animation: pulseLoad 2s ease-in-out infinite;
+}
+
+@keyframes pulseLoad {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.9;
+        transform: scale(1.01);
+    }
+}
+
+.loadingMoreIndicator .spinner {
+    width: 20px;
+    height: 20px;
+}
+
+.remainingCount {
+    font-size: 12px;
+    color: #8895b0;
+    font-weight: 400;
+}
+
+/* Delete Button */
+.deleteButton {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ff6b6b;
+    background: white;
+    color: #ff6b6b;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.deleteButton:hover:not(:disabled) {
+    background: #ff6b6b;
+    color: white;
+}
+
+.deleteButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.deleteButton svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Remaining Count Indicator */
+.remainingIndicator {
+    color: #667eea;
+    font-weight: 600;
+}

@@ -1,0 +1,549 @@
+{
+  "rootElement": "UniversalShipment",
+  "staticMappings": [
+    {
+      "type": "custom_element",
+      "value": "True",
+      "target": "UniversalShipment[0] > Shipment[0] > DataContext[0] > CodesMappedToTarget[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "GB1",
+      "target": "UniversalShipment[0] > Shipment[0] > DataContext[0] > Company[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "CustomsDeclaration",
+      "target": "UniversalShipment[0] > Shipment[0] > DataContext[0] > DataTargetCollection[0] > DataTarget[0] > Type[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=Branch_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > Branch[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "ADV",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialChargeCollection[0] > CommercialCharge[0] > ChargeType[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=VAT_Adjustment][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialChargeCollection[0] > CommercialCharge[0] > Amount[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=VAT_Adjustment_Currency][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialChargeCollection[0] > CommercialCharge[0] > Currency[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=InvoiceNumber][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > InvoiceNumber[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=InvoiceNumber][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > ReferenceNumber[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "PRE",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > Category[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "Z",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > SubType[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "380",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > Type[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=InvoiceAmount][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > InvoiceAmount[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=currency][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > InvoiceCurrency[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=NetWeight][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > NetWeight[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "KG",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > NetWeightUQ[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=OuterPacks][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > NoOfPacks[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=TotalWeight][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > Weight[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "KG",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > WeightUnit[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "11",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > ValuationCode[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=InvoiceNumber][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > InvoiceNumber[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "PRE",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > Category[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=InvoiceNumber][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > ReferenceNumber[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "Z",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > SubType[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "380",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > Type[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "SUP",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[5] > Category[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "SUP",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[6] > Category[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "SUP",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[1] > Category[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "SUP",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[2] > Category[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "SUP",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[3] > Category[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "SUP",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[4] > Category[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "KGM",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > CustomsQuantityUnit[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "KG",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > NetWeightUnit[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "KG",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > WeightUnit[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "MethodOfPayment",
+      "target": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0] > CommercialInvoiceLine[0] > AddInfoCollection[0] > AddInfo[0] > Key[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "AgentCode",
+      "target": "UniversalShipment[0] > Shipment[0] > CustomsProfileIdentifier[0] > Type[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=DefermentAccountNumber][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > DefermentAccountNumber[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "CDS",
+      "target": "UniversalShipment[0] > Shipment[0] > CustomsProfileIdentifier[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=Location_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > LocationAtClearance[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=MessageSubType_Code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > MessageSubType[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=Messagetype_Code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > MessageType[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=MessagingApplicationCode][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > MessagingApplicationCode[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=OuterPacks][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > OuterPacks[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "PKG",
+      "target": "UniversalShipment[0] > Shipment[0] > OuterPacksPackageType[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=PaymentMethod_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > PaymentMethod[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=PortOfLoading_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > PortOfLoading[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=PortOfDischarge_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > PortOfDischarge[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=PortOfOrigin_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > PortOfOrigin[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=PortOfDestination_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > PortOfDestination[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "STD",
+      "target": "UniversalShipment[0] > Shipment[0] > ServiceLevel[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=Sublocation_code][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > SubLocationAtClearance[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=TotalWeight][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > TotalWeight[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "KG",
+      "target": "UniversalShipment[0] > Shipment[0] > TotalWeightUnit[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=Nationality][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > TransportNationality[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=WayBillNumber_][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > WayBillNumber[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "HWB",
+      "target": "UniversalShipment[0] > Shipment[0] > WayBillType[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=basic_info_section][0] > datapoint[schema_id=InvoiceNumber][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > AdditionalReferenceCollection[0] > AdditionalReference[0] > ReferenceNumber[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "CLT",
+      "target": "UniversalShipment[0] > Shipment[0] > AdditionalReferenceCollection[0] > AdditionalReference[0] > Type[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "SUP",
+      "target": "UniversalShipment[0] > Shipment[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > Category[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=ReferenceNumber][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > ReferenceNumber[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=sadtype][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[0] > Type[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=EntryInstruction_Style][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > Style[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=SubStylecode][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > SubStyle[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=FiscalReferenceCode][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > CustomsReferenceCollection[0] > CustomsReference[0] > SubType[0] > Code[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "FIS",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > CustomsReferenceCollection[0] > CustomsReference[0] > Type[0] > Code[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=totals_section][0] > datapoint[schema_id=Fiscal_VAT_reference][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > CustomsReferenceCollection[0] > CustomsReference[0] > Reference[0]",
+      "type": "element"
+    },
+    {
+      "source": "content[0] > section[schema_id=vendor_section][0] > datapoint[schema_id=Importer_OrganizationCode][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > CustomsReferenceCollection[0] > CustomsReference[0] > Owner[0] > OrganizationCode[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "Owner",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > CustomsReferenceCollection[0] > CustomsReference[0] > Owner[0] > AddressType[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "AUT",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > CustomsReferenceCollection[0] > CustomsReference[1] > Type[0] > Code[0]"
+    },
+    {
+      "type": "custom_element",
+      "value": "OWNER",
+      "target": "UniversalShipment[0] > Shipment[0] > EntryInstructionCollection[0] > EntryInstruction[0] > CustomsReferenceCollection[0] > CustomsReference[1] > Owner[0] > AddressType[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=vendor_section][0] > datapoint[schema_id=Importer_OrganizationCode][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > OrganizationAddressCollection[0] > OrganizationAddress[1] > OrganizationCode[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "ImporterDocumentaryAddress",
+      "target": "UniversalShipment[0] > Shipment[0] > OrganizationAddressCollection[0] > OrganizationAddress[1] > AddressType[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=vendor_section][0] > datapoint[schema_id=Exporter_OrganizationCode][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > OrganizationAddressCollection[0] > OrganizationAddress[2] > OrganizationCode[0]",
+      "type": "element"
+    },
+    {
+      "type": "custom_element",
+      "value": "SupplierDocumentaryAddress",
+      "target": "UniversalShipment[0] > Shipment[0] > OrganizationAddressCollection[0] > OrganizationAddress[2] > AddressType[0]"
+    },
+    {
+      "source": "content[0] > section[schema_id=line_items_section][0] > multivalue[schema_id=LineItems][0] > tuple[schema_id=LineItems_tuple][0] > datapoint[schema_id=MarksAndNos_1][0]",
+      "target": "UniversalShipment[0] > Shipment[0] > PackingLineCollection[0] > PackingLine[0] > MarksAndNos[0]",
+      "type": "element"
+    }
+  ],
+  "collectionMappings": [
+    {
+      "sourceCollectionPath": "content[0] > section[schema_id=line_items_section][0] > multivalue[schema_id=LineItems][0]",
+      "targetCollectionPath": "UniversalShipment[0] > Shipment[0] > CommercialInfo[0] > CommercialInvoiceCollection[0] > CommercialInvoice[0] > CommercialInvoiceLineCollection[0]",
+      "sourceItemElementName": "tuple[schema_id=LineItems_tuple]",
+      "targetItemElementName": "CommercialInvoiceLine",
+      "mappings": [
+        {
+          "source": "datapoint[schema_id=Sad1Reference][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[5] > ReferenceNumber[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad1Status][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[5] > Status[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad1_Code][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[5] > Type[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad2Reference_][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[6] > ReferenceNumber[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad2Code][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[6] > Type[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad3Code][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[1] > Type[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=SadReason3][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[1] > Description[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad3Reference][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[1] > ReferenceNumber[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad4Code][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[2] > Type[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=SadReason4][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[2] > Description[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad4Reference][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[2] > ReferenceNumber[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad5Code][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[3] > Type[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=SadReason5][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[3] > Description[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad5Reference][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[3] > ReferenceNumber[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad6Code][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[4] > Type[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=SadReason6_][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[4] > Description[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Sad6Reference_][0]",
+          "target": "CustomsSupportingInformationCollection[0] > CustomsSupportingInformation[4] > ReferenceNumber[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=CountryOfOrigincode][0]",
+          "target": "CountryOfOrigin[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Item_description][0]",
+          "target": "Description[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Harmonised_Code][0]",
+          "target": "HarmonisedCode[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=InvoiceQuantity_][0]",
+          "target": "InvoiceQuantity[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=InvoiceQtyUnit][0]",
+          "target": "InvoiceQuantityUnit[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Line_value][0]",
+          "target": "LinePrice[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Line_netweight][0]",
+          "target": "NetWeight[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Line_netweight][0]",
+          "target": "CustomsQuantity[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=PrimaryPreference_][0]",
+          "target": "PrimaryPreference[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=CPC_][0]",
+          "target": "Procedure[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=VATType][0]",
+          "target": "TaxType[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Valuation][0]",
+          "target": "ValuationCode[0] > Code[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=Line_grossweight][0]",
+          "target": "Weight[0]",
+          "type": "element"
+        },
+        {
+          "source": "datapoint[schema_id=MethodOfPayment][0]",
+          "target": "AddInfoCollection[0] > AddInfo[0] > Value[0]",
+          "type": "element"
+        },
+        {
+          "type": "generated_line_number",
+          "target": "LineNo[0]"
+        }
+      ]
+    }
+  ]
+}

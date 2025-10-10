@@ -73,15 +73,62 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
     try {
         console.log('🔧 Using direct REST API approach with Gemini 2.5 Flash...');
         
-        // Limit target nodes to prevent massive prompts causing timeouts
-        const MAX_TARGETS = 80;
+        // OPTIMIZATION: Reduce target nodes for faster AI response (smaller prompts)
+        // Expected: 7-13s → 4-7s per request with reduced context
+        const MAX_TARGETS = 40; // Reduced from 80 for speed
         const limitedTargetNodes = targetNodes.length > MAX_TARGETS 
             ? targetNodes.slice(0, MAX_TARGETS)
             : targetNodes;
             
         if (targetNodes.length > MAX_TARGETS) {
-            console.log(`⚠️  Truncating ${targetNodes.length} target nodes to ${MAX_TARGETS} to reduce prompt size`);
+            console.log(`⚡ SPEED OPTIMIZATION: Truncating ${targetNodes.length} target nodes to ${MAX_TARGETS} for faster AI response`);
         }
+        
+        // ⚡ PRIORITY 1: Schema_id Normalization for exact matching
+        const normalizeSchemaId = (schemaId) => {
+            if (!schemaId) return '';
+            return schemaId
+                .replace(/_+$/g, '')           // Remove trailing underscores: "InvoiceQuantity_" → "InvoiceQuantity"
+                .replace(/^_+/g, '')           // Remove leading underscores
+                .replace(/([a-z])([A-Z])/g, '$1$2') // Keep camelCase but prepare for comparison
+                .toLowerCase()
+                .trim();
+        };
+        
+        // ⚡ PRIORITY 2: Code Element Wrapper Detection
+        // CargoWise wraps many values in <Code> elements: <Currency><Code>GBP</Code></Currency>
+        // We need to compare source to the PARENT element, not "Code"
+        const extractElementNameFromPath = (path, fullName) => {
+            if (!path) return { elementName: fullName, isCodeWrapper: false, parentElement: null };
+            
+            const isCodeWrapper = path.endsWith(' > Code[0]') || path.includes(' > Code[0] >');
+            
+            if (isCodeWrapper) {
+                const pathParts = path.split(' > ');
+                // Find parent element before "Code[0]"
+                const codeIndex = pathParts.findIndex(p => p.startsWith('Code['));
+                if (codeIndex > 0) {
+                    const parentPart = pathParts[codeIndex - 1];
+                    const parentElement = parentPart.split('[')[0].trim();
+                    return {
+                        elementName: parentElement, // Use parent for comparison
+                        isCodeWrapper: true,
+                        parentElement: parentElement,
+                        originalElement: 'Code'
+                    };
+                }
+            }
+            
+            // Not a code wrapper, extract element name normally
+            const parts = fullName.split(' > ');
+            const lastPart = parts[parts.length - 1].split('[')[0].split(':')[0].trim();
+            
+            return {
+                elementName: lastPart,
+                isCodeWrapper: false,
+                parentElement: null
+            };
+        };
         
         // Extract element values from names (format: "ElementName: 'value'" or "ElementName")
         const extractValue = (name) => {
@@ -100,18 +147,20 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
                 return {
                     schemaId: schemaIdMatch[1],
                     elementName: schemaIdMatch[1], // Use schema_id as element name
-                    source: 'schema_id'
+                    source: 'schema_id',
+                    isCodeWrapper: false
                 };
             }
             
-            // For TARGET: Extract element name from last part of path
-            const parts = fullName.split(' > ');
-            const lastPart = parts[parts.length - 1].split('[')[0].split(':')[0].trim();
+            // For TARGET: Check for Code wrapper and extract appropriate element name
+            const codeInfo = extractElementNameFromPath(fullPath, fullName);
             
             return {
                 schemaId: null,
-                elementName: lastPart,
-                source: 'element_name'
+                elementName: codeInfo.elementName,
+                source: 'element_name',
+                isCodeWrapper: codeInfo.isCodeWrapper,
+                parentElement: codeInfo.parentElement
             };
         };
         
@@ -229,20 +278,35 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
             const commonTokens = sourceTokens.filter(t => targetTokens.includes(t));
             const tokenOverlap = commonTokens.length / Math.max(sourceTokens.length, targetTokens.length);
             
-            // Semantic mapping for business terms
+            // ⚡ PRIORITY 4: Enhanced semantic mapping with customs/logistics domain terms
             const semanticMap = {
-                'item': ['line', 'product', 'goods', 'article'],
+                'item': ['line', 'product', 'goods', 'article', 'commodity'],
                 'description': ['desc', 'name', 'label', 'text'],
-                'value': ['amount', 'total', 'price', 'sum'],
+                'value': ['amount', 'total', 'price', 'sum', 'cost'],
                 'quantity': ['qty', 'count', 'number', 'num'],
-                'invoice': ['doc', 'document', 'bill'],
+                'invoice': ['doc', 'document', 'bill', 'commercial'],
                 'date': ['dt', 'time', 'timestamp'],
-                'vendor': ['supplier', 'seller', 'exporter'],
-                'customer': ['buyer', 'importer', 'consignee', 'client'],
+                'vendor': ['supplier', 'seller', 'exporter', 'shipper'],
+                'customer': ['buyer', 'importer', 'consignee', 'client', 'receiver'],
                 'number': ['no', 'num', 'nbr', 'id'],
-                'code': ['id', 'key', 'reference', 'ref'],
-                'address': ['addr', 'location'],
-                'total': ['sum', 'amount', 'value', 'price']
+                'code': ['id', 'key', 'reference', 'ref', 'type'],
+                'address': ['addr', 'location', 'place'],
+                'total': ['sum', 'amount', 'value', 'price'],
+                'harmonised': ['tariff', 'hs', 'commodity', 'classification'],
+                'exporter': ['supplier', 'seller', 'vendor', 'shipper', 'consignor'],
+                'importer': ['buyer', 'consignee', 'customer', 'receiver'],
+                'sad': ['supporting', 'additional', 'document', 'customs'],
+                'port': ['location', 'place', 'destination', 'origin'],
+                'outer': ['total', 'gross', 'aggregate', 'overall'],
+                'line': ['item', 'detail', 'row', 'entry'],
+                'weight': ['mass', 'wt', 'kg', 'kilogram', 'gross', 'net'],
+                'qty': ['quantity', 'count', 'number', 'num'],
+                'net': ['nett', 'actual'],
+                'gross': ['total', 'full', 'overall'],
+                'freight': ['transport', 'carriage', 'shipping', 'delivery'],
+                'customs': ['duty', 'import', 'declaration', 'clearance'],
+                'vat': ['tax', 'duty', 'levy'],
+                'currency': ['curr', 'ccy', 'monetary']
             };
             
             // Check for semantic matches
@@ -384,17 +448,29 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
                 valueCompatibility = calculateSimilarity(sourceValue, targetValue);
             }
             
-            // NEW SCORING: Contextual analysis takes priority
+            // ⚡ PRIORITY 1: Check for EXACT schema_id match (highest priority)
+            const normalizedSourceSchemaId = normalizeSchemaId(sourceSchemaId || sourceFieldName);
+            const normalizedTargetName = normalizeSchemaId(targetFieldName);
+            
+            let exactMatchBonus = 0;
+            if (normalizedSourceSchemaId && normalizedTargetName && normalizedSourceSchemaId === normalizedTargetName) {
+                exactMatchBonus = 30; // Huge boost for exact schema_id matches!
+                console.log(`🎯 EXACT MATCH DETECTED: "${sourceSchemaId}" → "${targetFieldName}" (normalized: "${normalizedSourceSchemaId}")`);
+            }
+            
+            // NEW SCORING: Contextual analysis + exact match bonus
             // - Contextual similarity: 50% (FULL path + field semantic analysis)
             // - Parent context: 25% (immediate parent validation)
             // - Path hierarchy: 15% (structural validation)
             // - Value compatibility: 10% (data validation)
-            const combinedScore = Math.round(
+            // - Exact match bonus: +30 points (for schema_id exact matches)
+            const combinedScore = Math.min(100, Math.round(
                 (contextualSimilarity * 0.50) + 
                 (parentSimilarity * 0.25) +
                 (pathSimilarity * 0.15) + 
-                (valueCompatibility * 0.10)
-            );
+                (valueCompatibility * 0.10) +
+                exactMatchBonus
+            ));
             
             return {
                 index,
@@ -404,11 +480,13 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
                 path: node.path,
                 pathContext: targetPathContext,
                 parent: targetParent,
+                isCodeWrapper: targetFieldInfo.isCodeWrapper || false,
                 contextualSimilarity,  // NEW: Full context score
                 nameSimilarity,        // LEGACY: Simple name match
                 parentSimilarity,
                 pathSimilarity,
                 valueCompatibility,
+                exactMatchBonus,       // NEW: Exact schema_id match bonus
                 combinedScore
             };
         });
@@ -416,15 +494,25 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
         // CRITICAL: Sort by combined score (highest match first)
         const sortedCandidates = targetCandidatesWithScores.sort((a, b) => b.combinedScore - a.combinedScore);
         
-        // Show top 20 most similar (already sorted)
-        const topCandidates = sortedCandidates.slice(0, 20);
+        // OPTIMIZATION: Pre-filter to only send top candidates to AI for faster response
+        // Show top 20 most similar (already sorted) + filter out very low scores (<20%)
+        const topCandidates = sortedCandidates
+            .filter(c => c.combinedScore >= 20) // Skip obviously bad matches
+            .slice(0, 20);
         
-        const otherCandidates = sortedCandidates.slice(20);
+        const otherCandidates = sortedCandidates
+            .filter(c => c.combinedScore < 20)
+            .slice(0, 20); // Keep some low-score options just in case
+        
+        console.log(`⚡ PRE-FILTERED: ${sortedCandidates.length} candidates → ${topCandidates.length + otherCandidates.length} sent to AI (score ≥20% or top 40)`);
         
         // Log top 5 matches for debugging
-        console.log(`\n📊 TOP 5 MATCHES for "${sourceFieldName}":`);
+        console.log(`\n📊 TOP 5 MATCHES for "${sourceFieldName}" (normalized: "${normalizeSchemaId(sourceSchemaId || sourceFieldName)}"):`);
         topCandidates.slice(0, 5).forEach((c, i) => {
-            console.log(`   ${i + 1}. ${c.name} (Score: ${c.combinedScore}%, Context: ${c.contextualSimilarity}%, Parent: ${c.parentSimilarity}%)`);
+            const exactMatchIndicator = c.exactMatchBonus > 0 ? ' 🎯 EXACT MATCH!' : '';
+            const codeWrapperIndicator = c.isCodeWrapper ? ' [Code wrapper]' : '';
+            console.log(`   ${i + 1}. ${c.name}${codeWrapperIndicator} (Score: ${c.combinedScore}%${exactMatchIndicator})`);
+            console.log(`      Context: ${c.contextualSimilarity}%, Parent: ${c.parentSimilarity}%, Exact bonus: +${c.exactMatchBonus}`);
             console.log(`      Path: ${c.pathContext.join(' → ')}`);
         });
         
@@ -442,161 +530,40 @@ async function generateMappingSuggestion(sourceNode, targetNodes, context = {}) 
             displayIndexToActualIndex.set(candidate.index, candidate.index);
         });
         
-        // Enhanced prompt with deep path structure analysis - PATH-FIRST approach
-        const prompt = `You are an XML schema mapping expert. You MUST analyze path structures FIRST before considering field names.
+        // ⚡ PRIORITY 3: OPTIMIZED PROMPT - 60% shorter for faster AI response
+        const sourceLevel = sourcePathContext.includes('multivalue') && sourcePathContext.includes('tuple') 
+            ? 'LINE ITEM' 
+            : 'HEADER';
+        
+        const prompt = `XML Schema Mapping Expert: Map source to best target candidate.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 SOURCE ELEMENT ANALYSIS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${context.instructions || ''}
 
-Field: "${sourceFieldName}"${sourceValue ? ` | Sample: "${sourceValue}"` : ''}
+SOURCE: "${sourceFieldName}"${sourceValue ? ` = "${sourceValue}"` : ''}
+Path: ${sourcePathContext.join(' > ')}
+Level: ${sourceLevel} ${sourceParent ? `(parent: ${sourceParent})` : ''}
 
-PATH STRUCTURE:
-${sourcePathContext.map((el, idx) => {
-    const indent = '  '.repeat(idx);
-    const icon = idx === 0 ? '📦' : idx === sourcePathContext.length - 1 ? '🎯' : idx === sourcePathContext.length - 2 ? '📂' : '📁';
-    return `${indent}${icon} ${el}`;
+CANDIDATES (pre-scored, highest first):
+${topCandidates.slice(0, 15).map(c => {
+    const level = c.pathContext.includes('LineItem') || c.pathContext.includes('Line') ? 'LINE' : 'HEADER';
+    return `[${c.index}] ${c.name} (${c.combinedScore}%) | ${level} | ${c.pathContext.slice(-3).join(' > ')}${c.value ? ` = "${c.value}"` : ''}`;
 }).join('\n')}
 
-CONTEXT INDICATORS:
-• Depth: ${sourcePathContext.length} levels
-• Parent: "${sourceParent}"
-${sourceSectionType ? `• Section: ${sourceSectionType}` : ''}
-${sourcePathContext.includes('section') && !sourcePathContext.includes('multivalue') ? '• ✅ HEADER-LEVEL FIELD (in "section", not in "multivalue")' : ''}
-${sourcePathContext.includes('multivalue') && sourcePathContext.includes('tuple') ? '• ✅ LINE ITEM FIELD (in "multivalue > tuple")' : ''}
+RULES:
+1. Match hierarchical level: ${sourceLevel} source → ${sourceLevel} target only
+2. Prefer exact field name matches (ignore underscores, case)
+3. Consider semantic equivalents: value=price=amount, quantity=qty, description=desc
+4. Candidates pre-sorted by context+path similarity (top = best match)
+5. ONLY map leaf nodes with values, not containers
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 TARGET CANDIDATES (${limitedTargetNodes.length} total, top ${topCandidates.length} by CONTEXTUAL score)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCORING:
+90-100%: Exact/near-exact match + correct level
+70-89%: Good semantic match + correct level
+50-69%: Moderate similarity + correct level
+<50%: Wrong level OR poor match
 
-${topCandidates.map(c => {
-    const isHeaderLevel = c.pathContext.includes('Header') || c.pathContext.length <= 3;
-    const isLineItemLevel = c.pathContext.includes('LineItem') || c.pathContext.includes('Line');
-    
-    return `┌─ INDEX ${c.index}: ${c.name} │ TOTAL: ${c.combinedScore}%
-│  📊 Scores: Context=${c.contextualSimilarity}% | Parent=${c.parentSimilarity}% | Path=${c.pathSimilarity}% | Value=${c.valueCompatibility}%
-│  🔍 Legacy Name Match: ${c.nameSimilarity}%
-│  ${c.value ? `📝 Sample: "${c.value}"` : '📝 No sample data'}
-│  👨‍👩‍👧 Parent: "${c.parent}"
-│  🗂️  Path: ${c.pathContext.join(' → ')}
-│  ${isHeaderLevel ? '✅ HEADER-LEVEL' : isLineItemLevel ? '✅ LINE ITEM-LEVEL' : '⚠️  Other level'}
-└─────────────────────────────────────────────────────────────────────────`;
-}).join('\n\n')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧠 MAPPING DECISION PROCESS (FOLLOW EXACTLY)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-STEP 1️⃣ : IDENTIFY SOURCE LEVEL
-${sourcePathContext.includes('multivalue') && sourcePathContext.includes('tuple') 
-    ? '   → SOURCE IS LINE ITEM LEVEL (in multivalue > tuple)' 
-    : '   → SOURCE IS HEADER LEVEL (in section, not in multivalue)'}
-
-STEP 2️⃣ : FILTER TARGETS BY LEVEL
-${sourcePathContext.includes('multivalue') && sourcePathContext.includes('tuple')
-    ? '   → ONLY consider candidates with "LineItem" or "Line" in path'
-    : '   → ONLY consider candidates with "Header" in path OR root-level (depth ≤ 3)'}
-   → REJECT candidates at wrong hierarchical level!
-
-STEP 3️⃣ : WITHIN CORRECT LEVEL, MATCH FIELD NAME
-   → Source field: "${sourceFieldName}"
-   → Find target with most similar name
-   → Consider: exact match > abbreviation > synonym
-
-STEP 4️⃣ : VERIFY PARENT CONTEXT
-   → Source parent: "${sourceParent}"
-   → Check if target parent is semantically similar
-   → Boost confidence if parents align
-
-STEP 5️⃣ : VALIDATE VALUE/TYPE
-   ${sourceValue ? `→ Source value: "${sourceValue}"` : '→ No source value to validate'}
-   → Ensure data types are compatible
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ CORRECT MATCH EXAMPLES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Example 1: HEADER-LEVEL FIELD
-Source: section > InvoiceNumber
-Target: Header > DocNumber ✅ CORRECT
-Reason: Both header-level, similar names, same business context
-
-Example 2: LINE ITEM FIELD
-Source: multivalue > tuple > Item_description
-Target: LineItems > LineItem > Description ✅ CORRECT
-Reason: Both line-item level, field name match
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-❌ WRONG MATCH EXAMPLES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Example 1: WRONG LEVEL (even with name match!)
-Source: section > Description (HEADER-LEVEL)
-Target: LineItems > LineItem > Description ❌ WRONG!
-Reason: Header field mapped to line item - hierarchical mismatch!
-
-Example 2: WRONG LEVEL (even with name match!)
-Source: multivalue > tuple > Quantity (LINE ITEM-LEVEL)
-Target: Header > TotalQuantity ❌ WRONG!
-Reason: Line item field mapped to header total - different context!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📏 PATH LEVEL RULES (CRITICAL - DO NOT VIOLATE)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Rossum "section" (without multivalue) → Target "Header" or root-level only
-Rossum "multivalue > tuple" → Target "LineItem" or "Line" children only
-
-PARENT EQUIVALENTS:
-"section" ≈ "Header", "Root", "Document"
-"tuple" ≈ "LineItem", "Item", "Line"
-"multivalue" ≈ "LineItems", "Items", "Lines" (parent of repeating elements)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔢 SCORING EXPLANATION (NEW CONTEXTUAL ANALYSIS)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Context Score (50% weight)**: Analyzes FULL path + field name semantically
-  - Extracts tokens from: field name + ALL parent elements
-  - Example: "Item_value" in "LineItems > tuple" 
-    → tokens: [item, value, lineitems, tuple]
-  - Matches with semantic equivalents: item≈line, value≈total≈amount
-  - This REPLACES simple name normalization with intelligent context!
-
-**Parent Score (25% weight)**: Immediate parent similarity
-**Path Score (15% weight)**: Hierarchical structure validation  
-**Value Score (10% weight)**: Sample data compatibility
-
-TOTAL = (Context × 0.50) + (Parent × 0.25) + (Path × 0.15) + (Value × 0.10)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 DECISION GUIDELINES (USE CONTEXTUAL SCORES)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-95-100%: High Context score (≥90) + Correct level + Strong parent match
-90-94%:  High Context score (≥80) + Correct level
-80-89%:  Good Context score (≥70) + Correct level  
-70-79%:  Moderate Context score (≥60) + Correct level
-<70%:    Low Context score OR wrong hierarchical level
-<50%:    REJECT - incompatible paths/context
-
-CRITICAL: Candidates are PRE-SORTED by TOTAL score (highest first).
-The TOP candidate is most likely correct - verify level match only!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📤 RESPONSE (JSON ONLY)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{
-  "targetElementIndex": <0-${limitedTargetNodes.length - 1}>,
-  "confidence": <0-100>,
-  "reasoning": "1. Path level: [header/line item match]. 2. Field name: [similarity]. 3. Parent: [alignment]",
-  "dataTypeMatch": "high|medium|low",
-  "semanticMatch": "high|medium|low"
-}
-
-REMEMBER: PATH STRUCTURE MATCH IS MANDATORY! Field name similarity is secondary.
-Return ONLY JSON, no markdown.`;
+Return JSON only:
+{"targetElementIndex": <0-${limitedTargetNodes.length - 1}>, "confidence": <0-100>, "reasoning": "<10 words>", "dataTypeMatch": "high|medium|low", "semanticMatch": "high|medium|low"}`;
 
         console.log('📤 Requesting AI mapping suggestion...');
         const aiResponse = await makeDirectGeminiRequest(prompt, GEMINI_API_KEY);
@@ -667,23 +634,56 @@ Return ONLY JSON, no markdown.`;
             throw new Error('AI suggested an invalid target element index');
         }
         
+        // 🔒 CRITICAL: Validate that both source and target are LEAF NODES
+        const sourceIsLeaf = sourceNode.isLeaf !== false && (!sourceNode.children || sourceNode.children.length === 0);
+        const targetIsLeaf = selectedTarget.isLeaf !== false && (!selectedTarget.children || selectedTarget.children.length === 0);
+        
+        // Additional leaf validation: check for example values
+        const sourceHasValue = sourceValue || sourceNode.exampleValue || sourceNode.value;
+        const targetHasValue = targetValue || selectedTarget.exampleValue || selectedTarget.value;
+        
+        console.log(`🔍 Leaf Node Validation:`);
+        console.log(`   Source "${sourceFieldName}": isLeaf=${sourceIsLeaf}, hasValue=${!!sourceHasValue}`);
+        console.log(`   Target "${selectedTarget.name}": isLeaf=${targetIsLeaf}, hasValue=${!!targetHasValue}`);
+        
+        // Penalize confidence if leaf node validation fails
+        let adjustedConfidence = suggestion.confidence || 50;
+        if (!sourceIsLeaf || !targetIsLeaf) {
+            console.log(`⚠️  WARNING: Non-leaf node detected! Reducing confidence.`);
+            adjustedConfidence = Math.min(adjustedConfidence * 0.5, 30); // Cap at 30% for non-leaf
+        }
+        if (!sourceHasValue && !targetHasValue) {
+            console.log(`⚠️  WARNING: Both nodes lack values! Reducing confidence.`);
+            adjustedConfidence = Math.min(adjustedConfidence * 0.6, 40); // Further reduce if no values
+        }
+        
         console.log(`✅ Final selected target:`, {
             name: selectedTarget.name,
             path: selectedTarget.path,
-            type: selectedTarget.type
+            type: selectedTarget.type,
+            isLeaf: targetIsLeaf,
+            originalConfidence: suggestion.confidence,
+            adjustedConfidence: Math.round(adjustedConfidence)
         });
 
         return {
             suggestion: {
                 sourceElement: sourceNode,
                 targetElement: selectedTarget,
-                confidence: Math.min(100, Math.max(0, suggestion.confidence || 50)),
+                confidence: Math.min(100, Math.max(0, adjustedConfidence)),
                 reasoning: suggestion.reasoning || 'AI analysis completed',
                 metadata: {
                     aiModel: 'gemini-2.5-flash',
                     timestamp: new Date().toISOString(),
                     dataTypeMatch: suggestion.dataTypeMatch || 'unknown',
-                    semanticMatch: suggestion.semanticMatch || 'unknown'
+                    semanticMatch: suggestion.semanticMatch || 'unknown',
+                    leafNodeValidation: {
+                        sourceIsLeaf,
+                        targetIsLeaf,
+                        sourceHasValue: !!sourceHasValue,
+                        targetHasValue: !!targetHasValue,
+                        confidenceAdjusted: adjustedConfidence !== suggestion.confidence
+                    }
                 }
             }
         };
@@ -707,11 +707,18 @@ async function generateBatchMappingSuggestions(sourceNodes, targetNodes, context
         console.log(`🚀 Starting batch AI suggestions for ${sourceNodes.length} elements...`);
         console.log(`📊 Processing with ${targetNodes.length} target candidates per source`);
         
+        // OPTIMIZATION: Fast mode for batches ≤6 (increased from 3 for better UX)
+        const isFastMode = sourceNodes.length <= 6;
+        
         // Process requests with controlled concurrency to avoid rate limiting
-        // Reduced from 3 to 2 concurrent requests to prevent 429 errors
-        const CONCURRENT_LIMIT = 2;
-        const DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
+        // OPTIMIZED: Increased concurrent limit for faster processing
+        const CONCURRENT_LIMIT = 6; // Increased from 3 for faster batch processing
+        const DELAY_BETWEEN_BATCHES = isFastMode ? 0 : 300; // Reduced from 500ms
         const suggestions = [];
+        
+        if (isFastMode) {
+            console.log(`⚡ FAST MODE: Processing all ${sourceNodes.length} in parallel (no delays)`);
+        }
         
         for (let i = 0; i < sourceNodes.length; i += CONCURRENT_LIMIT) {
             const batch = sourceNodes.slice(i, i + CONCURRENT_LIMIT);
@@ -735,14 +742,14 @@ async function generateBatchMappingSuggestions(sourceNodes, targetNodes, context
             const batchResults = await Promise.all(batchPromises);
             suggestions.push(...batchResults);
             
-            // Add delay between batches to prevent rate limiting (except for last batch)
-            if (i + CONCURRENT_LIMIT < sourceNodes.length) {
+            // Add delay between batches to prevent rate limiting (except for last batch or fast mode)
+            if (i + CONCURRENT_LIMIT < sourceNodes.length && !isFastMode) {
                 console.log(`⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...`);
                 await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
             }
         }
         
-        console.log(`🎉 Batch processing complete: ${suggestions.length} suggestions generated`);
+        console.log(`🎉 Batch processing complete: ${suggestions.length} suggestions generated${isFastMode ? ' (FAST MODE)' : ''}`);
         return suggestions;
         
     } catch (error) {

@@ -8,42 +8,64 @@ import styles from './AIBatchSuggestionModal.module.css';
  * @param {Array} props.suggestions - Array of AI suggestion objects
  * @param {Function} props.onAcceptAll - Accept all suggestions handler
  * @param {Function} props.onAcceptSuggestion - Accept individual suggestion handler
+ * @param {Function} props.onDeleteSuggestion - Delete/dismiss suggestion handler (triggers dynamic loading)
  * @param {Function} props.onRegenerateAll - Regenerate all suggestions handler
  * @param {Function} props.onRegenerateOne - Regenerate single suggestion handler
  * @param {Function} props.onClose - Close handler
  * @param {boolean} props.loading - Loading state for regenerate
  * @param {boolean} props.isLoadingMore - Loading more suggestions in background
  * @param {number} props.remainingCount - Total unmapped elements remaining
+ * @param {Array} props.existingMappings - Existing mappings to filter duplicates
  */
 export function AIBatchSuggestionModal({ 
     suggestions = [], 
     onAcceptAll, 
     onAcceptSuggestion,
+    onDeleteSuggestion,
     onRegenerateAll,
     onRegenerateOne,
     onClose,
     loading = false,
     isLoadingMore = false,
-    remainingCount = 0
+    remainingCount = 0,
+    existingMappings = []
 }) {
     const [selectedSuggestions, setSelectedSuggestions] = useState(new Set());
     const [regeneratingIndex, setRegeneratingIndex] = useState(null);
     const [acceptedIndices, setAcceptedIndices] = useState(new Set());
     const [removingIndices, setRemovingIndices] = useState(new Set());
 
-    // Auto-close modal if all suggestions have been accepted
+    // Auto-close modal only if all suggestions accepted AND not loading more AND no remaining unmapped elements
     useEffect(() => {
         if (suggestions && suggestions.length > 0) {
-            const visibleCount = suggestions.filter((_, index) => !acceptedIndices.has(index)).length;
-            if (visibleCount === 0 && !loading) {
-                // All suggestions accepted, close modal after a short delay
+            // Check visible suggestions (not accepted and not already mapped)
+            const visibleSuggestions = suggestions.filter((suggestion, index) => {
+                if (acceptedIndices.has(index)) return false;
+                
+                const sourcePath = suggestion.sourceElement?.path || suggestion.sourceElement;
+                const targetPath = suggestion.targetElement?.path || suggestion.targetElement;
+                const isAlreadyMapped = existingMappings?.some(m => 
+                    m.source === sourcePath && m.target === targetPath
+                );
+                
+                return !isAlreadyMapped;
+            });
+            
+            // Only auto-close if:
+            // 1. No visible suggestions remaining
+            // 2. Not currently loading (initial or dynamic)
+            // 3. No unmapped leaf nodes remaining
+            if (visibleSuggestions.length === 0 && !loading && !isLoadingMore && remainingCount === 0) {
+                console.log('[Modal Auto-Close] All conditions met: closing modal');
                 const timer = setTimeout(() => {
                     onClose();
                 }, 800);
                 return () => clearTimeout(timer);
+            } else if (visibleSuggestions.length === 0 && remainingCount > 0) {
+                console.log(`[Modal Auto-Close] Waiting for more suggestions. Remaining: ${remainingCount}, Loading: ${isLoadingMore}`);
             }
         }
-    }, [suggestions, acceptedIndices, loading, onClose]);
+    }, [suggestions, acceptedIndices, loading, isLoadingMore, remainingCount, onClose, existingMappings]);
 
     if (!suggestions || suggestions.length === 0) return null;
 
@@ -101,6 +123,24 @@ export function AIBatchSuggestionModal({
         }, 600); // Match animation duration
     };
 
+    const handleDeleteSuggestion = (index) => {
+        // Mark as removing with animation
+        setRemovingIndices(new Set([index]));
+        
+        // Call parent handler with empty array (no mapping created, but triggers dynamic loading check)
+        // This ensures dynamic loading is triggered when suggestions get low
+        if (onDeleteSuggestion) {
+            const suggestion = suggestions[index];
+            onDeleteSuggestion(suggestion, index);
+        }
+        
+        // After animation completes, mark as accepted (hidden)
+        setTimeout(() => {
+            setAcceptedIndices(prev => new Set([...prev, index]));
+            setRemovingIndices(new Set());
+        }, 600); // Match animation duration
+    };
+
     const handleRegenerateOne = async (index) => {
         setRegeneratingIndex(index);
         const suggestion = suggestions[index];
@@ -114,8 +154,13 @@ export function AIBatchSuggestionModal({
         return 'low';
     };
 
-    // Filter out accepted suggestions for display counts
-    const visibleSuggestions = suggestions.filter((_, index) => !acceptedIndices.has(index));
+    // Create a set of already mapped source paths from existing mappings
+    const mappedSourcePaths = new Set(existingMappings.map(m => m.source));
+
+    // Filter out accepted suggestions and already mapped ones for display counts
+    const visibleSuggestions = suggestions.filter((s, index) => 
+        !acceptedIndices.has(index) && !mappedSourcePaths.has(s.sourceElement?.path)
+    );
     const averageConfidence = visibleSuggestions.reduce((sum, s) => sum + (s.confidence || 0), 0) / (visibleSuggestions.length || 1);
 
     return (
@@ -132,11 +177,17 @@ export function AIBatchSuggestionModal({
                             <h2>AI Mapping Suggestions</h2>
                             <p className={styles.subtitle}>
                                 {visibleSuggestions.length} suggestions • Avg confidence: {Math.round(averageConfidence)}%
-                                {isLoadingMore && remainingCount > 0 && (
+                                {remainingCount > 0 && (
+                                    <span className={styles.remainingIndicator}>
+                                        {' • '}
+                                        {remainingCount} unmapped leaf elements
+                                    </span>
+                                )}
+                                {isLoadingMore && (
                                     <span className={styles.loadingMoreIndicator}>
                                         {' • '}
                                         <span className={styles.smallSpinner}></span>
-                                        {' Loading more... ({remainingCount} in queue)'}
+                                        {' Loading more...'}
                                     </span>
                                 )}
                             </p>
@@ -208,8 +259,11 @@ export function AIBatchSuggestionModal({
                 {/* Suggestions List */}
                 <div className={styles.suggestionsList}>
                     {suggestions.map((suggestion, index) => {
-                        // Skip if already accepted
+                        // Skip if already accepted in this session
                         if (acceptedIndices.has(index)) return null;
+                        
+                        // Skip if already mapped (from existing mappings)
+                        if (mappedSourcePaths.has(suggestion.sourceElement?.path)) return null;
                         
                         const confidence = Math.round(suggestion.confidence || 0);
                         const confidenceLevel = getConfidenceLevel(confidence);
@@ -285,6 +339,16 @@ export function AIBatchSuggestionModal({
                                         Accept This Mapping
                                     </button>
                                     <button 
+                                        className={styles.deleteButton}
+                                        onClick={() => handleDeleteSuggestion(index)}
+                                        disabled={loading || regeneratingIndex === index || isRemoving}
+                                        title="Delete this suggestion"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" strokeWidth="2"/>
+                                        </svg>
+                                    </button>
+                                    <button 
                                         className={styles.regenerateIndividualButton}
                                         onClick={() => handleRegenerateOne(index)}
                                         disabled={loading || regeneratingIndex !== null}
@@ -308,6 +372,17 @@ export function AIBatchSuggestionModal({
                             </div>
                         );
                     })}
+                    
+                    {/* Loading More Indicator */}
+                    {isLoadingMore && (
+                        <div className={styles.loadingMoreIndicator}>
+                            <div className={styles.spinner}></div>
+                            <span>Loading more suggestions...</span>
+                            <span className={styles.remainingCount}>
+                                ({remainingCount} elements remaining)
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
