@@ -23,6 +23,20 @@ const {
     setRLSContext
 } = require('./utils/lambdaSecurity');
 
+// --- Enhanced Audit Logging ---
+const {
+    logAuthenticationAttempt,
+    logUserRegistration,
+    logTransformationRequest,
+    logXMLSecurityThreat,
+    logAPIKeyCreation,
+    logAPIKeyDeletion,
+    logMappingCreation,
+    logMappingUpdate,
+    logMappingDeletion,
+    logPasswordChange
+} = require('./utils/auditLogger');
+
 // --- Database Connection ---
 const pool = require('./db');
 
@@ -397,6 +411,15 @@ exports.handler = async (event) => {
                         console.error(`[SECURITY] XML validation failed for ${path}:`, validation.error);
                         console.error(`[SECURITY] XML preview:`, sanitizeXmlForLogging(xmlToValidate));
                         
+                        // Log XML security threat
+                        await logXMLSecurityThreat(
+                            pool,
+                            path,
+                            validation.threatType || 'INVALID_XML',
+                            validation.severity || 'MEDIUM',
+                            event
+                        );
+                        
                         return createResponse(400, JSON.stringify({
                             error: 'XML Security Validation Failed',
                             details: validation.error,
@@ -575,6 +598,9 @@ exports.handler = async (event) => {
 
                     await client.query('COMMIT');
                     
+                    // Log successful user registration
+                    await logUserRegistration(pool, userId, email, event);
+                    
                     return createResponse(201, JSON.stringify({
                         message: 'Registration successful',
                         user: { id: userId, email, username }
@@ -617,6 +643,9 @@ exports.handler = async (event) => {
                 );
 
                 if (result.rows.length === 0) {
+                    // Log failed authentication - user not found
+                    await logAuthenticationAttempt(pool, email, false, event, 'User not found');
+                    
                     return createResponse(401, JSON.stringify({
                         error: 'Invalid credentials'
                     }));
@@ -626,10 +655,16 @@ exports.handler = async (event) => {
                 const validPassword = await bcrypt.compare(password, user.password);
 
                 if (!validPassword) {
+                    // Log failed authentication - invalid password
+                    await logAuthenticationAttempt(pool, email, false, event, 'Invalid password');
+                    
                     return createResponse(401, JSON.stringify({
                         error: 'Invalid credentials'
                     }));
                 }
+
+                // Log successful authentication
+                await logAuthenticationAttempt(pool, email, true, event);
 
                 const token = jwt.sign(
                     { id: user.id, email: user.email },
@@ -648,6 +683,9 @@ exports.handler = async (event) => {
 
             } catch (err) {
                 console.error('Login error:', err);
+                // Log system error during login
+                await logAuthenticationAttempt(pool, email, false, event, `System error: ${err.message}`);
+                
                 return createResponse(500, JSON.stringify({
                     error: 'Login failed',
                     details: err.message
