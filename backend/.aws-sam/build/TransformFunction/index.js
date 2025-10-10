@@ -11,6 +11,32 @@ const { generateMappingSuggestion, generateBatchMappingSuggestions, checkAIFeatu
 const db = require('./db');
 const userService = require('./services/user.service');
 
+// --- Security Utilities ---
+const {
+    validateXmlSecurity,
+    validateTransformationSafety,
+    sanitizeXmlForLogging,
+    requirePermission,
+    requireRole,
+    requireResourceAccess,
+    logSecurityEvent,
+    setRLSContext
+} = require('./utils/lambdaSecurity');
+
+// --- Enhanced Audit Logging ---
+const {
+    logAuthenticationAttempt,
+    logUserRegistration,
+    logTransformationRequest,
+    logXMLSecurityThreat,
+    logAPIKeyCreation,
+    logAPIKeyDeletion,
+    logMappingCreation,
+    logMappingUpdate,
+    logMappingDeletion,
+    logPasswordChange
+} = require('./utils/auditLogger');
+
 // --- Database Connection ---
 const pool = require('./db');
 
@@ -172,7 +198,15 @@ const createResponse = (statusCode, body, contentType = 'application/json') => (
         "Content-Type": contentType,
         "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+        // Security Headers (ISO 27001 - A.13.1)
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:3000 http://localhost:5173; font-src 'self' data:; object-src 'none'; frame-src 'none'",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
     }
 });
 
@@ -246,6 +280,83 @@ const verifyApiKey = async (apiKey) => {
     }
 };
 
+/**
+ * Helper function to check RBAC permissions for API settings endpoints
+ * @param {number} userId - User ID from JWT
+ * @param {string} path - Request path
+ * @param {string} method - HTTP method
+ * @returns {Promise<Object>} { authorized: boolean, error?: string, requiredPermission?: string }
+ */
+async function checkApiSettingsPermission(userId, path, method) {
+    // Map endpoints to required permissions
+    const permissionMap = {
+        'GET:/api-settings/keys': 'manage_api_keys',
+        'POST:/api-settings/keys': 'manage_api_keys',
+        'DELETE:/api-settings/keys': 'manage_api_keys',
+        'PATCH:/api-settings/keys': 'manage_api_keys',
+        
+        'GET:/api-settings/webhook': 'manage_webhooks',
+        'POST:/api-settings/webhook': 'manage_webhooks',
+        
+        'GET:/api-settings/output-delivery': 'manage_output_delivery',
+        'POST:/api-settings/output-delivery': 'manage_output_delivery',
+        
+        'GET:/api-settings/mappings': 'manage_mappings',
+        'POST:/api-settings/mappings': 'manage_mappings',
+        'PUT:/api-settings/mappings': 'manage_mappings',
+        'DELETE:/api-settings/mappings': 'manage_mappings'
+    };
+    
+    // Determine the base endpoint (remove IDs from path)
+    let baseEndpoint = path;
+    
+    // Normalize paths with IDs (e.g., /api-settings/keys/123 -> /api-settings/keys)
+    if (path.includes('/api-settings/keys/') && !path.endsWith('/set-mapping') && !path.endsWith('/toggle')) {
+        baseEndpoint = '/api-settings/keys';
+    } else if (path.includes('/api-settings/mappings/') && !path.endsWith('/mappings')) {
+        baseEndpoint = '/api-settings/mappings';
+    } else if (path.includes('/api-settings/keys/') && path.endsWith('/toggle')) {
+        baseEndpoint = '/api-settings/keys';
+        method = 'PATCH';
+    } else if (path.includes('/api-settings/keys/') && path.endsWith('/set-mapping')) {
+        baseEndpoint = '/api-settings/keys';
+        method = 'PATCH';
+    }
+    
+    const permissionKey = `${method}:${baseEndpoint}`;
+    const requiredPermission = permissionMap[permissionKey];
+    
+    if (!requiredPermission) {
+        // No specific permission required for this endpoint
+        return { authorized: true };
+    }
+    
+    // Check if user has the required permission
+    const authResult = await requirePermission(pool, userId, requiredPermission);
+    
+    if (!authResult.authorized) {
+        return {
+            authorized: false,
+            error: authResult.error,
+            requiredPermission
+        };
+    }
+    
+    // Log successful authorization
+    await logSecurityEvent(
+        pool,
+        userId,
+        'authorization_success',
+        'api_settings',
+        null,
+        requiredPermission,
+        true,
+        { path, method }
+    );
+    
+    return { authorized: true, requiredPermission };
+}
+
 exports.handler = async (event) => {
     if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
         return {
@@ -270,6 +381,158 @@ exports.handler = async (event) => {
         const body = isWebhookTransformEndpoint 
             ? event.body 
             : ((event.body && typeof event.body === 'string') ? JSON.parse(event.body) : event.body || {});
+
+        // ============================================================================
+        // SECURITY VALIDATION - XML Input Validation (XXE, Billion Laughs Prevention)
+        // ============================================================================
+        
+        // List of endpoints that handle XML transformation (require XML security validation)
+        const xmlTransformationEndpoints = [
+            '/transform',
+            '/transform-json',
+            '/api/transform',
+            '/api/webhook/transform',
+            '/schema/parse'
+        ];
+        
+        // Check if current request is for an XML transformation endpoint
+        const isXmlTransformationRequest = xmlTransformationEndpoints.some(endpoint => path === endpoint || path.endsWith(endpoint));
+        
+        if (isXmlTransformationRequest && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                // For webhook transform, body is already raw XML string
+                // For other endpoints, body is parsed JSON with sourceXml field
+                const xmlToValidate = isWebhookTransformEndpoint ? body : body.sourceXml;
+                const destinationXml = isWebhookTransformEndpoint ? null : body.destinationXml;
+                
+                // Validate source XML if present
+                if (xmlToValidate && typeof xmlToValidate === 'string') {
+                    const validation = validateXmlSecurity(xmlToValidate, {
+                        maxSize: 50 * 1024 * 1024, // 50MB
+                        maxDepth: 100,
+                        maxElements: 10000,
+                        allowDTD: false,
+                        allowExternalEntities: false
+                    });
+                    
+                    if (!validation.isValid) {
+                        console.error(`[SECURITY] XML validation failed for ${path}:`, validation.error);
+                        console.error(`[SECURITY] XML preview:`, sanitizeXmlForLogging(xmlToValidate));
+                        
+                        // Log XML security threat
+                        await logXMLSecurityThreat(
+                            pool,
+                            path,
+                            validation.threatType || 'INVALID_XML',
+                            validation.severity || 'MEDIUM',
+                            event
+                        );
+                        
+                        return createResponse(400, JSON.stringify({
+                            error: 'XML Security Validation Failed',
+                            details: validation.error,
+                            threatType: validation.threatType || 'INVALID_XML',
+                            severity: validation.severity || 'MEDIUM'
+                        }));
+                    }
+                    
+                    console.log(`[SECURITY] Source XML validation passed for ${path} (${(validation.sizeInBytes / 1024).toFixed(2)}KB)`);
+                }
+                
+                // Validate destination XML if present
+                if (destinationXml && typeof destinationXml === 'string') {
+                    const destValidation = validateXmlSecurity(destinationXml, {
+                        maxSize: 50 * 1024 * 1024,
+                        maxDepth: 100,
+                        maxElements: 10000,
+                        allowDTD: false,
+                        allowExternalEntities: false
+                    });
+                    
+                    if (!destValidation.isValid) {
+                        console.error(`[SECURITY] Destination XML validation failed for ${path}:`, destValidation.error);
+                        
+                        return createResponse(400, JSON.stringify({
+                            error: 'Destination XML Security Validation Failed',
+                            details: destValidation.error,
+                            threatType: destValidation.threatType || 'INVALID_XML',
+                            severity: destValidation.severity || 'MEDIUM'
+                        }));
+                    }
+                    
+                    console.log(`[SECURITY] Destination XML validation passed for ${path}`);
+                }
+                
+            } catch (validationError) {
+                console.error('[SECURITY] XML validation error:', validationError);
+                return createResponse(500, JSON.stringify({
+                    error: 'Security validation failed',
+                    details: validationError.message
+                }));
+            }
+        }
+
+        // ============================================================================
+        // SECURITY VALIDATION - RBAC (Role-Based Access Control) for API Settings
+        // ============================================================================
+        
+        // Check if this is an API settings endpoint (requires RBAC)
+        const isApiSettingsEndpoint = path.includes('/api-settings/');
+        
+        if (isApiSettingsEndpoint) {
+            try {
+                // First verify JWT to get user identity
+                let user;
+                try {
+                    user = await verifyJWT(event);
+                } catch (jwtError) {
+                    console.error('[RBAC] JWT verification failed for API settings endpoint:', jwtError.message);
+                    
+                    await logSecurityEvent(
+                        pool,
+                        null, // No user ID available
+                        'authentication_failed',
+                        'api_settings',
+                        null,
+                        path,
+                        false,
+                        { error: jwtError.message, path }
+                    );
+                    
+                    return createResponse(401, JSON.stringify({
+                        error: 'Authentication required',
+                        details: jwtError.message
+                    }));
+                }
+                
+                // Set PostgreSQL Row-Level Security context
+                await setRLSContext(pool, user.id);
+                
+                // Check RBAC permissions for API settings
+                const method = event.httpMethod || event.requestContext?.http?.method;
+                const rbacCheck = await checkApiSettingsPermission(user.id, path, method);
+                
+                if (!rbacCheck.authorized) {
+                    console.error(`[RBAC] Access denied for user ${user.id} to ${method} ${path}:`, rbacCheck.error);
+                    
+                    return createResponse(403, JSON.stringify({
+                        error: 'Access Denied',
+                        details: rbacCheck.error,
+                        requiredPermission: rbacCheck.requiredPermission,
+                        message: 'You do not have the required permissions to access this resource'
+                    }));
+                }
+                
+                console.log(`[RBAC] Access granted for user ${user.id} to ${method} ${path} (permission: ${rbacCheck.requiredPermission || 'N/A'})`);
+                
+            } catch (rbacError) {
+                console.error('[RBAC] RBAC validation error:', rbacError);
+                return createResponse(500, JSON.stringify({
+                    error: 'Authorization check failed',
+                    details: rbacError.message
+                }));
+            }
+        }
 
                 // --- Authentication Endpoints ---
         if (path.endsWith('/auth/register')) {
@@ -343,6 +606,9 @@ exports.handler = async (event) => {
 
                     await client.query('COMMIT');
                     
+                    // Log successful user registration
+                    await logUserRegistration(pool, userId, email, event);
+                    
                     return createResponse(201, JSON.stringify({
                         message: 'Registration successful',
                         user: { id: userId, email, username }
@@ -385,6 +651,9 @@ exports.handler = async (event) => {
                 );
 
                 if (result.rows.length === 0) {
+                    // Log failed authentication - user not found
+                    await logAuthenticationAttempt(pool, email, false, event, 'User not found');
+                    
                     return createResponse(401, JSON.stringify({
                         error: 'Invalid credentials'
                     }));
@@ -394,10 +663,16 @@ exports.handler = async (event) => {
                 const validPassword = await bcrypt.compare(password, user.password);
 
                 if (!validPassword) {
+                    // Log failed authentication - invalid password
+                    await logAuthenticationAttempt(pool, email, false, event, 'Invalid password');
+                    
                     return createResponse(401, JSON.stringify({
                         error: 'Invalid credentials'
                     }));
                 }
+
+                // Log successful authentication
+                await logAuthenticationAttempt(pool, email, true, event);
 
                 const token = jwt.sign(
                     { id: user.id, email: user.email },
@@ -416,6 +691,9 @@ exports.handler = async (event) => {
 
             } catch (err) {
                 console.error('Login error:', err);
+                // Log system error during login
+                await logAuthenticationAttempt(pool, email, false, event, `System error: ${err.message}`);
+                
                 return createResponse(500, JSON.stringify({
                     error: 'Login failed',
                     details: err.message
@@ -631,6 +909,7 @@ exports.handler = async (event) => {
                 // Verify current password
                 const validPassword = await bcrypt.compare(currentPassword, user.password);
                 if (!validPassword) {
+                    await logPasswordChange(pool, userId, false, event, 'Current password is incorrect');
                     return createResponse(400, JSON.stringify({
                         error: 'Current password is incorrect'
                     }));
@@ -645,6 +924,9 @@ exports.handler = async (event) => {
                     SET password = $1, updated_at = CURRENT_TIMESTAMP
                     WHERE id = $2
                 `, [hashedNewPassword, userId]);
+
+                // Log successful password change
+                await logPasswordChange(pool, userId, true, event);
 
                 return createResponse(200, JSON.stringify({
                     message: 'Password changed successfully'
@@ -870,6 +1152,11 @@ exports.handler = async (event) => {
                         [user.id, keyName.trim(), apiKey, hashedSecret, expiresAt]
                     );
                     
+                    const apiKeyId = result.rows[0].id;
+                    
+                    // Log API key creation
+                    await logAPIKeyCreation(pool, user.id, apiKeyId, keyName.trim(), event);
+                    
                     return createResponse(200, JSON.stringify({
                         ...result.rows[0],
                         api_secret: apiSecret,
@@ -894,6 +1181,12 @@ exports.handler = async (event) => {
                 
                 const client = await pool.connect();
                 try {
+                    // Get key name before deletion for logging
+                    const keyResult = await client.query(
+                        'SELECT key_name FROM api_keys WHERE id = $1 AND user_id = $2',
+                        [keyId, user.id]
+                    );
+                    
                     const result = await client.query(
                         'DELETE FROM api_keys WHERE id = $1 AND user_id = $2 RETURNING id',
                         [keyId, user.id]
@@ -901,6 +1194,11 @@ exports.handler = async (event) => {
                     
                     if (result.rows.length === 0) {
                         return createResponse(404, JSON.stringify({ error: 'API key not found' }));
+                    }
+                    
+                    // Log API key deletion
+                    if (keyResult.rows.length > 0) {
+                        await logAPIKeyDeletion(pool, user.id, keyId, keyResult.rows[0].key_name, event);
                     }
                     
                     return createResponse(200, JSON.stringify({ message: 'API key deleted successfully' }));
@@ -1174,7 +1472,13 @@ exports.handler = async (event) => {
                         [user.id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml || null, is_default || false]
                     );
                     
+                    const mappingId = result.rows[0].id;
+                    
                     await client.query('COMMIT');
+                    
+                    // Log mapping creation
+                    await logMappingCreation(pool, user.id, mappingId, mapping_name, event);
+                    
                     return createResponse(201, JSON.stringify(result.rows[0]));
                 } catch (err) {
                     await client.query('ROLLBACK');
@@ -1230,6 +1534,10 @@ exports.handler = async (event) => {
                     }
                     
                     await client.query('COMMIT');
+                    
+                    // Log mapping update
+                    await logMappingUpdate(pool, user.id, mappingId, result.rows[0].mapping_name, event);
+                    
                     return createResponse(200, JSON.stringify(result.rows[0]));
                 } catch (err) {
                     await client.query('ROLLBACK');
@@ -1250,6 +1558,12 @@ exports.handler = async (event) => {
                 
                 const client = await pool.connect();
                 try {
+                    // Get mapping name before deletion for logging
+                    const mappingResult = await client.query(
+                        'SELECT mapping_name FROM transformation_mappings WHERE id = $1 AND user_id = $2',
+                        [mappingId, user.id]
+                    );
+                    
                     const result = await client.query(
                         'DELETE FROM transformation_mappings WHERE id = $1 AND user_id = $2 RETURNING id',
                         [mappingId, user.id]
@@ -1257,6 +1571,11 @@ exports.handler = async (event) => {
                     
                     if (result.rows.length === 0) {
                         return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                    }
+                    
+                    // Log mapping deletion
+                    if (mappingResult.rows.length > 0) {
+                        await logMappingDeletion(pool, user.id, mappingId, mappingResult.rows[0].mapping_name, event);
                     }
                     
                     return createResponse(200, JSON.stringify({ message: 'Mapping deleted successfully' }));
@@ -1484,6 +1803,509 @@ exports.handler = async (event) => {
                 return createResponse(500, JSON.stringify({ 
                     error: 'Failed to check AI access', 
                     details: err.message 
+                }));
+            }
+        }
+
+        // ============================================================================
+        // PHASE 4: SECURITY MONITORING DASHBOARD API (ISO 27001 A.12.4.2)
+        // ============================================================================
+        
+        // GET /api/admin/audit/recent - Retrieve recent security audit events
+        if (path === '/api/admin/audit/recent' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                // Verify authentication
+                const user = await verifyJWT(event);
+                
+                // Check permission: view_audit_log (admin only)
+                const permissionCheck = await requirePermission(pool, user.id, 'view_audit_log');
+                if (!permissionCheck.authorized) {
+                    return createResponse(403, JSON.stringify({
+                        error: 'Access Denied',
+                        details: permissionCheck.error,
+                        requiredPermission: 'view_audit_log'
+                    }));
+                }
+                
+                // Parse query parameters
+                const queryParams = event.queryStringParameters || {};
+                const limit = parseInt(queryParams.limit) || 100;
+                const offset = parseInt(queryParams.offset) || 0;
+                const eventType = queryParams.event_type || null;
+                const success = queryParams.success !== undefined ? queryParams.success === 'true' : null;
+                
+                // Build query
+                let query = `
+                    SELECT 
+                        sal.id,
+                        sal.user_id,
+                        u.email,
+                        u.username,
+                        sal.event_type,
+                        sal.resource_type,
+                        sal.resource_id,
+                        sal.action,
+                        sal.success,
+                        sal.ip_address,
+                        sal.user_agent,
+                        sal.metadata,
+                        sal.created_at
+                    FROM security_audit_log sal
+                    LEFT JOIN users u ON sal.user_id = u.id
+                    WHERE 1=1
+                `;
+                
+                const params = [];
+                let paramIndex = 1;
+                
+                if (eventType) {
+                    query += ` AND sal.event_type = $${paramIndex}`;
+                    params.push(eventType);
+                    paramIndex++;
+                }
+                
+                if (success !== null) {
+                    query += ` AND sal.success = $${paramIndex}`;
+                    params.push(success);
+                    paramIndex++;
+                }
+                
+                query += ` ORDER BY sal.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+                params.push(limit, offset);
+                
+                const result = await pool.query(query, params);
+                
+                // Log access to audit log
+                await logSecurityEvent(pool, user.id, 'audit_access', 'audit_log', null, 'recent_events', true, {
+                    limit,
+                    offset,
+                    eventType,
+                    success,
+                    recordsReturned: result.rows.length
+                });
+                
+                return createResponse(200, JSON.stringify({
+                    events: result.rows,
+                    pagination: {
+                        limit,
+                        offset,
+                        returned: result.rows.length
+                    }
+                }));
+                
+            } catch (err) {
+                console.error('Audit recent events error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to retrieve audit events',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // GET /api/admin/audit/failed-auth - Failed authentication attempts
+        if (path === '/api/admin/audit/failed-auth' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                // Verify authentication
+                const user = await verifyJWT(event);
+                
+                // Check permission: view_audit_log (admin only)
+                const permissionCheck = await requirePermission(pool, user.id, 'view_audit_log');
+                if (!permissionCheck.authorized) {
+                    return createResponse(403, JSON.stringify({
+                        error: 'Access Denied',
+                        details: permissionCheck.error,
+                        requiredPermission: 'view_audit_log'
+                    }));
+                }
+                
+                // Parse query parameters
+                const queryParams = event.queryStringParameters || {};
+                const days = parseInt(queryParams.days) || 7;
+                const limit = parseInt(queryParams.limit) || 100;
+                
+                // Query failed authentication attempts
+                const result = await pool.query(`
+                    SELECT 
+                        sal.id,
+                        sal.user_id,
+                        u.email,
+                        u.username,
+                        sal.action,
+                        sal.ip_address,
+                        sal.user_agent,
+                        sal.metadata,
+                        sal.created_at
+                    FROM security_audit_log sal
+                    LEFT JOIN users u ON sal.user_id = u.id
+                    WHERE sal.event_type = 'authentication'
+                      AND sal.success = false
+                      AND sal.created_at >= NOW() - INTERVAL '${days} days'
+                    ORDER BY sal.created_at DESC
+                    LIMIT $1
+                `, [limit]);
+                
+                // Aggregate by IP address for threat analysis
+                const ipAggregation = await pool.query(`
+                    SELECT 
+                        sal.ip_address,
+                        COUNT(*) as attempt_count,
+                        MAX(sal.created_at) as last_attempt,
+                        array_agg(DISTINCT u.email) as targeted_emails
+                    FROM security_audit_log sal
+                    LEFT JOIN users u ON sal.user_id = u.id
+                    WHERE sal.event_type = 'authentication'
+                      AND sal.success = false
+                      AND sal.created_at >= NOW() - INTERVAL '${days} days'
+                      AND sal.ip_address IS NOT NULL
+                    GROUP BY sal.ip_address
+                    HAVING COUNT(*) > 3
+                    ORDER BY attempt_count DESC
+                    LIMIT 20
+                `);
+                
+                // Log access
+                await logSecurityEvent(pool, user.id, 'audit_access', 'audit_log', null, 'failed_auth', true, {
+                    days,
+                    limit,
+                    recordsReturned: result.rows.length
+                });
+                
+                return createResponse(200, JSON.stringify({
+                    failed_attempts: result.rows,
+                    suspicious_ips: ipAggregation.rows,
+                    period_days: days,
+                    total_failed: result.rows.length
+                }));
+                
+            } catch (err) {
+                console.error('Failed auth query error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to retrieve authentication failures',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // GET /api/admin/audit/threats - Security threats detected
+        if (path === '/api/admin/audit/threats' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                // Verify authentication
+                const user = await verifyJWT(event);
+                
+                // Check permission: view_audit_log (admin only)
+                const permissionCheck = await requirePermission(pool, user.id, 'view_audit_log');
+                if (!permissionCheck.authorized) {
+                    return createResponse(403, JSON.stringify({
+                        error: 'Access Denied',
+                        details: permissionCheck.error,
+                        requiredPermission: 'view_audit_log'
+                    }));
+                }
+                
+                // Parse query parameters
+                const queryParams = event.queryStringParameters || {};
+                const severity = queryParams.severity || null;
+                const days = parseInt(queryParams.days) || 30;
+                const limit = parseInt(queryParams.limit) || 100;
+                
+                // Build query for security threats
+                let query = `
+                    SELECT 
+                        sal.id,
+                        sal.user_id,
+                        u.email,
+                        u.username,
+                        sal.event_type,
+                        sal.action,
+                        sal.ip_address,
+                        sal.user_agent,
+                        sal.metadata,
+                        sal.created_at
+                    FROM security_audit_log sal
+                    LEFT JOIN users u ON sal.user_id = u.id
+                    WHERE sal.event_type IN ('xml_security_threat', 'access_denied', 'suspicious_activity')
+                      AND sal.created_at >= NOW() - INTERVAL '${days} days'
+                `;
+                
+                const params = [];
+                let paramIndex = 1;
+                
+                // Filter by severity if provided (stored in metadata)
+                if (severity) {
+                    query += ` AND sal.metadata->>'severity' = $${paramIndex}`;
+                    params.push(severity.toUpperCase());
+                    paramIndex++;
+                }
+                
+                query += ` ORDER BY sal.created_at DESC LIMIT $${paramIndex}`;
+                params.push(limit);
+                
+                const result = await pool.query(query, params);
+                
+                // Get threat summary statistics
+                const threatStats = await pool.query(`
+                    SELECT 
+                        sal.event_type,
+                        sal.metadata->>'severity' as severity,
+                        sal.metadata->>'threatType' as threat_type,
+                        COUNT(*) as count
+                    FROM security_audit_log sal
+                    WHERE sal.event_type IN ('xml_security_threat', 'access_denied', 'suspicious_activity')
+                      AND sal.created_at >= NOW() - INTERVAL '${days} days'
+                    GROUP BY sal.event_type, sal.metadata->>'severity', sal.metadata->>'threatType'
+                    ORDER BY count DESC
+                `);
+                
+                // Log access
+                await logSecurityEvent(pool, user.id, 'audit_access', 'audit_log', null, 'threats', true, {
+                    severity,
+                    days,
+                    limit,
+                    recordsReturned: result.rows.length
+                });
+                
+                return createResponse(200, JSON.stringify({
+                    threats: result.rows,
+                    statistics: threatStats.rows,
+                    period_days: days,
+                    total_threats: result.rows.length
+                }));
+                
+            } catch (err) {
+                console.error('Threats query error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to retrieve security threats',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // GET /api/admin/audit/user-activity/:userId - User activity timeline
+        if (path.match(/^\/api\/admin\/audit\/user-activity\//) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                // Verify authentication
+                const user = await verifyJWT(event);
+                
+                // Check permission: view_audit_log (admin only)
+                const permissionCheck = await requirePermission(pool, user.id, 'view_audit_log');
+                if (!permissionCheck.authorized) {
+                    return createResponse(403, JSON.stringify({
+                        error: 'Access Denied',
+                        details: permissionCheck.error,
+                        requiredPermission: 'view_audit_log'
+                    }));
+                }
+                
+                // Extract userId from path
+                const pathParts = path.split('/');
+                const targetUserId = pathParts[pathParts.length - 1];
+                
+                // Parse query parameters
+                const queryParams = event.queryStringParameters || {};
+                const days = parseInt(queryParams.days) || 30;
+                const limit = parseInt(queryParams.limit) || 200;
+                const eventType = queryParams.event_type || null;
+                
+                // Build query
+                let query = `
+                    SELECT 
+                        sal.id,
+                        sal.event_type,
+                        sal.resource_type,
+                        sal.resource_id,
+                        sal.action,
+                        sal.success,
+                        sal.ip_address,
+                        sal.user_agent,
+                        sal.metadata,
+                        sal.created_at
+                    FROM security_audit_log sal
+                    WHERE sal.user_id = $1
+                      AND sal.created_at >= NOW() - INTERVAL '${days} days'
+                `;
+                
+                const params = [targetUserId];
+                let paramIndex = 2;
+                
+                if (eventType) {
+                    query += ` AND sal.event_type = $${paramIndex}`;
+                    params.push(eventType);
+                    paramIndex++;
+                }
+                
+                query += ` ORDER BY sal.created_at DESC LIMIT $${paramIndex}`;
+                params.push(limit);
+                
+                const result = await pool.query(query, params);
+                
+                // Get user info
+                const userInfo = await pool.query(`
+                    SELECT id, email, username, full_name, created_at
+                    FROM users
+                    WHERE id = $1
+                `, [targetUserId]);
+                
+                // Get activity summary
+                const activitySummary = await pool.query(`
+                    SELECT 
+                        sal.event_type,
+                        COUNT(*) as count,
+                        SUM(CASE WHEN sal.success THEN 1 ELSE 0 END) as successful,
+                        SUM(CASE WHEN NOT sal.success THEN 1 ELSE 0 END) as failed
+                    FROM security_audit_log sal
+                    WHERE sal.user_id = $1
+                      AND sal.created_at >= NOW() - INTERVAL '${days} days'
+                    GROUP BY sal.event_type
+                    ORDER BY count DESC
+                `, [targetUserId]);
+                
+                // Log access
+                await logSecurityEvent(pool, user.id, 'audit_access', 'audit_log', null, 'user_activity', true, {
+                    targetUserId,
+                    days,
+                    limit,
+                    eventType,
+                    recordsReturned: result.rows.length
+                });
+                
+                return createResponse(200, JSON.stringify({
+                    user: userInfo.rows[0] || null,
+                    activity: result.rows,
+                    summary: activitySummary.rows,
+                    period_days: days,
+                    total_events: result.rows.length
+                }));
+                
+            } catch (err) {
+                console.error('User activity query error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to retrieve user activity',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // GET /api/admin/audit/stats - Security statistics and metrics
+        if (path === '/api/admin/audit/stats' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                // Verify authentication
+                const user = await verifyJWT(event);
+                
+                // Check permission: view_audit_log (admin only)
+                const permissionCheck = await requirePermission(pool, user.id, 'view_audit_log');
+                if (!permissionCheck.authorized) {
+                    return createResponse(403, JSON.stringify({
+                        error: 'Access Denied',
+                        details: permissionCheck.error,
+                        requiredPermission: 'view_audit_log'
+                    }));
+                }
+                
+                // Parse query parameters
+                const queryParams = event.queryStringParameters || {};
+                const days = parseInt(queryParams.days) || 30;
+                
+                // Get overall statistics
+                const overallStats = await pool.query(`
+                    SELECT 
+                        COUNT(*) as total_events,
+                        SUM(CASE WHEN success THEN 1 ELSE 0 END) as successful_events,
+                        SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) as failed_events,
+                        COUNT(DISTINCT user_id) as active_users,
+                        COUNT(DISTINCT ip_address) as unique_ips
+                    FROM security_audit_log
+                    WHERE created_at >= NOW() - INTERVAL '${days} days'
+                `);
+                
+                // Event type breakdown
+                const eventTypeStats = await pool.query(`
+                    SELECT 
+                        event_type,
+                        COUNT(*) as count,
+                        SUM(CASE WHEN success THEN 1 ELSE 0 END) as successful,
+                        SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) as failed
+                    FROM security_audit_log
+                    WHERE created_at >= NOW() - INTERVAL '${days} days'
+                    GROUP BY event_type
+                    ORDER BY count DESC
+                `);
+                
+                // Top active users
+                const topUsers = await pool.query(`
+                    SELECT 
+                        u.email,
+                        u.username,
+                        COUNT(*) as event_count,
+                        MAX(sal.created_at) as last_activity
+                    FROM security_audit_log sal
+                    LEFT JOIN users u ON sal.user_id = u.id
+                    WHERE sal.created_at >= NOW() - INTERVAL '${days} days'
+                      AND sal.user_id IS NOT NULL
+                    GROUP BY u.email, u.username
+                    ORDER BY event_count DESC
+                    LIMIT 10
+                `);
+                
+                // Security threats summary
+                const threatsSummary = await pool.query(`
+                    SELECT 
+                        COUNT(*) as total_threats,
+                        SUM(CASE WHEN metadata->>'severity' = 'CRITICAL' THEN 1 ELSE 0 END) as critical_threats,
+                        SUM(CASE WHEN metadata->>'severity' = 'HIGH' THEN 1 ELSE 0 END) as high_threats,
+                        SUM(CASE WHEN metadata->>'severity' = 'MEDIUM' THEN 1 ELSE 0 END) as medium_threats
+                    FROM security_audit_log
+                    WHERE event_type IN ('xml_security_threat', 'access_denied', 'suspicious_activity')
+                      AND created_at >= NOW() - INTERVAL '${days} days'
+                `);
+                
+                // Failed authentication by day (last 7 days for trend)
+                const authTrend = await pool.query(`
+                    SELECT 
+                        DATE(created_at) as date,
+                        COUNT(*) as failed_count
+                    FROM security_audit_log
+                    WHERE event_type = 'authentication'
+                      AND success = false
+                      AND created_at >= NOW() - INTERVAL '7 days'
+                    GROUP BY DATE(created_at)
+                    ORDER BY date DESC
+                `);
+                
+                // Resource access patterns
+                const resourceStats = await pool.query(`
+                    SELECT 
+                        resource_type,
+                        action,
+                        COUNT(*) as count
+                    FROM security_audit_log
+                    WHERE created_at >= NOW() - INTERVAL '${days} days'
+                      AND resource_type IS NOT NULL
+                    GROUP BY resource_type, action
+                    ORDER BY count DESC
+                    LIMIT 20
+                `);
+                
+                // Log access
+                await logSecurityEvent(pool, user.id, 'audit_access', 'audit_log', null, 'stats', true, {
+                    days
+                });
+                
+                return createResponse(200, JSON.stringify({
+                    overview: overallStats.rows[0],
+                    event_types: eventTypeStats.rows,
+                    top_users: topUsers.rows,
+                    threats: threatsSummary.rows[0],
+                    auth_trend: authTrend.rows,
+                    resource_access: resourceStats.rows,
+                    period_days: days,
+                    generated_at: new Date().toISOString()
+                }));
+                
+            } catch (err) {
+                console.error('Stats query error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to retrieve statistics',
+                    details: err.message
                 }));
             }
         }

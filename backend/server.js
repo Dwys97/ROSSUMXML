@@ -1,15 +1,22 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const authRoutes = require('./routes/auth.routes');
 const apiSettingsRoutes = require('./routes/api-settings.routes');
 const { parseXmlToTree } = require('./services/xmlParser.service');
+const { getCorsOptions, helmetConfig } = require('./middleware/securityHeaders');
 const db = require('./db');
 
 const app = express();
 
-// Middlewares
-app.use(cors());
+// Security Headers Middleware (ISO 27001 - A.13.1)
+app.use(helmetConfig);
+
+// CORS Configuration with whitelist
+app.use(cors(getCorsOptions()));
+
+// Body parsing
 app.use(express.json());
 
 // Routes
@@ -71,5 +78,6 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🔒 Security headers enabled (ISO 27001 - A.13.1)`);
 });
