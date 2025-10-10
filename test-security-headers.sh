@@ -42,13 +42,13 @@ echo ""
 # Test 1: Check helmet dependency installed
 # ========================================
 echo -e "${BLUE}Test 1: Helmet.js Dependency${NC}"
-if grep -q '"helmet"' /home/runner/work/ROSSUMXML/ROSSUMXML/backend/package.json; then
+if grep -q '"helmet"' /workspaces/ROSSUMXML/backend/package.json; then
     print_test 0 "Helmet.js listed in package.json"
 else
     print_test 1 "Helmet.js NOT in package.json"
 fi
 
-if [ -d "/home/runner/work/ROSSUMXML/ROSSUMXML/backend/node_modules/helmet" ]; then
+if [ -d "/workspaces/ROSSUMXML/backend/node_modules/helmet" ]; then
     print_test 0 "Helmet.js installed in node_modules"
 else
     print_test 1 "Helmet.js NOT installed"
@@ -59,23 +59,23 @@ fi
 # ========================================
 echo ""
 echo -e "${BLUE}Test 2: Security Middleware File${NC}"
-if [ -f "/home/runner/work/ROSSUMXML/ROSSUMXML/backend/middleware/securityHeaders.js" ]; then
+if [ -f "/workspaces/ROSSUMXML/backend/middleware/securityHeaders.js" ]; then
     print_test 0 "securityHeaders.js middleware exists"
     
     # Check for key functions
-    if grep -q "helmetConfig" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/middleware/securityHeaders.js; then
+    if grep -q "helmetConfig" /workspaces/ROSSUMXML/backend/middleware/securityHeaders.js; then
         print_test 0 "helmetConfig function present"
     else
         print_test 1 "helmetConfig function missing"
     fi
     
-    if grep -q "secureCookieOptions" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/middleware/securityHeaders.js; then
+    if grep -q "secureCookieOptions" /workspaces/ROSSUMXML/backend/middleware/securityHeaders.js; then
         print_test 0 "secureCookieOptions configuration present"
     else
         print_test 1 "secureCookieOptions missing"
     fi
     
-    if grep -q "getCorsOptions" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/middleware/securityHeaders.js; then
+    if grep -q "getCorsOptions" /workspaces/ROSSUMXML/backend/middleware/securityHeaders.js; then
         print_test 0 "getCorsOptions function present"
     else
         print_test 1 "getCorsOptions function missing"
@@ -89,22 +89,22 @@ fi
 # ========================================
 echo ""
 echo -e "${BLUE}Test 3: Server Configuration${NC}"
-if [ -f "/home/runner/work/ROSSUMXML/ROSSUMXML/backend/server.js" ]; then
+if [ -f "/workspaces/ROSSUMXML/backend/server.js" ]; then
     print_test 0 "server.js exists in backend root"
     
-    if grep -q "require('helmet')" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/server.js; then
+    if grep -q "require('helmet')" /workspaces/ROSSUMXML/backend/server.js; then
         print_test 0 "Helmet required in server.js"
     else
         print_test 1 "Helmet NOT required in server.js"
     fi
     
-    if grep -q "helmetConfig" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/server.js; then
+    if grep -q "helmetConfig" /workspaces/ROSSUMXML/backend/server.js; then
         print_test 0 "helmetConfig middleware applied"
     else
         print_test 1 "helmetConfig middleware NOT applied"
     fi
     
-    if grep -q "getCorsOptions" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/server.js; then
+    if grep -q "getCorsOptions" /workspaces/ROSSUMXML/backend/server.js; then
         print_test 0 "CORS whitelist configuration applied"
     else
         print_test 1 "CORS whitelist NOT configured"
@@ -118,25 +118,25 @@ fi
 # ========================================
 echo ""
 echo -e "${BLUE}Test 4: Lambda Handler Security Headers${NC}"
-if grep -q "Strict-Transport-Security" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/index.js; then
+if grep -q "Strict-Transport-Security" /workspaces/ROSSUMXML/backend/index.js; then
     print_test 0 "HSTS header configured in Lambda handler"
 else
     print_test 1 "HSTS header NOT configured"
 fi
 
-if grep -q "X-Content-Type-Options" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/index.js; then
+if grep -q "X-Content-Type-Options" /workspaces/ROSSUMXML/backend/index.js; then
     print_test 0 "X-Content-Type-Options header configured"
 else
     print_test 1 "X-Content-Type-Options NOT configured"
 fi
 
-if grep -q "X-Frame-Options" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/index.js; then
+if grep -q "X-Frame-Options" /workspaces/ROSSUMXML/backend/index.js; then
     print_test 0 "X-Frame-Options header configured"
 else
     print_test 1 "X-Frame-Options NOT configured"
 fi
 
-if grep -q "Content-Security-Policy" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/index.js; then
+if grep -q "Content-Security-Policy" /workspaces/ROSSUMXML/backend/index.js; then
     print_test 0 "Content-Security-Policy header configured"
 else
     print_test 1 "CSP header NOT configured"
@@ -149,21 +149,21 @@ echo ""
 echo -e "${BLUE}Test 5: Security Header Values${NC}"
 
 # Check HSTS max-age is 1 year (31536000 seconds)
-if grep -q "max-age=31536000" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/index.js; then
+if grep -q "max-age=31536000" /workspaces/ROSSUMXML/backend/index.js; then
     print_test 0 "HSTS max-age set to 1 year (31536000 seconds)"
 else
     print_test 1 "HSTS max-age NOT set correctly"
 fi
 
 # Check X-Frame-Options is DENY
-if grep -q 'X-Frame-Options.*DENY' /home/runner/work/ROSSUMXML/ROSSUMXML/backend/index.js; then
+if grep -q 'X-Frame-Options.*DENY' /workspaces/ROSSUMXML/backend/index.js; then
     print_test 0 "X-Frame-Options set to DENY (clickjacking protection)"
 else
     print_test 1 "X-Frame-Options NOT set to DENY"
 fi
 
 # Check nosniff
-if grep -q 'nosniff' /home/runner/work/ROSSUMXML/ROSSUMXML/backend/index.js; then
+if grep -q 'nosniff' /workspaces/ROSSUMXML/backend/index.js; then
     print_test 0 "X-Content-Type-Options set to nosniff"
 else
     print_test 1 "nosniff NOT configured"
@@ -174,13 +174,13 @@ fi
 # ========================================
 echo ""
 echo -e "${BLUE}Test 6: Cookie Security Configuration${NC}"
-if grep -q "httpOnly.*true" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/middleware/securityHeaders.js; then
+if grep -q "httpOnly.*true" /workspaces/ROSSUMXML/backend/middleware/securityHeaders.js; then
     print_test 0 "Cookies configured with httpOnly flag"
 else
     print_test 1 "httpOnly flag NOT set for cookies"
 fi
 
-if grep -q "sameSite.*strict" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/middleware/securityHeaders.js; then
+if grep -q "sameSite.*strict" /workspaces/ROSSUMXML/backend/middleware/securityHeaders.js; then
     print_test 0 "Cookies configured with sameSite=strict (CSRF protection)"
 else
     print_test 1 "sameSite NOT configured for cookies"
@@ -191,14 +191,14 @@ fi
 # ========================================
 echo ""
 echo -e "${BLUE}Test 7: SAM Build Directory Updated${NC}"
-if [ -f "/home/runner/work/ROSSUMXML/ROSSUMXML/backend/.aws-sam/build/TransformFunction/middleware/securityHeaders.js" ]; then
+if [ -f "/workspaces/ROSSUMXML/backend/.aws-sam/build/TransformFunction/middleware/securityHeaders.js" ]; then
     print_test 0 "securityHeaders.js copied to SAM build"
 else
     print_test 1 "securityHeaders.js NOT in SAM build"
 fi
 
-if [ -f "/home/runner/work/ROSSUMXML/ROSSUMXML/backend/.aws-sam/build/TransformFunction/server.js" ]; then
-    if grep -q "helmetConfig" /home/runner/work/ROSSUMXML/ROSSUMXML/backend/.aws-sam/build/TransformFunction/server.js; then
+if [ -f "/workspaces/ROSSUMXML/backend/.aws-sam/build/TransformFunction/server.js" ]; then
+    if grep -q "helmetConfig" /workspaces/ROSSUMXML/backend/.aws-sam/build/TransformFunction/server.js; then
         print_test 0 "SAM server.js configured with helmet"
     else
         print_test 1 "SAM server.js NOT configured with helmet"
