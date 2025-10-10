@@ -6,8 +6,8 @@ import MappingSVG from '../components/editor/MappingSVG';
 import MappingsList from '../components/editor/MappingsList';
 import { AISuggestionModal } from '../components/editor/AISuggestionModal';
 import { AIBatchSuggestionModal } from '../components/editor/AIBatchSuggestionModal';
-import { AILoadingToast } from '../components/editor/AILoadingToast';
 import { UpgradePrompt } from '../components/editor/UpgradePrompt';
+import ApiSettingsModal from '../components/common/ApiSettingsModal';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
 import { useAIFeatures, generateAISuggestion, generateBatchAISuggestions } from '../hooks/useAIFeatures';
@@ -69,17 +69,9 @@ function EditorPage() {
     const [batchSuggestions, setBatchSuggestions] = useState([]);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [batchLoading, setBatchLoading] = useState(false);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [remainingUnmappedCount, setRemainingUnmappedCount] = useState(0);
-    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 }); // NEW: Progress tracking
-    const processingQueueRef = useRef([]);
-    const mappingsRef = useRef(mappings);
-    const shouldCancelBatchRef = useRef(false); // Flag to cancel background processing
     
-    // Keep mappingsRef in sync with mappings
-    useEffect(() => {
-        mappingsRef.current = mappings;
-    }, [mappings]);
+    // --- API SETTINGS MODAL STATE ---
+    const [showApiSettings, setShowApiSettings] = useState(false);
 
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
@@ -308,21 +300,19 @@ function EditorPage() {
                 return;
             }
 
-            // Prepare enhanced context for AI with UK customs domain
+            // Prepare context for AI
             const context = {
-                sourceSchema: sourceTree.name || 'UK Customs Export/Import Data',
-                targetSchema: targetTree.name || 'UK Customs Software System',
+                sourceSchema: sourceTree.name || 'Source Schema',
+                targetSchema: targetTree.name || 'Target Schema',
                 existingMappings: mappings.map(m => ({
                     source: m.source,
                     target: m.target
-                })),
-                domain: 'UK Customs and International Trade'
+                }))
             };
 
-            // Call AI service - Note: We're finding best SOURCE for a given TARGET
-            // So we pass ALL source nodes and the single target node
+            // Call AI service
             const result = await generateAISuggestion(
-                targetNode,
+                { name: targetNode.name, path: targetNode.path, type: 'element' },
                 sourceNodes,
                 context
             );
@@ -386,73 +376,27 @@ function EditorPage() {
 
     // --- BATCH AI SUGGESTION HANDLERS ---
     
-    // Progressive batch processing function
-    const processNextBatch = useCallback(async (remainingSources, targetLeaves) => {
-        const BATCH_SIZE = 5;
-        let currentIndex = 0;
+    // Helper function to collect all elements from a tree
+    const collectAllElements = useCallback((tree) => {
+        const elements = [];
         
-        while (currentIndex < remainingSources.length) {
-            // Check if processing should be cancelled (modal closed)
-            if (shouldCancelBatchRef.current) {
-                console.log('Background batch processing cancelled by user');
-                setIsLoadingMore(false);
-                setRemainingUnmappedCount(0);
-                return;
-            }
-            
-            // Wait a bit before next batch to not overwhelm the server
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Check again after delay in case modal was closed during wait
-            if (shouldCancelBatchRef.current) {
-                console.log('Background batch processing cancelled by user');
-                setIsLoadingMore(false);
-                setRemainingUnmappedCount(0);
-                return;
-            }
-            
-            const batch = remainingSources.slice(currentIndex, currentIndex + BATCH_SIZE);
-            const remainingAfterThisBatch = remainingSources.length - (currentIndex + BATCH_SIZE);
-            currentIndex += BATCH_SIZE;
-            
-            try {
-                // Get FRESH context with current mappings (including accepted suggestions)
-                // Use mappingsRef.current to get the latest mappings without recreating this callback
-                const freshContext = {
-                    sourceSchema: sourceTree?.name || 'UK Customs Export/Import Data',
-                    targetSchema: targetTree?.name || 'UK Customs Software System', 
-                    existingMappings: mappingsRef.current.map(m => ({ source: m.source, target: m.target })),
-                    domain: 'UK Customs and International Trade'
-                };
+        const traverse = (node) => {
+            if (node) {
+                elements.push({
+                    name: node.name,
+                    path: node.path,
+                    type: node.type
+                });
                 
-                const mappingRequests = batch.map(sourceNode => ({
-                    sourceNode: sourceNode,
-                    targetNodes: targetLeaves.slice(0, 50),
-                    context: freshContext
-                }));
-                
-                const result = await generateBatchAISuggestions(mappingRequests);
-                
-                // Append new suggestions to existing ones
-                setBatchSuggestions(prev => [...prev, ...(result.suggestions || [])]);
-                
-                // Update remaining count with elements still in queue
-                setRemainingUnmappedCount(Math.max(0, remainingAfterThisBatch));
-                
-                // Hide loading if this was the last batch
-                if (remainingAfterThisBatch <= 0) {
-                    setIsLoadingMore(false);
+                if (node.children) {
+                    node.children.forEach(traverse);
                 }
-                
-            } catch (error) {
-                console.error('Error processing batch:', error);
-                // Continue with next batch even if one fails
             }
-        }
+        };
         
-        // Ensure loading indicator is off when done
-        setIsLoadingMore(false);
-    }, [sourceTree, targetTree]);
+        traverse(tree);
+        return elements;
+    }, []);
     
     const handleBatchAISuggest = useCallback(async () => {
         if (!sourceTree || !targetTree || !hasAIAccess) {
@@ -460,95 +404,53 @@ function EditorPage() {
             return;
         }
 
-        // Reset cancellation flag when starting new batch
-        shouldCancelBatchRef.current = false;
-        
         setBatchLoading(true);
-        // Don't show modal yet - wait until first batch is ready
-        setBatchSuggestions([]); // Clear previous suggestions
+        setShowBatchModal(true);
         
         try {
-            // Get all leaf nodes directly using existing helper functions
-            const allSourceLeaves = getAllSourceNodes(sourceTree);
-            const allTargetLeaves = getAllSourceNodes(targetTree);
+            // Collect all unmapped source and target nodes
+            const sourceElements = collectAllElements(sourceTree);
+            const targetElements = collectAllElements(targetTree);
             
-            // Filter out already mapped elements BY PATH (not by name)
+            // Filter out already mapped elements
             const mappedSources = new Set(mappings.map(m => m.source));
             const mappedTargets = new Set(mappings.map(m => m.target));
             
-            const unmappedSourceLeaves = allSourceLeaves.filter(el => !mappedSources.has(el.path));
-            const unmappedTargetLeaves = allTargetLeaves.filter(el => !mappedTargets.has(el.path));
+            const unmappedSources = sourceElements.filter(el => !mappedSources.has(el.path));
+            const unmappedTargets = targetElements.filter(el => !mappedTargets.has(el.path));
             
-            const totalUnmapped = unmappedSourceLeaves.length;
-            
-            // SET TOTAL PROGRESS
-            setBatchProgress({ current: 0, total: totalUnmapped });
-            
-            if (totalUnmapped === 0) {
-                alert('No unmapped elements found. All elements are already mapped!');
-                setShowBatchModal(false);
-                setBatchLoading(false);
-                return;
+            // Limit batch size to prevent timeout issues (Lambda has 30s limit, each AI request takes ~10s)
+            const MAX_BATCH_SIZE = 3;
+            if (unmappedSources.length > MAX_BATCH_SIZE) {
+                alert(`Found ${unmappedSources.length} unmapped elements. Processing first ${MAX_BATCH_SIZE} to stay within server timeout limits (each AI request takes ~10 seconds). You can run this again to process remaining elements.`);
             }
+            const sourcesToProcess = unmappedSources.slice(0, MAX_BATCH_SIZE);
             
-            // PROGRESSIVE LOADING: Process in batches of 5
-            const BATCH_SIZE = 5;
-            const firstBatch = unmappedSourceLeaves.slice(0, BATCH_SIZE);
-            const remainingBatches = unmappedSourceLeaves.slice(BATCH_SIZE);
-            
-            // Store remaining batches for progressive loading
-            processingQueueRef.current = remainingBatches;
-            
-            // Set remaining count to elements NOT in first batch (i.e., in queue)
-            setRemainingUnmappedCount(remainingBatches.length);
-            
-            // Prepare enhanced context with UK customs domain information
+            // Create proper mapping requests structure for each source element
+            // Optimize context to avoid sending large tree objects repeatedly
             const optimizedContext = {
-                sourceSchema: sourceTree?.name || 'UK Customs Export/Import Data',
-                targetSchema: targetTree?.name || 'UK Customs Software System', 
-                existingMappings: mappings.map(m => ({ source: m.source, target: m.target })),
-                domain: 'UK Customs and International Trade',
-                standards: ['CDS', 'CHIEF', 'HMRC', 'EDIFACT']
+                sourceSchema: sourceTree?.name || 'Unknown',
+                targetSchema: targetTree?.name || 'Unknown', 
+                existingMappings: mappings.map(m => ({ source: m.source, target: m.target }))
             };
             
-            // Generate FIRST BATCH immediately
-            const firstMappingRequests = firstBatch.map(sourceNode => ({
+            const mappingRequests = sourcesToProcess.map(sourceNode => ({
                 sourceNode: sourceNode,
-                targetNodes: unmappedTargetLeaves.slice(0, 50),
+                targetNodes: unmappedTargets,
                 context: optimizedContext
             }));
             
-            const firstResult = await generateBatchAISuggestions(firstMappingRequests);
-            setBatchSuggestions(firstResult.suggestions || []);
+            const result = await generateBatchAISuggestions(mappingRequests);
             
-            // UPDATE PROGRESS after first batch
-            setBatchProgress({ current: firstBatch.length, total: totalUnmapped });
-            setBatchLoading(false);
-            
-            // NOW show modal with first batch ready
-            setShowBatchModal(true);
-            
-            // Start processing REMAINING BATCHES in background (only if there are any)
-            if (remainingBatches.length > 0) {
-                // Set isLoadingMore BEFORE starting background processing
-                setIsLoadingMore(true);
-                processNextBatch(remainingBatches, unmappedTargetLeaves);
-            } else {
-                // No more batches, ensure loading is off
-                setIsLoadingMore(false);
-                setRemainingUnmappedCount(0);
-            }
-            
+            setBatchSuggestions(result.suggestions || []);
         } catch (error) {
             console.error('Batch AI suggestion error:', error);
             alert(error.message || 'Failed to generate AI suggestions. Please try again.');
-            // Ensure loading states are reset on error
             setShowBatchModal(false);
+        } finally {
             setBatchLoading(false);
-            setIsLoadingMore(false);
-            setRemainingUnmappedCount(0);
         }
-    }, [sourceTree, targetTree, mappings, hasAIAccess, getAllSourceNodes, processNextBatch]);
+    }, [sourceTree, targetTree, mappings, hasAIAccess, collectAllElements]);
 
     const handleAcceptBatchSuggestions = useCallback((selectedSuggestions) => {
         if (!selectedSuggestions.length) return;
@@ -566,59 +468,18 @@ function EditorPage() {
         }));
 
         updateMappings([...mappings, ...newMappings]);
-        // Don't close modal or clear suggestions - let user continue
+        setShowBatchModal(false);
+        setBatchSuggestions([]);
     }, [mappings, sourceTree, targetTree, updateMappings]);
 
     const handleCloseBatchModal = useCallback(() => {
-        // Signal background processing to stop
-        shouldCancelBatchRef.current = true;
-        
         setShowBatchModal(false);
         setBatchSuggestions([]);
-        setIsLoadingMore(false);
-        setRemainingUnmappedCount(0);
     }, []);
 
     const handleRegenerateBatchSuggestions = useCallback(async () => {
         await handleBatchAISuggest();
     }, [handleBatchAISuggest]);
-
-    const handleRegenerateOneSuggestion = useCallback(async (suggestion, index) => {
-        // Regenerate AI suggestion for this specific source node
-        try {
-            const sourceNode = suggestion.sourceElement;
-            const allTargetLeaves = getAllSourceNodes(targetTree);
-            
-            // Filter out already mapped targets
-            const mappedTargets = new Set(mappings.map(m => m.target));
-            const unmappedTargetLeaves = allTargetLeaves.filter(el => !mappedTargets.has(el.path));
-            
-            const optimizedContext = {
-                sourceSchema: sourceTree?.name || 'UK Customs Export/Import Data',
-                targetSchema: targetTree?.name || 'UK Customs Software System', 
-                existingMappings: mappings.map(m => ({ source: m.source, target: m.target })),
-                domain: 'UK Customs and International Trade'
-            };
-            
-            const mappingRequest = {
-                sourceNode: sourceNode,
-                targetNodes: unmappedTargetLeaves.slice(0, 50),
-                context: optimizedContext
-            };
-            
-            const result = await generateBatchAISuggestions([mappingRequest]);
-            
-            // Replace the suggestion at this index
-            if (result.suggestions && result.suggestions.length > 0) {
-                const newSuggestions = [...batchSuggestions];
-                newSuggestions[index] = result.suggestions[0];
-                setBatchSuggestions(newSuggestions);
-            }
-        } catch (error) {
-            console.error('Failed to regenerate suggestion:', error);
-            alert('Failed to regenerate suggestion. Please try again.');
-        }
-    }, [sourceTree, targetTree, mappings, batchSuggestions, getAllSourceNodes]);
 
     // --- SAVE LOGIC ---
     const handleSaveMappings = () => {
@@ -802,7 +663,16 @@ function EditorPage() {
         <>
             <TopNav />
             <div className="app-container extra-spacing" style={{ paddingTop: '100px' }}>
-                <Link to="/transformer" className="home-link" style={{ marginTop: '0' }}>← Back to Transformer</Link>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <Link to="/transformer" className="home-link" style={{ marginTop: '0' }}>← Back to Transformer</Link>
+                    <button 
+                        onClick={() => setShowApiSettings(true)}
+                        className={styles.apiSettingsButton}
+                        title="API Settings"
+                    >
+                        ⚙️ API Settings
+                    </button>
+                </div>
 
                 <div className="upload-section">
                 <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setSourceTree, true)}>
@@ -882,6 +752,9 @@ function EditorPage() {
                     onCollectionSelect={handleCollectionSelect}
                     registerNodeRef={registerNodeRef}
                     targetValueMap={targetValueMap}
+                    hasAIAccess={hasAIAccess}
+                    onAISuggest={handleAISuggest}
+                    aiLoading={aiLoading}
                 />
 
                 <MappingsList
@@ -927,16 +800,6 @@ function EditorPage() {
             </div>
             <Footer text="Created by Daniils Radionovs" />
 
-            {/* AI Loading Toast - Shown while initial batch is being generated */}
-            {batchLoading && !showBatchModal && (
-                <AILoadingToast
-                    message="Generating AI suggestions..."
-                    subtitle="Analyzing schemas and creating intelligent mappings"
-                    current={batchProgress.current}
-                    total={batchProgress.total}
-                />
-            )}
-
             {/* AI Suggestion Modal */}
             {aiSuggestion && (
                 <AISuggestionModal
@@ -953,14 +816,10 @@ function EditorPage() {
             {showBatchModal && (
                 <AIBatchSuggestionModal
                     suggestions={batchSuggestions}
-                    onAcceptSuggestion={handleAcceptBatchSuggestions}
-                    onAcceptAll={handleAcceptBatchSuggestions}
-                    onRegenerateAll={handleRegenerateBatchSuggestions}
-                    onRegenerateOne={handleRegenerateOneSuggestion}
+                    onAcceptSelected={handleAcceptBatchSuggestions}
                     onClose={handleCloseBatchModal}
+                    onRegenerate={handleRegenerateBatchSuggestions}
                     loading={batchLoading}
-                    isLoadingMore={isLoadingMore}
-                    remainingCount={remainingUnmappedCount}
                 />
             )}
 
@@ -968,6 +827,12 @@ function EditorPage() {
             {showUpgradePrompt && (
                 <UpgradePrompt onClose={() => setShowUpgradePrompt(false)} />
             )}
+
+            {/* API Settings Modal */}
+            <ApiSettingsModal 
+                isOpen={showApiSettings}
+                onClose={() => setShowApiSettings(false)}
+            />
         </>
     );
 }

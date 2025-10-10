@@ -98,7 +98,6 @@ const TopNav = memo(function TopNav() {
                             <>
                                 <NavLink to="/transformer" className={styles.navLink}>Transformer</NavLink>
                                 <NavLink to="/editor" className={styles.navLink}>Editor</NavLink>
-                                <NavLink to="/api-settings" className={styles.navLink}>API Settings</NavLink>
                                 <button 
                                     onClick={handleProfileClick} 
                                     className={styles.userButton}
