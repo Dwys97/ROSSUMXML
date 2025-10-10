@@ -7,7 +7,6 @@ import MappingsList from '../components/editor/MappingsList';
 import { AISuggestionModal } from '../components/editor/AISuggestionModal';
 import { AIBatchSuggestionModal } from '../components/editor/AIBatchSuggestionModal';
 import { UpgradePrompt } from '../components/editor/UpgradePrompt';
-import ApiSettingsModal from '../components/common/ApiSettingsModal';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
 import { useAIFeatures, generateAISuggestion, generateBatchAISuggestions } from '../hooks/useAIFeatures';
@@ -69,9 +68,6 @@ function EditorPage() {
     const [batchSuggestions, setBatchSuggestions] = useState([]);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [batchLoading, setBatchLoading] = useState(false);
-    
-    // --- API SETTINGS MODAL STATE ---
-    const [showApiSettings, setShowApiSettings] = useState(false);
 
     const nodeRefs = useRef(new Map());
     const editorSectionRef = useRef(null);
@@ -663,15 +659,8 @@ function EditorPage() {
         <>
             <TopNav />
             <div className="app-container extra-spacing" style={{ paddingTop: '100px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ marginBottom: '20px' }}>
                     <Link to="/transformer" className="home-link" style={{ marginTop: '0' }}>← Back to Transformer</Link>
-                    <button 
-                        onClick={() => setShowApiSettings(true)}
-                        className={styles.apiSettingsButton}
-                        title="API Settings"
-                    >
-                        ⚙️ API Settings
-                    </button>
                 </div>
 
                 <div className="upload-section">
@@ -827,12 +816,6 @@ function EditorPage() {
             {showUpgradePrompt && (
                 <UpgradePrompt onClose={() => setShowUpgradePrompt(false)} />
             )}
-
-            {/* API Settings Modal */}
-            <ApiSettingsModal 
-                isOpen={showApiSettings}
-                onClose={() => setShowApiSettings(false)}
-            />
         </>
     );
 }

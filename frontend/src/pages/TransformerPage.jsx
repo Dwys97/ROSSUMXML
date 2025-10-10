@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import FileDropzone from '../components/common/FileDropzone';
-import ApiSettingsModal from '../components/common/ApiSettingsModal';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
 
@@ -18,9 +17,6 @@ function TransformerPage() {
     const [outputXml, setOutputXml] = useState('');
     const [status, setStatus] = useState('Ready');
     const [sourceCount, setSourceCount] = useState(0);
-    
-    // API Settings Modal state
-    const [showApiSettings, setShowApiSettings] = useState(false);
 
     const handleTransform = async () => {
         if (sourceFiles.length === 0 || !destinationXml || !mappingJson) {
@@ -69,28 +65,6 @@ function TransformerPage() {
         <>
             <TopNav />
             <div className="app-container extra-spacing" style={{ paddingTop: '100px' }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-                    <button 
-                        onClick={() => setShowApiSettings(true)}
-                        style={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            color: 'white',
-                            border: 'none',
-                            padding: '10px 20px',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                        title="API Settings"
-                    >
-                        ⚙️ API Settings
-                    </button>
-                </div>
-                
                 <section className="how-to-use" style={{ marginTop: '0' }}>
                 <div className="steps-container">
                     <div className="step">
@@ -214,12 +188,6 @@ function TransformerPage() {
             </section>
             </div>
             <Footer text="© 2025 SchemaBridge — Built for production · EDI & XML integration" />
-            
-            {/* API Settings Modal */}
-            <ApiSettingsModal 
-                isOpen={showApiSettings}
-                onClose={() => setShowApiSettings(false)}
-            />
         </>
     );
 }

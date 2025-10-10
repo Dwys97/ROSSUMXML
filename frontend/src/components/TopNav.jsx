@@ -2,6 +2,7 @@ import React, { useState, memo, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import UserProfile from './profile/UserProfile';
+import ApiSettingsModal from './common/ApiSettingsModal';
 import styles from './TopNav.module.css';
 import logo from '../assets/logo-light.svg';
 
@@ -11,6 +12,7 @@ const TopNav = memo(function TopNav() {
     const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact'].includes(location.pathname);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [showApiSettings, setShowApiSettings] = useState(false);
 
     // Check authentication state when entering the page
     useEffect(() => {
@@ -96,8 +98,13 @@ const TopNav = memo(function TopNav() {
                             </>
                         ) : user ? (
                             <>
-                                <NavLink to="/transformer" className={styles.navLink}>Transformer</NavLink>
-                                <NavLink to="/editor" className={styles.navLink}>Editor</NavLink>
+                                <button 
+                                    onClick={() => setShowApiSettings(true)} 
+                                    className={styles.apiSettingsButton}
+                                    aria-label="API Settings"
+                                >
+                                    ⚙️ API Settings
+                                </button>
                                 <button 
                                     onClick={handleProfileClick} 
                                     className={styles.userButton}
@@ -170,6 +177,15 @@ const TopNav = memo(function TopNav() {
                         ) : user ? (
                             <>
                                 <button 
+                                    onClick={() => {
+                                        setShowApiSettings(true);
+                                        setIsMobileMenuOpen(false);
+                                    }} 
+                                    className={styles.mobileApiSettingsButton}
+                                >
+                                    ⚙️ API Settings
+                                </button>
+                                <button 
                                     onClick={handleProfileClick} 
                                     className={styles.mobileUserButton}
                                 >
@@ -192,6 +208,12 @@ const TopNav = memo(function TopNav() {
                     isOpen={isProfileOpen} 
                     onClose={() => setIsProfileOpen(false)}
                     onLogout={handleLogout}
+                />
+            )}
+            {showApiSettings && (
+                <ApiSettingsModal 
+                    isOpen={showApiSettings} 
+                    onClose={() => setShowApiSettings(false)}
                 />
             )}
         </>
