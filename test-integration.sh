@@ -85,7 +85,7 @@ info "Step 3: Verify audit log entry created (Phase 2)"
 # Check if authentication was logged
 sleep 1
 AUDIT_CHECK=$(docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -c \
-    "SELECT COUNT(*) FROM security_audit_log WHERE event_type = 'authentication_success' AND user_id = '$USER_ID' ORDER BY created_at DESC LIMIT 1;")
+    "SELECT COUNT(*) FROM security_audit_log WHERE event_type = 'authentication_success' AND user_id = '$USER_ID';")
 
 if [ "$AUDIT_CHECK" -ge 1 ]; then
     pass_test "Audit logging - Authentication event recorded"
@@ -135,7 +135,7 @@ fi
 info "Step 2: Verify threat logged in audit log (Phase 2)"
 sleep 1
 THREAT_LOG_COUNT=$(docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -c \
-    "SELECT COUNT(*) FROM security_audit_log WHERE event_type = 'xml_security_threat_detected' ORDER BY created_at DESC LIMIT 1;")
+    "SELECT COUNT(*) FROM security_audit_log WHERE event_type = 'xml_security_threat_detected';")
 
 if [ "$THREAT_LOG_COUNT" -ge 1 ]; then
     pass_test "Audit Logging - XML threat logged to security_audit_log"
