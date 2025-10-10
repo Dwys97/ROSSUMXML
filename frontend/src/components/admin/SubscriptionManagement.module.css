@@ -1,0 +1,113 @@
+.subscriptionManagement {
+    padding: 20px;
+}
+
+.header {
+    margin-bottom: 30px;
+}
+
+.header h2 {
+    font-size: 1.8rem;
+    color: #333;
+    margin: 0;
+}
+
+.filters {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.filterSelect {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.tableContainer {
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
+
+.subscriptionsTable {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.subscriptionsTable th {
+    background: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.subscriptionsTable td {
+    padding: 12px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.subscriptionsTable tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.inlineSelect {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.actionButton {
+    padding: 6px 12px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.actionButton:hover {
+    background: #0056b3;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.paginationButton {
+    padding: 8px 16px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.paginationButton:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.pageInfo {
+    font-size: 1rem;
+    color: #666;
+}
+
+.loading, .error {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2rem;
+}
+
+.error {
+    color: #dc3545;
+}
