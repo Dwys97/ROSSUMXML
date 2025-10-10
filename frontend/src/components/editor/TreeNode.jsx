@@ -13,7 +13,7 @@ function TreeNode({
     registerNodeRef,
     onDrop,
     onCustomValue,
-    targetValueMap // New prop to get the mapped value
+    targetValueMap, // New prop to get the mapped value
 }) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const ref = useRef(null);
@@ -127,7 +127,18 @@ function TreeNode({
                 </span>
 
                 {!isSource && !hasChildren && (
-                     <button className="custom-value-btn" title="Set custom value" onClick={(e) => { e.stopPropagation(); onCustomValue(path); }}>✎</button>
+                    <div className="node-actions">
+                        <button 
+                            className="custom-value-btn" 
+                            title="Set custom value" 
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                onCustomValue(path); 
+                            }}
+                        >
+                            ✎
+                        </button>
+                    </div>
                 )}
             </div>
 

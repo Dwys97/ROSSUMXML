@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import TreeNode from './TreeNode';
 
-const SchemaTree = React.forwardRef(({ title, treeData, isSource, ...props }, ref) => {
+const SchemaTree = React.forwardRef(({ 
+    title, 
+    treeData, 
+    isSource, 
+    ...props 
+}, ref) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const handleSearch = (e) => {
@@ -31,7 +36,7 @@ const SchemaTree = React.forwardRef(({ title, treeData, isSource, ...props }, re
                         <TreeNode 
                             node={treeData} 
                             isSource={isSource} 
-                            searchTerm={searchTerm} 
+                            searchTerm={searchTerm}
                             {...props} 
                         />
                     </ul>

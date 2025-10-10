@@ -573,9 +573,17 @@ a.secondary-btn {
     flex-shrink: 1;
 }
 
+/* Node actions container for AI button and custom value button */
+.node-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
 .custom-value-btn {
     order: 2;
-    margin-left: auto;
     background: transparent;
     border: none;
     color: #a5a9b5;

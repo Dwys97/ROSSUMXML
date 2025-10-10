@@ -1,6 +1,17 @@
 import React from 'react';
 
-function MappingsList({ mappings, onUpdateMappings, onSave, onSaveToApi, onUndo, canUndo, saveStatus }) {
+function MappingsList({ 
+    mappings, 
+    onUpdateMappings, 
+    onSave, 
+    onSaveToApi, 
+    onUndo, 
+    canUndo, 
+    saveStatus,
+    hasAIAccess,
+    onAISuggestAll,
+    aiLoading
+}) {
 
     const handleRemove = (index) => {
         const newMappings = [...mappings];
@@ -46,6 +57,23 @@ function MappingsList({ mappings, onUpdateMappings, onSave, onSaveToApi, onUndo,
             </div>
             
             <button onClick={handleClearAll} className="secondary-btn" style={{ background: '#e74c3c', marginBottom: '10px' }}>Clear All Mappings</button>
+
+            {hasAIAccess && (
+                <button 
+                    onClick={onAISuggestAll} 
+                    className="primary-btn" 
+                    style={{ 
+                        background: '#667eea', 
+                        marginBottom: '10px',
+                        width: '100%',
+                        opacity: aiLoading ? 0.7 : 1,
+                        cursor: aiLoading ? 'wait' : 'pointer'
+                    }}
+                    disabled={aiLoading}
+                >
+                    {aiLoading ? '🤖 Generating suggestions...' : '🤖 AI Suggest All Mappings'}
+                </button>
+            )}
 
             <div className="mapping-buttons">
                 <button id="undoBtn" className="secondary-btn" onClick={onUndo} disabled={!canUndo}>↩ Undo Last Action</button>
