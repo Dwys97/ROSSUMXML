@@ -901,6 +901,7 @@ exports.handler = async (event) => {
                 // Verify current password
                 const validPassword = await bcrypt.compare(currentPassword, user.password);
                 if (!validPassword) {
+                    await logPasswordChange(pool, userId, false, event, 'Current password is incorrect');
                     return createResponse(400, JSON.stringify({
                         error: 'Current password is incorrect'
                     }));
@@ -915,6 +916,9 @@ exports.handler = async (event) => {
                     SET password = $1, updated_at = CURRENT_TIMESTAMP
                     WHERE id = $2
                 `, [hashedNewPassword, userId]);
+
+                // Log successful password change
+                await logPasswordChange(pool, userId, true, event);
 
                 return createResponse(200, JSON.stringify({
                     message: 'Password changed successfully'
@@ -1140,6 +1144,11 @@ exports.handler = async (event) => {
                         [user.id, keyName.trim(), apiKey, hashedSecret, expiresAt]
                     );
                     
+                    const apiKeyId = result.rows[0].id;
+                    
+                    // Log API key creation
+                    await logAPIKeyCreation(pool, user.id, apiKeyId, keyName.trim(), event);
+                    
                     return createResponse(200, JSON.stringify({
                         ...result.rows[0],
                         api_secret: apiSecret,
@@ -1164,6 +1173,12 @@ exports.handler = async (event) => {
                 
                 const client = await pool.connect();
                 try {
+                    // Get key name before deletion for logging
+                    const keyResult = await client.query(
+                        'SELECT key_name FROM api_keys WHERE id = $1 AND user_id = $2',
+                        [keyId, user.id]
+                    );
+                    
                     const result = await client.query(
                         'DELETE FROM api_keys WHERE id = $1 AND user_id = $2 RETURNING id',
                         [keyId, user.id]
@@ -1171,6 +1186,11 @@ exports.handler = async (event) => {
                     
                     if (result.rows.length === 0) {
                         return createResponse(404, JSON.stringify({ error: 'API key not found' }));
+                    }
+                    
+                    // Log API key deletion
+                    if (keyResult.rows.length > 0) {
+                        await logAPIKeyDeletion(pool, user.id, keyId, keyResult.rows[0].key_name, event);
                     }
                     
                     return createResponse(200, JSON.stringify({ message: 'API key deleted successfully' }));
@@ -1444,7 +1464,13 @@ exports.handler = async (event) => {
                         [user.id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml || null, is_default || false]
                     );
                     
+                    const mappingId = result.rows[0].id;
+                    
                     await client.query('COMMIT');
+                    
+                    // Log mapping creation
+                    await logMappingCreation(pool, user.id, mappingId, mapping_name, event);
+                    
                     return createResponse(201, JSON.stringify(result.rows[0]));
                 } catch (err) {
                     await client.query('ROLLBACK');
@@ -1500,6 +1526,10 @@ exports.handler = async (event) => {
                     }
                     
                     await client.query('COMMIT');
+                    
+                    // Log mapping update
+                    await logMappingUpdate(pool, user.id, mappingId, result.rows[0].mapping_name, event);
+                    
                     return createResponse(200, JSON.stringify(result.rows[0]));
                 } catch (err) {
                     await client.query('ROLLBACK');
@@ -1520,6 +1550,12 @@ exports.handler = async (event) => {
                 
                 const client = await pool.connect();
                 try {
+                    // Get mapping name before deletion for logging
+                    const mappingResult = await client.query(
+                        'SELECT mapping_name FROM transformation_mappings WHERE id = $1 AND user_id = $2',
+                        [mappingId, user.id]
+                    );
+                    
                     const result = await client.query(
                         'DELETE FROM transformation_mappings WHERE id = $1 AND user_id = $2 RETURNING id',
                         [mappingId, user.id]
@@ -1527,6 +1563,11 @@ exports.handler = async (event) => {
                     
                     if (result.rows.length === 0) {
                         return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                    }
+                    
+                    // Log mapping deletion
+                    if (mappingResult.rows.length > 0) {
+                        await logMappingDeletion(pool, user.id, mappingId, mappingResult.rows[0].mapping_name, event);
                     }
                     
                     return createResponse(200, JSON.stringify({ message: 'Mapping deleted successfully' }));
