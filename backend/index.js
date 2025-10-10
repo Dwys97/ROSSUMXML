@@ -11,6 +11,18 @@ const { generateMappingSuggestion, generateBatchMappingSuggestions, checkAIFeatu
 const db = require('./db');
 const userService = require('./services/user.service');
 
+// --- Security Utilities ---
+const {
+    validateXmlSecurity,
+    validateTransformationSafety,
+    sanitizeXmlForLogging,
+    requirePermission,
+    requireRole,
+    requireResourceAccess,
+    logSecurityEvent,
+    setRLSContext
+} = require('./utils/lambdaSecurity');
+
 // --- Database Connection ---
 const pool = require('./db');
 
@@ -246,6 +258,83 @@ const verifyApiKey = async (apiKey) => {
     }
 };
 
+/**
+ * Helper function to check RBAC permissions for API settings endpoints
+ * @param {number} userId - User ID from JWT
+ * @param {string} path - Request path
+ * @param {string} method - HTTP method
+ * @returns {Promise<Object>} { authorized: boolean, error?: string, requiredPermission?: string }
+ */
+async function checkApiSettingsPermission(userId, path, method) {
+    // Map endpoints to required permissions
+    const permissionMap = {
+        'GET:/api-settings/keys': 'manage_api_keys',
+        'POST:/api-settings/keys': 'manage_api_keys',
+        'DELETE:/api-settings/keys': 'manage_api_keys',
+        'PATCH:/api-settings/keys': 'manage_api_keys',
+        
+        'GET:/api-settings/webhook': 'manage_webhooks',
+        'POST:/api-settings/webhook': 'manage_webhooks',
+        
+        'GET:/api-settings/output-delivery': 'manage_output_delivery',
+        'POST:/api-settings/output-delivery': 'manage_output_delivery',
+        
+        'GET:/api-settings/mappings': 'manage_mappings',
+        'POST:/api-settings/mappings': 'manage_mappings',
+        'PUT:/api-settings/mappings': 'manage_mappings',
+        'DELETE:/api-settings/mappings': 'manage_mappings'
+    };
+    
+    // Determine the base endpoint (remove IDs from path)
+    let baseEndpoint = path;
+    
+    // Normalize paths with IDs (e.g., /api-settings/keys/123 -> /api-settings/keys)
+    if (path.includes('/api-settings/keys/') && !path.endsWith('/set-mapping') && !path.endsWith('/toggle')) {
+        baseEndpoint = '/api-settings/keys';
+    } else if (path.includes('/api-settings/mappings/') && !path.endsWith('/mappings')) {
+        baseEndpoint = '/api-settings/mappings';
+    } else if (path.includes('/api-settings/keys/') && path.endsWith('/toggle')) {
+        baseEndpoint = '/api-settings/keys';
+        method = 'PATCH';
+    } else if (path.includes('/api-settings/keys/') && path.endsWith('/set-mapping')) {
+        baseEndpoint = '/api-settings/keys';
+        method = 'PATCH';
+    }
+    
+    const permissionKey = `${method}:${baseEndpoint}`;
+    const requiredPermission = permissionMap[permissionKey];
+    
+    if (!requiredPermission) {
+        // No specific permission required for this endpoint
+        return { authorized: true };
+    }
+    
+    // Check if user has the required permission
+    const authResult = await requirePermission(pool, userId, requiredPermission);
+    
+    if (!authResult.authorized) {
+        return {
+            authorized: false,
+            error: authResult.error,
+            requiredPermission
+        };
+    }
+    
+    // Log successful authorization
+    await logSecurityEvent(
+        pool,
+        userId,
+        'authorization_success',
+        'api_settings',
+        null,
+        requiredPermission,
+        true,
+        { path, method }
+    );
+    
+    return { authorized: true, requiredPermission };
+}
+
 exports.handler = async (event) => {
     if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
         return {
@@ -270,6 +359,149 @@ exports.handler = async (event) => {
         const body = isWebhookTransformEndpoint 
             ? event.body 
             : ((event.body && typeof event.body === 'string') ? JSON.parse(event.body) : event.body || {});
+
+        // ============================================================================
+        // SECURITY VALIDATION - XML Input Validation (XXE, Billion Laughs Prevention)
+        // ============================================================================
+        
+        // List of endpoints that handle XML transformation (require XML security validation)
+        const xmlTransformationEndpoints = [
+            '/transform',
+            '/transform-json',
+            '/api/transform',
+            '/api/webhook/transform',
+            '/schema/parse'
+        ];
+        
+        // Check if current request is for an XML transformation endpoint
+        const isXmlTransformationRequest = xmlTransformationEndpoints.some(endpoint => path === endpoint || path.endsWith(endpoint));
+        
+        if (isXmlTransformationRequest && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                // For webhook transform, body is already raw XML string
+                // For other endpoints, body is parsed JSON with sourceXml field
+                const xmlToValidate = isWebhookTransformEndpoint ? body : body.sourceXml;
+                const destinationXml = isWebhookTransformEndpoint ? null : body.destinationXml;
+                
+                // Validate source XML if present
+                if (xmlToValidate && typeof xmlToValidate === 'string') {
+                    const validation = validateXmlSecurity(xmlToValidate, {
+                        maxSize: 50 * 1024 * 1024, // 50MB
+                        maxDepth: 100,
+                        maxElements: 10000,
+                        allowDTD: false,
+                        allowExternalEntities: false
+                    });
+                    
+                    if (!validation.isValid) {
+                        console.error(`[SECURITY] XML validation failed for ${path}:`, validation.error);
+                        console.error(`[SECURITY] XML preview:`, sanitizeXmlForLogging(xmlToValidate));
+                        
+                        return createResponse(400, JSON.stringify({
+                            error: 'XML Security Validation Failed',
+                            details: validation.error,
+                            threatType: validation.threatType || 'INVALID_XML',
+                            severity: validation.severity || 'MEDIUM'
+                        }));
+                    }
+                    
+                    console.log(`[SECURITY] Source XML validation passed for ${path} (${(validation.sizeInBytes / 1024).toFixed(2)}KB)`);
+                }
+                
+                // Validate destination XML if present
+                if (destinationXml && typeof destinationXml === 'string') {
+                    const destValidation = validateXmlSecurity(destinationXml, {
+                        maxSize: 50 * 1024 * 1024,
+                        maxDepth: 100,
+                        maxElements: 10000,
+                        allowDTD: false,
+                        allowExternalEntities: false
+                    });
+                    
+                    if (!destValidation.isValid) {
+                        console.error(`[SECURITY] Destination XML validation failed for ${path}:`, destValidation.error);
+                        
+                        return createResponse(400, JSON.stringify({
+                            error: 'Destination XML Security Validation Failed',
+                            details: destValidation.error,
+                            threatType: destValidation.threatType || 'INVALID_XML',
+                            severity: destValidation.severity || 'MEDIUM'
+                        }));
+                    }
+                    
+                    console.log(`[SECURITY] Destination XML validation passed for ${path}`);
+                }
+                
+            } catch (validationError) {
+                console.error('[SECURITY] XML validation error:', validationError);
+                return createResponse(500, JSON.stringify({
+                    error: 'Security validation failed',
+                    details: validationError.message
+                }));
+            }
+        }
+
+        // ============================================================================
+        // SECURITY VALIDATION - RBAC (Role-Based Access Control) for API Settings
+        // ============================================================================
+        
+        // Check if this is an API settings endpoint (requires RBAC)
+        const isApiSettingsEndpoint = path.includes('/api-settings/');
+        
+        if (isApiSettingsEndpoint) {
+            try {
+                // First verify JWT to get user identity
+                let user;
+                try {
+                    user = await verifyJWT(event);
+                } catch (jwtError) {
+                    console.error('[RBAC] JWT verification failed for API settings endpoint:', jwtError.message);
+                    
+                    await logSecurityEvent(
+                        pool,
+                        null, // No user ID available
+                        'authentication_failed',
+                        'api_settings',
+                        null,
+                        path,
+                        false,
+                        { error: jwtError.message, path }
+                    );
+                    
+                    return createResponse(401, JSON.stringify({
+                        error: 'Authentication required',
+                        details: jwtError.message
+                    }));
+                }
+                
+                // Set PostgreSQL Row-Level Security context
+                await setRLSContext(pool, user.id);
+                
+                // Check RBAC permissions for API settings
+                const method = event.httpMethod || event.requestContext?.http?.method;
+                const rbacCheck = await checkApiSettingsPermission(user.id, path, method);
+                
+                if (!rbacCheck.authorized) {
+                    console.error(`[RBAC] Access denied for user ${user.id} to ${method} ${path}:`, rbacCheck.error);
+                    
+                    return createResponse(403, JSON.stringify({
+                        error: 'Access Denied',
+                        details: rbacCheck.error,
+                        requiredPermission: rbacCheck.requiredPermission,
+                        message: 'You do not have the required permissions to access this resource'
+                    }));
+                }
+                
+                console.log(`[RBAC] Access granted for user ${user.id} to ${method} ${path} (permission: ${rbacCheck.requiredPermission || 'N/A'})`);
+                
+            } catch (rbacError) {
+                console.error('[RBAC] RBAC validation error:', rbacError);
+                return createResponse(500, JSON.stringify({
+                    error: 'Authorization check failed',
+                    details: rbacError.message
+                }));
+            }
+        }
 
                 // --- Authentication Endpoints ---
         if (path.endsWith('/auth/register')) {
