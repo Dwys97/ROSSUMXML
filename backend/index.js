@@ -802,7 +802,7 @@ exports.handler = async (event) => {
         if (path.endsWith('/user/profile/update') && (event.httpMethod === 'POST' || event.httpMethod === 'PUT' || event.requestContext?.http?.method === 'POST' || event.requestContext?.http?.method === 'PUT')) {
             try {
                 // Verify JWT token
-                const decoded = verifyJWT(event);
+                const decoded = await verifyJWT(event);
                 const userId = decoded.id;
 
                 const { 
@@ -811,7 +811,10 @@ exports.handler = async (event) => {
                     address, 
                     city, 
                     country, 
-                    zipCode 
+                    zipCode,
+                    company,
+                    bio,
+                    avatar_url
                 } = body;
 
                 // Validate required fields
@@ -831,10 +834,13 @@ exports.handler = async (event) => {
                         city = $4,
                         country = $5,
                         zip_code = $6,
+                        company = $7,
+                        bio = $8,
+                        avatar_url = $9,
                         updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $7
-                    RETURNING id, username, email, full_name, phone, address, city, country, zip_code, updated_at
-                `, [fullName, phone, address, city, country, zipCode, userId]);
+                    WHERE id = $10
+                    RETURNING id, username, email, full_name, phone, address, city, country, zip_code, company, bio, avatar_url, updated_at
+                `, [fullName, phone, address, city, country, zipCode, company, bio, avatar_url, userId]);
 
                 if (result.rows.length === 0) {
                     return createResponse(404, JSON.stringify({
@@ -856,6 +862,9 @@ exports.handler = async (event) => {
                         city: updatedUser.city || '',
                         country: updatedUser.country || '',
                         zipCode: updatedUser.zip_code || '',
+                        company: updatedUser.company || '',
+                        bio: updatedUser.bio || '',
+                        avatar_url: updatedUser.avatar_url || '',
                         updated_at: updatedUser.updated_at
                     }
                 }));
