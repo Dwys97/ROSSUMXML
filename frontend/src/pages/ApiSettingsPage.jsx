@@ -425,9 +425,12 @@ const ApiSettingsPage = () => {
 
                     <div className={styles.apiKeysList}>
                         {apiKeys.length === 0 ? (
-                            <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                                No API keys yet. Create one below to get started.
-                            </p>
+                            <div className={styles.emptyState}>
+                                <div className={styles.emptyStateIcon}>🔑</div>
+                                <div className={styles.emptyStateText}>
+                                    No API keys yet. Create one below to get started.
+                                </div>
+                            </div>
                         ) : (
                             apiKeys.map(key => (
                                 <div key={key.id} className={styles.apiKeyItem}>
@@ -804,7 +807,7 @@ const ApiSettingsPage = () => {
                                             </span>
                                         ))}
                                     </div>
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    <div className={styles.actionButtonGroup}>
                                         <input
                                             type="email"
                                             className={styles.input}
@@ -926,7 +929,7 @@ const ApiSettingsPage = () => {
                                                 Updated: {formatDate(mapping.updated_at)}
                                             </span>
                                             {mapping.has_destination_schema && (
-                                                <span className={styles.metaItem} style={{ color: '#10b981' }}>
+                                                <span className={`${styles.metaItem} ${styles.metaItemSuccess}`}>
                                                     ✓ Destination schema included
                                                 </span>
                                             )}
@@ -988,7 +991,7 @@ const ApiSettingsPage = () => {
                                         type="file"
                                         id="jsonFileUpload"
                                         accept=".json"
-                                        style={{ display: 'none' }}
+                                        className={styles.hidden}
                                         onChange={handleJsonFileUpload}
                                     />
                                     <button
@@ -998,20 +1001,19 @@ const ApiSettingsPage = () => {
                                     >
                                         📁 Upload JSON File
                                     </button>
-                                    <small style={{ color: '#666', marginLeft: '10px' }}>
+                                    <small className={styles.helperText}>
                                         or type/paste JSON below
                                     </small>
                                 </div>
                                 <textarea
-                                    className={`${styles.textarea} ${styles.jsonEditor}`}
+                                    className={`${styles.textarea} ${styles.jsonEditor} ${styles.monoText}`}
                                     value={mappingForm.mapping_json}
                                     onChange={(e) => setMappingForm({ ...mappingForm, mapping_json: e.target.value })}
                                     placeholder='{"field1": "value1", "field2": "value2"}'
                                     rows={12}
                                     required
-                                    style={{ fontFamily: 'monospace', fontSize: '13px' }}
                                 />
-                                <small style={{ color: '#666' }}>Enter valid JSON for the transformation mapping</small>
+                                <small className={styles.helperTextSmall}>Enter valid JSON for the transformation mapping</small>
                             </div>
 
                             <div className={styles.inputGroup}>
@@ -1021,7 +1023,7 @@ const ApiSettingsPage = () => {
                                         type="file"
                                         id="xmlFileUpload"
                                         accept=".xml"
-                                        style={{ display: 'none' }}
+                                        className={styles.hidden}
                                         onChange={handleXmlFileUpload}
                                     />
                                     <button
@@ -1031,11 +1033,11 @@ const ApiSettingsPage = () => {
                                     >
                                         📄 Upload Destination Schema
                                     </button>
-                                    <small style={{ color: '#666', marginLeft: '10px' }}>
+                                    <small className={styles.helperText}>
                                         {mappingForm.destination_schema_xml ? '✓ Schema uploaded' : 'Required for API transformations'}
                                     </small>
                                 </div>
-                                <small style={{ color: '#999', fontSize: '12px' }}>
+                                <small className={styles.helperTextSmall}>
                                     Upload the destination XML schema template. Source schema will be provided via API/webhook call.
                                 </small>
                             </div>
@@ -1085,7 +1087,7 @@ const ApiSettingsPage = () => {
                             <p><strong>⚠️ Important:</strong> Save these credentials now. The API secret will not be shown again!</p>
                         </div>
 
-                        <div style={{ marginTop: '20px' }}>
+                        <div className={styles.marginTop}>
                             <div className={styles.inputGroup}>
                                 <label className={styles.inputLabel}>API Key</label>
                                 <div className={styles.apiKeyValue}>
@@ -1114,9 +1116,8 @@ const ApiSettingsPage = () => {
                         </div>
 
                         <button
-                            className={`${styles.button} ${styles.buttonPrimary}`}
+                            className={`${styles.button} ${styles.buttonPrimary} ${styles.fullWidth} ${styles.marginTop}`}
                             onClick={() => setShowSecretModal(false)}
-                            style={{ marginTop: '20px', width: '100%' }}
                         >
                             I've Saved My Credentials
                         </button>
