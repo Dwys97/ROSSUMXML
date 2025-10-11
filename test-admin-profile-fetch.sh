@@ -135,14 +135,14 @@ run_test "Fetch user profile by ID" \
     "200"
 
 # Step 4: Test with invalid user ID
-run_test "Fetch profile with invalid ID" \
-    "/api/profile/999999" \
+run_test "Fetch profile with non-existent UUID" \
+    "/api/profile/00000000-0000-0000-0000-000000000000" \
     "GET" \
     "" \
     "404"
 
-# Step 5: Test with non-numeric ID
-run_test "Fetch profile with non-numeric ID" \
+# Step 5: Test with non-UUID format
+run_test "Fetch profile with invalid UUID format" \
     "/api/profile/invalid" \
     "GET" \
     "" \

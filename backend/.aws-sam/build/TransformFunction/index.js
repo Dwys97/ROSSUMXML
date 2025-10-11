@@ -2321,7 +2321,7 @@ exports.handler = async (event) => {
         // ISO 27001 Control: A.9.2.1 (User Registration)
         // Allows admins to fetch full profile data for any user
         // Note: path includes /api prefix in Lambda proxy integration
-        if (path.match(/^\/api\/profile\/[a-f0-9\-]{36}$/i) && method === 'GET') {
+        if (path.startsWith('/api/profile/') && method === 'GET') {
             const user = await verifyJWT(event);
             if (!user) {
                 return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
@@ -2343,8 +2343,16 @@ exports.handler = async (event) => {
                 // Extract user ID from path (UUID format)
                 const targetUserId = path.split('/').pop();
                 
-                if (!targetUserId || targetUserId.length !== 36) {
-                    return createResponse(400, JSON.stringify({ error: 'Invalid user ID format (expected UUID)' }));
+                // Validate UUID format (36 characters: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+                const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+                if (!targetUserId || !uuidRegex.test(targetUserId)) {
+                    await logSecurityEvent(pool, user.id, 'validation_failure', 'user', null, 'get_user_profile', false, {
+                        reason: 'invalid_uuid_format',
+                        provided_value: targetUserId
+                    });
+                    return createResponse(400, JSON.stringify({ 
+                        error: 'Invalid user ID format (expected UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)' 
+                    }));
                 }
 
                 // Fetch full user profile
