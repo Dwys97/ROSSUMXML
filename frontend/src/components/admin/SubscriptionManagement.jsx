@@ -52,10 +52,10 @@ function SubscriptionManagement() {
         }
     };
 
-    const handleUpdateSubscription = async (subscriptionId, updates) => {
+    const handleUpdateSubscription = async (userId, updates) => {
         try {
             const token = getToken();
-            const response = await fetch(`${API_BASE}/subscriptions/${subscriptionId}`, {
+            const response = await fetch(`${API_BASE}/subscriptions/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -141,24 +141,24 @@ function SubscriptionManagement() {
                                 <td>
                                     <select
                                         value={sub.level}
-                                        onChange={(e) => handleUpdateSubscription(sub.id, { level: e.target.value })}
+                                        onChange={(e) => handleUpdateSubscription(sub.user_id, { level: e.target.value })}
                                         className={styles.inlineSelect}
                                     >
                                         <option value="free">Free</option>
+                                        <option value="basic">Basic</option>
                                         <option value="professional">Professional</option>
-                                        <option value="premium">Premium</option>
                                         <option value="enterprise">Enterprise</option>
                                     </select>
                                 </td>
                                 <td>
                                     <select
                                         value={sub.status}
-                                        onChange={(e) => handleUpdateSubscription(sub.id, { status: e.target.value })}
+                                        onChange={(e) => handleUpdateSubscription(sub.user_id, { status: e.target.value })}
                                         className={styles.inlineSelect}
                                     >
                                         <option value="active">Active</option>
                                         <option value="inactive">Inactive</option>
-                                        <option value="cancelled">Cancelled</option>
+                                        <option value="suspended">Suspended</option>
                                     </select>
                                 </td>
                                 <td>{sub.starts_at ? new Date(sub.starts_at).toLocaleDateString() : 'N/A'}</td>
@@ -169,7 +169,7 @@ function SubscriptionManagement() {
                                         onClick={() => {
                                             const newExpiry = prompt('Enter new expiry date (YYYY-MM-DD):');
                                             if (newExpiry) {
-                                                handleUpdateSubscription(sub.id, { expires_at: newExpiry });
+                                                handleUpdateSubscription(sub.user_id, { expires_at: newExpiry });
                                             }
                                         }}
                                     >

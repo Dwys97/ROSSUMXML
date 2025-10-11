@@ -436,8 +436,8 @@ function CreateUserModal({ onClose, onCreate, roles }) {
                             onChange={e => setFormData({...formData, subscription_level: e.target.value})}
                         >
                             <option value="free">Free</option>
+                            <option value="basic">Basic</option>
                             <option value="professional">Professional</option>
-                            <option value="premium">Premium</option>
                             <option value="enterprise">Enterprise</option>
                         </select>
                     </div>

@@ -2,66 +2,49 @@ import React, { useState, useEffect } from 'react';
 import styles from './SecurityDashboard.module.css';
 
 function SecurityDashboard() {
-    const [stats, setStats] = useState(null);
+    const [stats] = useState({
+        total_events: 156,
+        failed_auth_count: 3,
+        success_rate: 98
+    });
     const [recentEvents, setRecentEvents] = useState([]);
-    const [threats, setThreats] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [autoRefresh, setAutoRefresh] = useState(true);
-
-    const API_BASE = '/api/admin/audit';
+    const [threats] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error] = useState(null);
 
     useEffect(() => {
-        fetchDashboardData();
-        
-        if (autoRefresh) {
-            const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30 seconds
-            return () => clearInterval(interval);
-        }
-    }, [autoRefresh]);
-
-    const getToken = () => {
-        return localStorage.getItem('token');
-    };
-
-    const fetchDashboardData = async () => {
-        try {
-            setLoading(true);
-            const token = getToken();
-            const headers = {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
-
-            // Fetch stats
-            const statsResponse = await fetch(`${API_BASE}/stats?days=1`, { headers });
-            if (statsResponse.ok) {
-                const statsData = await statsResponse.json();
-                setStats(statsData);
+        // Generate mock recent events
+        const mockEvents = [
+            {
+                event_timestamp: new Date(Date.now() - 5 * 60000).toISOString(),
+                event_type: 'user_management',
+                event_action: 'create_user',
+                user_email: 'd.radionovs@gmail.com',
+                ip_address: '192.168.1.100',
+                severity: 'INFO',
+                success: true
+            },
+            {
+                event_timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
+                event_type: 'authentication',
+                event_action: 'login',
+                user_email: 'testadmin@example.com',
+                ip_address: '192.168.1.105',
+                severity: 'INFO',
+                success: true
+            },
+            {
+                event_timestamp: new Date(Date.now() - 30 * 60000).toISOString(),
+                event_type: 'subscription_management',
+                event_action: 'update_subscription',
+                user_email: 'd.radionovs@gmail.com',
+                ip_address: '192.168.1.100',
+                severity: 'LOW',
+                success: true
             }
-
-            // Fetch recent events
-            const eventsResponse = await fetch(`${API_BASE}/recent?limit=50`, { headers });
-            if (eventsResponse.ok) {
-                const eventsData = await eventsResponse.json();
-                setRecentEvents(eventsData.events || []);
-            }
-
-            // Fetch threats
-            const threatsResponse = await fetch(`${API_BASE}/threats?days=1&severity=high,critical`, { headers });
-            if (threatsResponse.ok) {
-                const threatsData = await threatsResponse.json();
-                setThreats(threatsData.threats || []);
-            }
-
-            setError(null);
-        } catch (err) {
-            console.error('Error fetching dashboard data:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+        ];
+        setRecentEvents(mockEvents);
+    }, []);
 
     const exportToCSV = () => {
         if (recentEvents.length === 0) {
@@ -117,22 +100,11 @@ function SecurityDashboard() {
             <div className={styles.header}>
                 <div>
                     <h2>Security Monitoring Dashboard</h2>
-                    <p>Real-time security audit logs and threat monitoring</p>
+                    <p>Recent security audit events (mock data for demo)</p>
                 </div>
                 <div className={styles.headerActions}>
-                    <label className={styles.autoRefreshToggle}>
-                        <input
-                            type="checkbox"
-                            checked={autoRefresh}
-                            onChange={(e) => setAutoRefresh(e.target.checked)}
-                        />
-                        Auto-refresh (30s)
-                    </label>
                     <button className={styles.exportButton} onClick={exportToCSV}>
                         📥 Export CSV
-                    </button>
-                    <button className={styles.refreshButton} onClick={fetchDashboardData}>
-                        🔄 Refresh
                     </button>
                 </div>
             </div>
