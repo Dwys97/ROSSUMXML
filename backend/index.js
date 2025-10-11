@@ -721,8 +721,6 @@ exports.handler = async (event) => {
                         u.country,
                         u.zip_code,
                         u.company,
-                        u.bio,
-                        u.avatar_url,
                         u.created_at,
                         u.updated_at,
                         s.status as subscription_status,
@@ -763,8 +761,6 @@ exports.handler = async (event) => {
                     country: userData.country || '',
                     zipCode: userData.zip_code || '',
                     company: userData.company || '',
-                    bio: userData.bio || '',
-                    avatar_url: userData.avatar_url || '',
                     created_at: userData.created_at,
                     updated_at: userData.updated_at,
                     subscription_status: userData.subscription_status || 'inactive',
@@ -812,9 +808,7 @@ exports.handler = async (event) => {
                     city, 
                     country, 
                     zipCode,
-                    company,
-                    bio,
-                    avatar_url
+                    company
                 } = body;
 
                 // Validate required fields
@@ -835,12 +829,10 @@ exports.handler = async (event) => {
                         country = $5,
                         zip_code = $6,
                         company = $7,
-                        bio = $8,
-                        avatar_url = $9,
                         updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $10
-                    RETURNING id, username, email, full_name, phone, address, city, country, zip_code, company, bio, avatar_url, updated_at
-                `, [fullName, phone, address, city, country, zipCode, company, bio, avatar_url, userId]);
+                    WHERE id = $8
+                    RETURNING id, username, email, full_name, phone, address, city, country, zip_code, company, updated_at
+                `, [fullName, phone, address, city, country, zipCode, company, userId]);
 
                 if (result.rows.length === 0) {
                     return createResponse(404, JSON.stringify({
@@ -863,8 +855,6 @@ exports.handler = async (event) => {
                         country: updatedUser.country || '',
                         zipCode: updatedUser.zip_code || '',
                         company: updatedUser.company || '',
-                        bio: updatedUser.bio || '',
-                        avatar_url: updatedUser.avatar_url || '',
                         updated_at: updatedUser.updated_at
                     }
                 }));
@@ -2383,8 +2373,6 @@ exports.handler = async (event) => {
                         u.country,
                         u.zip_code,
                         u.company,
-                        u.bio,
-                        u.avatar_url,
                         u.created_at,
                         u.updated_at,
                         s.status as subscription_status,
@@ -2429,8 +2417,6 @@ exports.handler = async (event) => {
                     country: userData.country || '',
                     zip_code: userData.zip_code || '',
                     company: userData.company || '',
-                    bio: userData.bio || '',
-                    avatar_url: userData.avatar_url || '',
                     created_at: userData.created_at,
                     updated_at: userData.updated_at,
                     subscription_status: userData.subscription_status || 'inactive',
