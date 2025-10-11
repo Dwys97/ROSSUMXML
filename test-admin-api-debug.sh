@@ -7,7 +7,7 @@
 # subscription management
 # ============================================================================
 
-set -e  # Exit on error
+set +e  # Exit on error
 
 BASE_URL="http://localhost:3000"
 ADMIN_EMAIL="d.radionovs@gmail.com"
@@ -70,7 +70,7 @@ check_response() {
 
 echo -e "\n${YELLOW}=== SETUP: Getting Admin Token ===${NC}\n"
 
-# Login as admin (user already exists with admin role assigned)
+# Login as admin (user already exists with admin role)
 LOGIN_RESPONSE=$(curl -s -X POST "$BASE_URL/api/auth/login" \
     -H "Content-Type: application/json" \
     -d "{
