@@ -13,6 +13,7 @@ import EnterprisePage from './pages/EnterprisePage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import UserProfile from './components/profile/UserProfile';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import './App.css';
 
 function App() {
@@ -53,6 +54,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <UserProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
                 </ProtectedRoute>
               } 
             />

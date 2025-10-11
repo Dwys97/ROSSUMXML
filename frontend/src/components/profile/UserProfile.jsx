@@ -245,7 +245,10 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         address: '',
         city: '',
         country: '',
-        zipCode: ''
+        zipCode: '',
+        company: '',
+        bio: '',
+        avatar_url: ''
     });
 
     const [billingForm, setBillingForm] = useState({
@@ -289,7 +292,10 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                     address: data.address || '',
                     city: data.city || '',
                     country: data.country || '',
-                    zipCode: data.zipCode || ''
+                    zipCode: data.zipCode || '',
+                    company: data.company || '',
+                    bio: data.bio || '',
+                    avatar_url: data.avatar_url || ''
                 });
                 setBillingForm(prev => ({
                     ...prev,
@@ -562,6 +568,36 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                                 disabled={formSaved || loading}
                                             />
                                         </div>
+                                        <div className={styles.formField}>
+                                            <label>Company</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.company}
+                                                onChange={(e) => setEditForm(prev => ({...prev, company: e.target.value}))}
+                                                disabled={formSaved || loading}
+                                                placeholder="Your company name"
+                                            />
+                                        </div>
+                                        <div className={styles.formField}>
+                                            <label>Bio</label>
+                                            <textarea
+                                                value={editForm.bio}
+                                                onChange={(e) => setEditForm(prev => ({...prev, bio: e.target.value}))}
+                                                disabled={formSaved || loading}
+                                                rows={3}
+                                                placeholder="Tell us about yourself..."
+                                            />
+                                        </div>
+                                        <div className={styles.formField}>
+                                            <label>Avatar URL</label>
+                                            <input
+                                                type="url"
+                                                value={editForm.avatar_url}
+                                                onChange={(e) => setEditForm(prev => ({...prev, avatar_url: e.target.value}))}
+                                                disabled={formSaved || loading}
+                                                placeholder="https://example.com/avatar.jpg"
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className={styles.fieldGroup}>
@@ -643,6 +679,22 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                         <div className={styles.field}>
                                             <label>Phone</label>
                                             <p>{userData.phone || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Company</label>
+                                            <p>{userData.company || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Bio</label>
+                                            <p>{userData.bio || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Avatar URL</label>
+                                            <p>{userData.avatar_url ? (
+                                                <a href={userData.avatar_url} target="_blank" rel="noopener noreferrer">
+                                                    {userData.avatar_url}
+                                                </a>
+                                            ) : 'Not provided'}</p>
                                         </div>
                                     </div>
 

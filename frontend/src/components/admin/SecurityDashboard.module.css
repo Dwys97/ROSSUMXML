@@ -1,0 +1,317 @@
+.securityDashboard {
+    padding: 20px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 30px;
+}
+
+.header h2 {
+    font-size: 1.8rem;
+    color: #ffffff;
+    margin: 0 0 8px 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.header p {
+    color: #a5a9b5;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.headerActions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.exportButton, .refreshButton {
+    padding: 10px 18px;
+    background: rgba(29, 114, 243, 0.2);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    border: 1px solid rgba(29, 114, 243, 0.3);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 12px rgba(29, 114, 243, 0.2);
+}
+
+.exportButton:hover, .refreshButton:hover {
+    background: rgba(29, 114, 243, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(29, 114, 243, 0.3);
+}
+
+.statsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.statCard {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.statCard:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.statLabel {
+    font-size: 0.9rem;
+    color: #a5a9b5;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.statValue {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.threatsSection {
+    margin-bottom: 30px;
+}
+
+.threatsSection h3 {
+    color: #fca5a5;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    text-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.threatsList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.threatItem {
+    padding: 16px;
+    border-radius: 12px;
+    border-left: 4px solid;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.threatItem:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.threatHeader {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.threatType {
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 1rem;
+}
+
+.threatTime {
+    color: #a5a9b5;
+    font-size: 0.9rem;
+}
+
+.threatDetails {
+    color: #a5a9b5;
+    font-size: 0.9rem;
+}
+
+.severityCritical {
+    border-left-color: #dc2626;
+    background: rgba(220, 38, 38, 0.05);
+}
+
+.severityHigh {
+    border-left-color: #ea580c;
+    background: rgba(234, 88, 12, 0.05);
+}
+
+.severityMedium {
+    border-left-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.severityLow {
+    border-left-color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.severityInfo {
+    border-left-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.eventsSection {
+    margin-bottom: 20px;
+}
+
+.eventsSection h3 {
+    color: #ffffff;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+}
+
+.tableContainer {
+    overflow-x: auto;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.eventsTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.eventsTable th {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.eventsTable td {
+    padding: 14px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #a5a9b5;
+    font-size: 0.95rem;
+}
+
+.eventsTable tbody tr {
+    transition: all 0.3s ease;
+}
+
+.eventsTable tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.severityBadge {
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.severityBadge.severityCritical {
+    background: rgba(220, 38, 38, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.severityBadge.severityHigh {
+    background: rgba(234, 88, 12, 0.2);
+    color: #fdba74;
+    border: 1px solid rgba(234, 88, 12, 0.3);
+}
+
+.severityBadge.severityMedium {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.severityBadge.severityLow {
+    background: rgba(16, 185, 129, 0.2);
+    color: #86efac;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.severityBadge.severityInfo {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.statusSuccess {
+    color: #86efac;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.statusFailed {
+    color: #fca5a5;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.loading, .error {
+    text-align: center;
+    padding: 60px 20px;
+    font-size: 1.2rem;
+}
+
+.loading {
+    color: #a5a9b5;
+}
+
+.error {
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .headerActions {
+        flex-wrap: wrap;
+    }
+
+    .statsGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .eventsTable {
+        font-size: 0.85rem;
+    }
+
+    .eventsTable th,
+    .eventsTable td {
+        padding: 10px 8px;
+    }
+}
