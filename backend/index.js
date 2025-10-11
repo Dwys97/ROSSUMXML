@@ -2314,8 +2314,126 @@ exports.handler = async (event) => {
         // ADMIN PANEL ENDPOINTS (User, Role, Subscription Management)
         // ============================================================================
         // ISO 27001 Control: A.9.2 (User Access Management)
-        // Total: 11 endpoints for comprehensive admin panel functionality
+        // Total: 12 endpoints for comprehensive admin panel functionality
         // ============================================================================
+
+        // ENDPOINT 0: GET /api/profile/:userId - Get user profile by ID (Admin only)
+        // ISO 27001 Control: A.9.2.1 (User Registration)
+        // Allows admins to fetch full profile data for any user
+        // Note: path includes /api prefix in Lambda proxy integration
+        if (path.match(/^\/api\/profile\/[a-f0-9\-]{36}$/i) && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            // Check permission: user:read (admin only)
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                await logSecurityEvent(pool, user.id, 'authorization_failure', 'user', null, 'get_user_profile', false, {
+                    reason: 'insufficient_permissions',
+                    required_permission: 'user:read'
+                });
+                return createResponse(403, JSON.stringify({ 
+                    error: permissionCheck.error || 'Forbidden: user:read permission required' 
+                }));
+            }
+
+            try {
+                // Extract user ID from path (UUID format)
+                const targetUserId = path.split('/').pop();
+                
+                if (!targetUserId || targetUserId.length !== 36) {
+                    return createResponse(400, JSON.stringify({ error: 'Invalid user ID format (expected UUID)' }));
+                }
+
+                // Fetch full user profile
+                const result = await pool.query(`
+                    SELECT 
+                        u.id,
+                        u.username,
+                        u.email,
+                        u.full_name,
+                        u.phone,
+                        u.address,
+                        u.city,
+                        u.country,
+                        u.zip_code,
+                        u.company,
+                        u.bio,
+                        u.avatar_url,
+                        u.created_at,
+                        u.updated_at,
+                        s.status as subscription_status,
+                        s.level as subscription_level,
+                        s.expires_at as subscription_expires,
+                        bd.card_last4,
+                        bd.card_brand,
+                        bd.card_expiry,
+                        bd.billing_address,
+                        bd.billing_city,
+                        bd.billing_country,
+                        bd.billing_zip
+                    FROM users u
+                    LEFT JOIN subscriptions s ON u.id = s.user_id
+                    LEFT JOIN billing_details bd ON u.id = bd.user_id
+                    WHERE u.id = $1
+                `, [targetUserId]);
+
+                if (result.rows.length === 0) {
+                    await logSecurityEvent(pool, user.id, 'resource_not_found', 'user', targetUserId, 'get_user_profile', false, {
+                        reason: 'user_not_found'
+                    });
+                    return createResponse(404, JSON.stringify({ error: 'User not found' }));
+                }
+
+                const userData = result.rows[0];
+
+                // Log successful profile access
+                await logSecurityEvent(pool, user.id, 'data_access', 'user', targetUserId, 'get_user_profile', true, {
+                    accessed_fields: ['profile', 'subscription', 'billing']
+                });
+
+                // Return profile data (using snake_case to match database fields)
+                return createResponse(200, JSON.stringify({
+                    id: userData.id,
+                    username: userData.username,
+                    email: userData.email,
+                    full_name: userData.full_name,
+                    phone: userData.phone || '',
+                    address: userData.address || '',
+                    city: userData.city || '',
+                    country: userData.country || '',
+                    zip_code: userData.zip_code || '',
+                    company: userData.company || '',
+                    bio: userData.bio || '',
+                    avatar_url: userData.avatar_url || '',
+                    created_at: userData.created_at,
+                    updated_at: userData.updated_at,
+                    subscription_status: userData.subscription_status || 'inactive',
+                    subscription_level: userData.subscription_level || 'free',
+                    subscription_expires: userData.subscription_expires,
+                    card_last4: userData.card_last4 || '',
+                    card_brand: userData.card_brand || '',
+                    card_expiry: userData.card_expiry || '',
+                    billing_address: userData.billing_address || '',
+                    billing_city: userData.billing_city || '',
+                    billing_country: userData.billing_country || '',
+                    billing_zip: userData.billing_zip || ''
+                }));
+
+            } catch (err) {
+                console.error('Get user profile error:', err);
+                await logSecurityEvent(pool, user.id, 'system_error', 'user', null, 'get_user_profile', false, {
+                    error: err.message,
+                    stack: err.stack
+                });
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to fetch user profile',
+                    details: err.message 
+                }));
+            }
+        }
 
         // ENDPOINT 1: GET /api/admin/users - List all users
         if (path === '/api/admin/users' && method === 'GET') {

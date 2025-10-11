@@ -458,13 +458,75 @@ function CreateUserModal({ onClose, onCreate, roles }) {
 // Edit User Modal Component
 function EditUserModal({ user, onClose, onUpdate }) {
     const [formData, setFormData] = useState({
-        full_name: user.full_name || '',
-        phone: user.phone || '',
-        address: user.address || '',
-        city: user.city || '',
-        country: user.country || '',
-        zip_code: user.zip_code || ''
+        full_name: '',
+        phone: '',
+        address: '',
+        city: '',
+        country: '',
+        zip_code: '',
+        company: '',
+        bio: '',
+        avatar_url: ''
     });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        fetchUserProfile();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user.id]);
+
+    const fetchUserProfile = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            
+            // Fetch full profile data from /api/profile/:userId endpoint
+            const response = await fetch(`/api/profile/${user.id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch user profile');
+            }
+
+            const profileData = await response.json();
+            
+            // Populate form with fetched profile data
+            setFormData({
+                full_name: profileData.full_name || '',
+                phone: profileData.phone || '',
+                address: profileData.address || '',
+                city: profileData.city || '',
+                country: profileData.country || '',
+                zip_code: profileData.zip_code || '',
+                company: profileData.company || '',
+                bio: profileData.bio || '',
+                avatar_url: profileData.avatar_url || ''
+            });
+            setError(null);
+        } catch (err) {
+            console.error('Error fetching user profile:', err);
+            setError(err.message);
+            // Fallback to basic user data if profile fetch fails
+            setFormData({
+                full_name: user.full_name || '',
+                phone: user.phone || '',
+                address: user.address || '',
+                city: user.city || '',
+                country: user.country || '',
+                zip_code: user.zip_code || '',
+                company: '',
+                bio: '',
+                avatar_url: ''
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -475,6 +537,17 @@ function EditUserModal({ user, onClose, onUpdate }) {
         <div className={styles.modalOverlay} onClick={onClose}>
             <div className={styles.modal} onClick={e => e.stopPropagation()}>
                 <h3>Edit User: {user.email}</h3>
+                
+                {loading ? (
+                    <div className={styles.loadingMessage}>Loading user profile...</div>
+                ) : error ? (
+                    <div className={styles.errorMessage}>
+                        Warning: Could not load full profile. {error}
+                        <br />
+                        <small>Showing available data only.</small>
+                    </div>
+                ) : null}
+                
                 <form onSubmit={handleSubmit}>
                     <div className={styles.formGroup}>
                         <label>Full Name</label>
@@ -482,38 +555,97 @@ function EditUserModal({ user, onClose, onUpdate }) {
                             type="text"
                             value={formData.full_name}
                             onChange={e => setFormData({...formData, full_name: e.target.value})}
+                            disabled={loading}
                         />
                     </div>
+                    
                     <div className={styles.formGroup}>
                         <label>Phone</label>
                         <input
                             type="text"
                             value={formData.phone}
                             onChange={e => setFormData({...formData, phone: e.target.value})}
+                            disabled={loading}
                         />
                     </div>
+                    
+                    <div className={styles.formGroup}>
+                        <label>Company</label>
+                        <input
+                            type="text"
+                            value={formData.company}
+                            onChange={e => setFormData({...formData, company: e.target.value})}
+                            disabled={loading}
+                        />
+                    </div>
+                    
+                    <div className={styles.formGroup}>
+                        <label>Bio</label>
+                        <textarea
+                            value={formData.bio}
+                            onChange={e => setFormData({...formData, bio: e.target.value})}
+                            rows={3}
+                            disabled={loading}
+                        />
+                    </div>
+                    
+                    <div className={styles.formGroup}>
+                        <label>Address</label>
+                        <input
+                            type="text"
+                            value={formData.address}
+                            onChange={e => setFormData({...formData, address: e.target.value})}
+                            disabled={loading}
+                        />
+                    </div>
+                    
                     <div className={styles.formGroup}>
                         <label>City</label>
                         <input
                             type="text"
                             value={formData.city}
                             onChange={e => setFormData({...formData, city: e.target.value})}
+                            disabled={loading}
                         />
                     </div>
+                    
                     <div className={styles.formGroup}>
                         <label>Country</label>
                         <input
                             type="text"
                             value={formData.country}
                             onChange={e => setFormData({...formData, country: e.target.value})}
+                            disabled={loading}
                         />
                     </div>
+                    
+                    <div className={styles.formGroup}>
+                        <label>Zip Code</label>
+                        <input
+                            type="text"
+                            value={formData.zip_code}
+                            onChange={e => setFormData({...formData, zip_code: e.target.value})}
+                            disabled={loading}
+                        />
+                    </div>
+                    
+                    <div className={styles.formGroup}>
+                        <label>Avatar URL</label>
+                        <input
+                            type="url"
+                            value={formData.avatar_url}
+                            onChange={e => setFormData({...formData, avatar_url: e.target.value})}
+                            disabled={loading}
+                            placeholder="https://example.com/avatar.jpg"
+                        />
+                    </div>
+                    
                     <div className={styles.formActions}>
                         <button type="button" onClick={onClose} className={styles.cancelButton}>
                             Cancel
                         </button>
-                        <button type="submit" className={styles.primaryButton}>
-                            Update User
+                        <button type="submit" className={styles.primaryButton} disabled={loading}>
+                            {loading ? 'Loading...' : 'Update User'}
                         </button>
                     </div>
                 </form>
