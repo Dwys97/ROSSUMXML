@@ -6,6 +6,57 @@
  */
 
 const crypto = require('crypto');
+const { getIpLocation, extractIpAddress } = require('./ipLocation');
+
+/**
+ * Determine website location from request path
+ * @param {string} path - Request path
+ * @param {string} method - HTTP method
+ * @returns {string} Location identifier
+ */
+function determineLocation(path, method = 'GET') {
+    if (!path) return 'unknown';
+    
+    // Backend API endpoints
+    if (path.startsWith('/api/')) {
+        // Authentication endpoints
+        if (path.includes('/auth/login')) return 'backend-api:login';
+        if (path.includes('/auth/register')) return 'backend-api:register';
+        if (path.includes('/auth/')) return 'backend-api:auth';
+        
+        // Transformation endpoints
+        if (path.includes('/transform')) return 'backend-api:transformation';
+        if (path.includes('/mappings')) return 'backend-api:mappings';
+        
+        // Schema endpoints
+        if (path.includes('/schema')) return 'backend-api:schema';
+        
+        // Security/Admin endpoints
+        if (path.includes('/security')) return 'backend-api:security-admin';
+        if (path.includes('/audit')) return 'backend-api:audit';
+        if (path.includes('/users')) return 'backend-api:user-management';
+        if (path.includes('/roles')) return 'backend-api:roles';
+        if (path.includes('/permissions')) return 'backend-api:permissions';
+        
+        // API Settings
+        if (path.includes('/api-settings')) return 'backend-api:settings';
+        
+        // Generic API
+        return 'backend-api:' + path.split('/')[2] || 'unknown';
+    }
+    
+    // Frontend pages (if served through backend)
+    if (path.includes('/login')) return 'frontend:login';
+    if (path.includes('/register')) return 'frontend:register';
+    if (path.includes('/editor')) return 'frontend:editor';
+    if (path.includes('/transform')) return 'frontend:transformation';
+    if (path.includes('/mapping')) return 'frontend:mappings';
+    if (path.includes('/admin')) return 'frontend:admin-dashboard';
+    if (path.includes('/settings')) return 'frontend:settings';
+    if (path.includes('/billing')) return 'frontend:billing';
+    
+    return 'unknown';
+}
 
 // ============================================================================
 // XML Security Validation (XXE, Billion Laughs, SSRF Prevention)
@@ -362,12 +413,51 @@ async function userCanAccessResource(pool, userId, resourceType, resourceId, acc
  * @param {Object} metadata - Additional metadata
  * @returns {Promise<void>}
  */
-async function logSecurityEvent(pool, userId, eventType, resourceType, resourceId, action, success, metadata = {}) {
+async function logSecurityEvent(pool, userId, eventType, resourceType, resourceId, action, success, metadata = {}, ipAddress = null, userAgent = null, location = null, ipLocation = null) {
     const client = await pool.connect();
     try {
+        // If location/IP data not provided, try to get from global request context
+        const context = global.currentRequestContext || {};
+        const finalIpAddress = ipAddress || context.ipAddress || null;
+        const finalUserAgent = userAgent || context.userAgent || null;
+        const finalLocation = location || context.location || null;
+        const finalIpLocation = ipLocation || context.ipLocation || null;
+        
+        // Debug logging
+        if (finalLocation) {
+            console.log(`[SECURITY AUDIT] Logging event at location: ${finalLocation}`);
+        }
+        
+        // Check if logging is enabled before writing to audit log
+        const settingsResult = await client.query(
+            `SELECT setting_value FROM security_settings WHERE setting_key = 'logging_enabled'`
+        );
+        
+        // Default to enabled if setting doesn't exist
+        const loggingEnabled = settingsResult.rows.length === 0 
+            ? true 
+            : settingsResult.rows[0].setting_value === 'true';
+        
+        if (!loggingEnabled) {
+            console.log(`[SECURITY AUDIT] Logging disabled - skipping event: ${eventType}/${action}`);
+            return; // Skip logging
+        }
+        
         await client.query(
-            'SELECT log_security_event($1, $2, $3, $4, $5, $6, $7)',
-            [userId, eventType, resourceType, resourceId, action, success, JSON.stringify(metadata)]
+            'SELECT log_security_event($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+            [
+                userId, 
+                eventType, 
+                resourceType, 
+                resourceId, 
+                action, 
+                success, 
+                finalIpAddress,
+                finalUserAgent,
+                JSON.stringify(metadata),
+                finalLocation,
+                finalIpLocation ? JSON.stringify(finalIpLocation) : null
+            ]
         );
     } catch (error) {
         console.error('Failed to log security event:', error);
@@ -530,5 +620,10 @@ module.exports = {
     setRLSContext,
     requirePermission,
     requireRole,
-    requireResourceAccess
+    requireResourceAccess,
+    
+    // Location helpers
+    determineLocation,
+    getIpLocation,
+    extractIpAddress
 };

@@ -20,7 +20,10 @@ const {
     requireRole,
     requireResourceAccess,
     logSecurityEvent,
-    setRLSContext
+    setRLSContext,
+    determineLocation,
+    getIpLocation,
+    extractIpAddress
 } = require('./utils/lambdaSecurity');
 
 // --- Enhanced Audit Logging ---
@@ -47,6 +50,30 @@ if (!JWT_SECRET) {
 }
 
 // --- Helper Functions ---
+
+/**
+ * Enhanced security event logger with location and IP geolocation
+ */
+async function logSecurityEventWithContext(pool, userId, eventType, resourceType, resourceId, action, success, metadata = {}) {
+    // Access request context from the current scope (passed down from handler)
+    const context = global.currentRequestContext || {};
+    
+    return logSecurityEvent(
+        pool,
+        userId,
+        eventType,
+        resourceType,
+        resourceId,
+        action,
+        success,
+        metadata,
+        context.ipAddress || null,
+        context.userAgent || null,
+        context.location || null,
+        context.ipLocation || null
+    );
+}
+
 function getCardBrand(cardNumber) {
     const num = cardNumber.replace(/\s/g, '');
     
@@ -358,6 +385,35 @@ async function checkApiSettingsPermission(userId, path, method) {
 }
 
 exports.handler = async (event) => {
+    // Extract request metadata for security logging
+    const requestIp = extractIpAddress(event);
+    const requestPath = event.requestContext?.http?.path || event.path;
+    const requestMethod = event.httpMethod || event.requestContext?.http?.method;
+    const requestLocation = determineLocation(requestPath, requestMethod);
+    const userAgent = event.headers?.['user-agent'] || event.headers?.['User-Agent'] || 'Unknown';
+    
+    // Debug logging
+    console.log(`[REQUEST] ${requestMethod} ${requestPath} -> Location: ${requestLocation}, IP: ${requestIp}`);
+    
+    // Get IP geolocation (async, non-blocking)
+    let requestIpLocation = null;
+    try {
+        requestIpLocation = await getIpLocation(requestIp);
+        if (requestIpLocation) {
+            console.log(`[IP LOCATION] ${requestIp} -> ${requestIpLocation.city || 'Unknown'}, ${requestIpLocation.country || 'Unknown'}`);
+        }
+    } catch (err) {
+        console.warn('[Security] Failed to get IP location:', err.message);
+    }
+    
+    // Store in global context for logging functions
+    global.currentRequestContext = {
+        ipAddress: requestIp,
+        userAgent: userAgent,
+        location: requestLocation,
+        ipLocation: requestIpLocation
+    };
+    
     if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
         return {
             statusCode: 200,
@@ -721,8 +777,6 @@ exports.handler = async (event) => {
                         u.country,
                         u.zip_code,
                         u.company,
-                        u.bio,
-                        u.avatar_url,
                         u.created_at,
                         u.updated_at,
                         s.status as subscription_status,
@@ -763,8 +817,6 @@ exports.handler = async (event) => {
                     country: userData.country || '',
                     zipCode: userData.zip_code || '',
                     company: userData.company || '',
-                    bio: userData.bio || '',
-                    avatar_url: userData.avatar_url || '',
                     created_at: userData.created_at,
                     updated_at: userData.updated_at,
                     subscription_status: userData.subscription_status || 'inactive',
@@ -802,7 +854,7 @@ exports.handler = async (event) => {
         if (path.endsWith('/user/profile/update') && (event.httpMethod === 'POST' || event.httpMethod === 'PUT' || event.requestContext?.http?.method === 'POST' || event.requestContext?.http?.method === 'PUT')) {
             try {
                 // Verify JWT token
-                const decoded = verifyJWT(event);
+                const decoded = await verifyJWT(event);
                 const userId = decoded.id;
 
                 const { 
@@ -811,7 +863,8 @@ exports.handler = async (event) => {
                     address, 
                     city, 
                     country, 
-                    zipCode 
+                    zipCode,
+                    company
                 } = body;
 
                 // Validate required fields
@@ -831,10 +884,11 @@ exports.handler = async (event) => {
                         city = $4,
                         country = $5,
                         zip_code = $6,
+                        company = $7,
                         updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $7
-                    RETURNING id, username, email, full_name, phone, address, city, country, zip_code, updated_at
-                `, [fullName, phone, address, city, country, zipCode, userId]);
+                    WHERE id = $8
+                    RETURNING id, username, email, full_name, phone, address, city, country, zip_code, company, updated_at
+                `, [fullName, phone, address, city, country, zipCode, company, userId]);
 
                 if (result.rows.length === 0) {
                     return createResponse(404, JSON.stringify({
@@ -856,6 +910,7 @@ exports.handler = async (event) => {
                         city: updatedUser.city || '',
                         country: updatedUser.country || '',
                         zipCode: updatedUser.zip_code || '',
+                        company: updatedUser.company || '',
                         updated_at: updatedUser.updated_at
                     }
                 }));
@@ -2374,8 +2429,6 @@ exports.handler = async (event) => {
                         u.country,
                         u.zip_code,
                         u.company,
-                        u.bio,
-                        u.avatar_url,
                         u.created_at,
                         u.updated_at,
                         s.status as subscription_status,
@@ -2420,8 +2473,6 @@ exports.handler = async (event) => {
                     country: userData.country || '',
                     zip_code: userData.zip_code || '',
                     company: userData.company || '',
-                    bio: userData.bio || '',
-                    avatar_url: userData.avatar_url || '',
                     created_at: userData.created_at,
                     updated_at: userData.updated_at,
                     subscription_status: userData.subscription_status || 'inactive',
@@ -3191,13 +3242,130 @@ exports.handler = async (event) => {
         }
 
         // ============================================================================
+        // SECURITY ENDPOINTS - Audit Logs & Security Settings
+        // ============================================================================
+
+        // GET /api/security/audit-logs - Get audit logs with filtering
+        if (path === '/api/security/audit-logs' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'view_audit_log');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: permissionCheck.error || 'Forbidden: view_audit_log permission required' 
+                }));
+            }
+
+            const securityRoutes = require('./routes/security.routes');
+            return await securityRoutes.getAuditLogs(event);
+        }
+
+        // GET /api/security/settings - Get security settings
+        if (path === '/api/security/settings' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'view_audit_log');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: permissionCheck.error || 'Forbidden: view_audit_log permission required' 
+                }));
+            }
+
+            const securityRoutes = require('./routes/security.routes');
+            return await securityRoutes.getSecuritySettings(event);
+        }
+
+        // POST /api/security/settings - Update security settings
+        if (path === '/api/security/settings' && method === 'POST') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            // Only admins can update security settings
+            const permissionCheck = await requirePermission(pool, user.id, 'manage_users');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: 'Forbidden: Admin permission required to update security settings' 
+                }));
+            }
+
+            const securityRoutes = require('./routes/security.routes');
+            return await securityRoutes.updateSecuritySettings(event, user.id);
+        }
+
+        // DELETE /api/security/audit-logs - Clear audit logs (with password)
+        if (path === '/api/security/audit-logs' && method === 'DELETE') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            // Only admins can clear audit logs
+            const permissionCheck = await requirePermission(pool, user.id, 'manage_users');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: 'Forbidden: Admin permission required to clear audit logs' 
+                }));
+            }
+
+            const securityRoutes = require('./routes/security.routes');
+            return await securityRoutes.clearAuditLogs(event, user.id);
+        }
+
+        // ============================================================================
         // END OF ADMIN PANEL ENDPOINTS
         // ============================================================================
 
+        // Log unauthorized API access attempt (404 on API endpoints)
+        if (path && path.startsWith('/api/')) {
+            await logSecurityEventWithContext(
+                pool,
+                null, // No user - unauthorized
+                'unauthorized_access',
+                'api_endpoint',
+                null,
+                `${method} ${path}`,
+                false,
+                {
+                    reason: 'Endpoint not found or access denied',
+                    path: path,
+                    method: method
+                }
+            );
+        }
+
         return createResponse(404, JSON.stringify({ error: 'Endpoint not found' }), 'application/json');
 
-        } catch (err) {
+    } catch (err) {
         console.error('Lambda error:', err);
+        
+        // Log critical errors with context
+        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+            await logSecurityEventWithContext(
+                pool,
+                null,
+                'authentication_failed',
+                'jwt',
+                null,
+                'token_validation',
+                false,
+                {
+                    error: err.message,
+                    errorType: err.name
+                }
+            );
+        }
+        
         return createResponse(500, JSON.stringify({ error: 'Transformation failed', details: err.message }), 'application/json');
+    } finally {
+        // Clear global context
+        global.currentRequestContext = null;
     }
-};
+}
