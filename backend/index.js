@@ -84,6 +84,81 @@ function getCardBrand(cardNumber) {
     
     return 'Unknown';
 }
+
+// ------------------
+// Rossum JSON to XML Converter
+// ------------------
+/**
+ * Converts Rossum JSON annotation content to XML format
+ * @param {Object} annotation - The annotation object from Rossum webhook payload
+ * @returns {string} XML string
+ */
+function convertRossumJsonToXml(annotation) {
+    const doc = new DOMParser().parseFromString('<RossumInvoice/>', 'text/xml');
+    const root = doc.documentElement;
+    
+    if (!annotation || !annotation.content || !Array.isArray(annotation.content)) {
+        throw new Error('Invalid Rossum annotation structure - missing content array');
+    }
+    
+    // Add annotation metadata
+    const metadata = doc.createElement('Metadata');
+    metadata.appendChild(createTextElement(doc, 'AnnotationId', annotation.id));
+    metadata.appendChild(createTextElement(doc, 'Status', annotation.status));
+    if (annotation.modified_at) {
+        metadata.appendChild(createTextElement(doc, 'ModifiedAt', annotation.modified_at));
+    }
+    root.appendChild(metadata);
+    
+    // Process each section in the content array
+    annotation.content.forEach(section => {
+        if (section.category !== 'section') return;
+        
+        const sectionElement = doc.createElement(section.schema_id || 'Section');
+        
+        // Process children (datapoints and multivalues)
+        if (section.children && Array.isArray(section.children)) {
+            section.children.forEach(child => {
+                if (child.category === 'datapoint' && child.content) {
+                    const field = doc.createElement(child.schema_id || 'Field');
+                    field.textContent = child.content.value || '';
+                    sectionElement.appendChild(field);
+                } else if (child.category === 'multivalue' && child.children) {
+                    // Handle line items (tuples)
+                    const multiElement = doc.createElement(child.schema_id || 'MultiValue');
+                    child.children.forEach(tuple => {
+                        if (tuple.category === 'tuple' && tuple.children) {
+                            const tupleElement = doc.createElement('Item');
+                            tuple.children.forEach(field => {
+                                if (field.category === 'datapoint' && field.content) {
+                                    const fieldElement = doc.createElement(field.schema_id || 'Field');
+                                    fieldElement.textContent = field.content.value || '';
+                                    tupleElement.appendChild(fieldElement);
+                                }
+                            });
+                            multiElement.appendChild(tupleElement);
+                        }
+                    });
+                    sectionElement.appendChild(multiElement);
+                }
+            });
+        }
+        
+        root.appendChild(sectionElement);
+    });
+    
+    return new XMLSerializer().serializeToString(doc);
+}
+
+/**
+ * Helper function to create a text element
+ */
+function createTextElement(doc, tagName, textContent) {
+    const element = doc.createElement(tagName);
+    element.textContent = textContent || '';
+    return element;
+}
+
 // ------------------
 // XML Helpers (existing logic preserved)
 // ------------------
@@ -2087,7 +2162,7 @@ exports.handler = async (event) => {
                     // ============================================
                     // STEP 5: FETCH XML FROM ROSSUM API
                     // ============================================
-                    console.log(`[Rossum Webhook] Fetching XML from: ${annotationUrl}`);
+                    console.log(`[Rossum Webhook] Processing annotation content for: ${annotationUrl}`);
                     
                     // Update webhook event status to processing
                     await client.query(
@@ -2095,54 +2170,25 @@ exports.handler = async (event) => {
                         ['processing', webhookEventId]
                     );
                     
-                    // Construct Rossum export URL
-                    // Rossum provides XML export via /export endpoint with format parameter
-                    const exportUrl = `${annotationUrl}/export?format=xml`;
-                    
+                    // Rossum sends the extracted data in the webhook payload as annotation.content (JSON)
+                    // We need to convert this JSON to XML format
                     let sourceXml;
                     try {
-                        const rossumResponse = await fetch(exportUrl, {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `Bearer ${config.rossum_api_token}`,
-                                'Accept': 'application/xml',
-                                'User-Agent': 'ROSSUMXML-Webhook/1.0'
-                            },
-                            timeout: (config.webhook_timeout_seconds || 30) * 1000
-                        });
-                        
-                        if (!rossumResponse.ok) {
-                            const errorText = await rossumResponse.text();
-                            console.error(`[Rossum Webhook] Rossum API error: ${rossumResponse.status}`, errorText);
-                            
-                            // Update webhook event with error
-                            await client.query(
-                                `UPDATE webhook_events 
-                                 SET status = $1, error_message = $2, http_status_code = $3, 
-                                     response_payload = $4, updated_at = CURRENT_TIMESTAMP 
-                                 WHERE id = $5`,
-                                [
-                                    'failed',
-                                    `Failed to fetch XML from Rossum: ${rossumResponse.status}`,
-                                    rossumResponse.status,
-                                    errorText,
-                                    webhookEventId
-                                ]
-                            );
-                            
-                            return createResponse(502, JSON.stringify({ 
-                                error: 'Failed to fetch XML from Rossum API',
-                                message: `Rossum API returned status ${rossumResponse.status}`,
-                                details: errorText,
-                                annotationUrl: annotationUrl
-                            }));
+                        if (!rossumPayload.annotation.content || !Array.isArray(rossumPayload.annotation.content)) {
+                            throw new Error('Webhook payload does not contain annotation.content array');
                         }
                         
-                        sourceXml = await rossumResponse.text();
-                        console.log(`[Rossum Webhook] Fetched XML: ${sourceXml.length} bytes`);
+                        console.log(`[Rossum Webhook] Converting Rossum content to XML (${rossumPayload.annotation.content.length} sections)`);
                         
-                    } catch (fetchErr) {
-                        console.error('[Rossum Webhook] Error fetching from Rossum:', fetchErr);
+                        // Convert Rossum JSON content to XML
+                        sourceXml = convertRossumJsonToXml(rossumPayload.annotation);
+                        console.log(`[Rossum Webhook] Converted to XML: ${sourceXml.length} bytes`);
+                        console.log(`\n========== SOURCE XML (from Rossum JSON) ==========`);
+                        console.log(sourceXml);
+                        console.log(`========== END SOURCE XML ==========\n`);
+                        
+                    } catch (conversionErr) {
+                        console.error('[Rossum Webhook] Error converting Rossum data to XML:', conversionErr);
                         
                         // Update webhook event with error
                         await client.query(
@@ -2151,15 +2197,15 @@ exports.handler = async (event) => {
                              WHERE id = $3`,
                             [
                                 'failed',
-                                `Network error fetching from Rossum: ${fetchErr.message}`,
+                                `Error converting Rossum data to XML: ${conversionErr.message}`,
                                 webhookEventId
                             ]
                         );
                         
                         return createResponse(502, JSON.stringify({ 
-                            error: 'Network error connecting to Rossum API',
-                            message: fetchErr.message,
-                            annotationUrl: exportUrl
+                            error: 'Error converting Rossum data to XML',
+                            message: conversionErr.message,
+                            annotationUrl: annotationUrl
                         }));
                     }
                     
@@ -2184,6 +2230,9 @@ exports.handler = async (event) => {
                         );
                         
                         console.log(`[Rossum Webhook] Transformation successful: ${transformedXml.length} bytes`);
+                        console.log(`\n========== TRANSFORMED XML (output) ==========`);
+                        console.log(transformedXml);
+                        console.log(`========== END TRANSFORMED XML ==========\n`);
                         
                     } catch (transformErr) {
                         console.error('[Rossum Webhook] Transformation error:', transformErr);
