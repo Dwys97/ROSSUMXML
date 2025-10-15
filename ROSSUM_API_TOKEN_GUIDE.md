@@ -18,6 +18,87 @@
 
 ## 🔑 How to Get Rossum API Token
 
+## Method 1: Using the Rossum API (Recommended)
+
+The most reliable way to obtain your Rossum API token is through the authentication API endpoint.
+
+**Important:** Each Rossum account has its own unique URL prefix (subdomain). The URL format is:
+```
+https://<your-organization>.rossum.app/api/v1/auth/login
+```
+
+For example:
+- `https://xmlmapper.rossum.app/api/v1/auth/login`
+- `https://acme-corp.rossum.app/api/v1/auth/login`
+- `https://east-west-trading.rossum.app/api/v1/auth/login`
+
+**Note:** It's NOT `api.rossum.ai` - each account has a custom prefix!
+
+### Step 1: Login via API
+
+Replace `<your-organization>` with your Rossum account prefix:
+
+```bash
+curl -s -H 'Content-Type: application/json' \
+  -d '{"username": "your-email@example.com", "password": "your-password"}' \
+  'https://<your-organization>.rossum.app/api/v1/auth/login'
+```
+
+**Example Response:**
+```json
+{"key": "db313f24f5738c8e04635e036ec8a45cdd6d6b03"}
+```
+
+**Important Notes:**
+- Use your **Rossum login email** and **password** (same credentials you use to log into Rossum UI)
+- The returned `key` is your API token
+- This key is valid for **162 hours** (approximately 7 days) by default
+- The key remains valid until you explicitly log out or it expires
+
+**To obtain YOUR token, run this command:**
+
+### Step 2: Find Your Organization Prefix
+
+If you don't know your organization prefix, check:
+1. The URL you use to log into Rossum (e.g., `https://xmlmapper.rossum.app`)
+2. Your Rossum welcome email or account setup documentation
+3. Contact your Rossum administrator
+
+### Step 3: Use the Token
+
+The `key` value in the response is your **Rossum API Token**. This token:
+- Is valid for **162 hours** (approximately 6.75 days) by default
+- Can be used to authenticate API requests to Rossum
+- Will expire when you log out or after the timeout period
+
+**Copy this key** - you'll need to add it to your ROSSUMXML API Settings.
+
+---
+
+## Quick Copy-Paste Commands
+
+### Get Token via API
+```bash
+# Replace YOUR_ORGANIZATION with your Rossum prefix (e.g., xmlmapper, acme-corp, etc.)
+# Replace YOUR_EMAIL and YOUR_PASSWORD with your credentials
+curl -s -H 'Content-Type: application/json' \
+  -d '{"username": "YOUR_EMAIL", "password": "YOUR_PASSWORD"}' \
+  'https://YOUR_ORGANIZATION.rossum.app/api/v1/auth/login' | jq -r '.key'
+```
+
+### Example (xmlmapper organization):
+```bash
+curl -s -H 'Content-Type: application/json' \
+  -d '{"username": "jijesiv423@bdnets.com", "password": "Cancunmexico2025"}' \
+  'https://xmlmapper.rossum.app/api/v1/auth/login' | jq -r '.key'
+```
+
+Replace `YOUR_PASSWORD` with your actual Rossum password.
+
+---
+
+### **Method 2: UI-based Token Generation**
+
 The API token location depends on your Rossum account type and version. Here are all the possible locations:
 
 ### **Option 1: User Settings → API Tokens**
@@ -181,7 +262,38 @@ ps aux | grep "sam local" | grep -v grep
 
 ---
 
-## 📊 Expected Results
+## � Troubleshooting Login API
+
+### **Error: "Unable to log in with provided credentials"**
+
+If you get this error, check the following:
+
+1. **Verify your credentials in Rossum UI:**
+   - Go to https://rossum.app or your organization's Rossum domain
+   - Try logging in with the same email and password
+   - If login fails, reset your password
+
+2. **Check for organization-specific domain:**
+   - Some organizations use custom Rossum domains like `https://your-company.rossum.app`
+   - Try replacing `api.rossum.app` with your organization's domain in the API URL:
+   ```bash
+   curl -s -H 'Content-Type: application/json' \
+     -d '{"username": "your-email@example.com", "password": "your-password"}' \
+     'https://your-company.rossum.app/api/v1/auth/login'
+   ```
+
+3. **Check for SSO/SAML authentication:**
+   - If your organization uses SSO (Single Sign-On), you might need to:
+   - Contact your Rossum admin to generate an API token for you
+   - OR use the UI-based token generation methods below
+
+4. **Password special characters:**
+   - If your password contains special characters (`!`, `$`, `@`, etc.), make sure they're properly escaped
+   - Or use single quotes around the JSON payload
+
+---
+
+## �📊 Expected Results
 
 ### **✅ Success (No Token Needed):**
 ```
