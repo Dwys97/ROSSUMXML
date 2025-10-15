@@ -1875,13 +1875,17 @@ exports.handler = async (event) => {
                 // ============================================
                 // STEP 1: AUTHENTICATE REQUEST
                 // ============================================
-                const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+                // Accept API key from either header OR query parameter
+                // (Rossum Extensions don't support injecting secrets as headers, so we use query param)
+                const apiKey = event.headers?.['x-api-key'] || 
+                              event.headers?.['X-Api-Key'] ||
+                              event.queryStringParameters?.api_key;
                 
                 if (!apiKey) {
                     console.log('[Rossum Webhook] Missing API key');
                     return createResponse(401, JSON.stringify({ 
                         error: 'Missing API key',
-                        message: 'Please provide your ROSSUMXML API key in the x-api-key header',
+                        message: 'Please provide your ROSSUMXML API key in the x-api-key header or api_key query parameter',
                         documentation: 'https://docs.rossumxml.com/webhooks/rossum-integration'
                     }));
                 }

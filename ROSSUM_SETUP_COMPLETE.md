@@ -89,6 +89,19 @@ LIMIT 5;
 
 ### Step 5: Expected Success Result
 
+**Note:** As of October 15, 2025, we're troubleshooting the XML export endpoint. Current status:
+
+✅ **Working:**
+- Webhook delivery from Rossum
+- API key authentication
+- Request parsing and logging
+
+❌ **In Progress:**
+- Finding correct Rossum XML export endpoint
+- Current error: 404 on `/export?format=xml`
+- See `ROSSUM_TESTING_PROGRESS.md` for details
+
+**When fully working, you'll see:**
 ```
 time                 | event_type | status  | error_message | source_xml_size | transformed_xml_size | processing_time_ms
 ---------------------+------------+---------+---------------+-----------------+----------------------+-------------------
@@ -267,5 +280,29 @@ Before testing, confirm:
 
 ---
 
-**Status:** All configuration complete. Ready for testing!  
-**Updated:** October 15, 2025 - Token added successfully
+## 📝 Current Status Update
+
+**Date:** October 15, 2025
+
+### What's Working ✅
+1. ✅ Webhook delivery (10+ webhooks received)
+2. ✅ API key authentication via query parameter
+3. ✅ Database logging (all events captured)
+4. ✅ Rossum API token configured
+5. ✅ LocalTunnel and backend operational
+
+### What's Being Investigated 🔍
+1. **Rossum XML Export Endpoint**
+   - Current endpoint `/export?format=xml` returns 404
+   - Rossum does support XML export (confirmed by user)
+   - Need to find correct endpoint or configuration
+   - See `ROSSUM_TESTING_PROGRESS.md` for investigation details
+
+### Next Steps
+1. Check Rossum queue settings for XML export configuration
+2. Review Rossum API documentation for export endpoints
+3. Test alternative export endpoints
+4. Contact Rossum support if needed
+
+**Integration Status:** 95% Complete (webhooks working, troubleshooting XML format)  
+**Updated:** October 15, 2025 - Webhooks confirmed working
