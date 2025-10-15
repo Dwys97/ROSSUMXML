@@ -1725,13 +1725,18 @@ exports.handler = async (event) => {
 
         // Transform XML using API key's linked mapping (for webhooks and API integrations)
         // This is separate from the frontend /api/transform endpoint
+        // AUTH: API key only (no JWT required) - designed for external webhooks like Rossum AI
         if (path === '/api/webhook/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
-                const user = await verifyJWT(event);
+                // Get the API key from x-api-key header
+                const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
                 
-                // Get the API key from the Authorization header
-                const authHeader = event.headers?.Authorization || event.headers?.authorization;
-                const apiKey = authHeader.slice(7); // Remove 'Bearer ' prefix
+                if (!apiKey) {
+                    return createResponse(401, JSON.stringify({ 
+                        error: 'Missing API key',
+                        details: 'Please provide your API key in the x-api-key header'
+                    }));
+                }
                 
                 // Get source XML from request body (raw XML, not JSON-parsed)
                 const sourceXml = event.body;
@@ -1742,39 +1747,114 @@ exports.handler = async (event) => {
                 
                 const client = await pool.connect();
                 try {
-                    // Get the API key's linked transformation mapping
-                    const result = await client.query(
-                        `SELECT tm.mapping_json, tm.destination_schema_xml, tm.mapping_name
+                    // Verify API key and get user ID + mapping in one query
+                    const keyResult = await client.query(
+                        `SELECT ak.user_id, ak.is_active, ak.expires_at, ak.key_name,
+                                tm.mapping_json, tm.destination_schema_xml, tm.mapping_name,
+                                tm.source_schema_type, tm.destination_schema_type
                          FROM api_keys ak
                          JOIN transformation_mappings tm ON tm.id = ak.default_mapping_id
-                         WHERE ak.api_key = $1 AND ak.user_id = $2`,
-                        [apiKey, user.id]
+                         WHERE ak.api_key = $1`,
+                        [apiKey]
                     );
                     
-                    if (result.rows.length === 0) {
-                        return createResponse(404, JSON.stringify({ 
-                            error: 'No transformation mapping linked to this API key. Please configure a mapping in API Settings.' 
+                    if (keyResult.rows.length === 0) {
+                        // Log failed API key authentication
+                        await logSecurityEvent(
+                            pool,
+                            null,
+                            'authentication_failed',
+                            'api_key',
+                            null,
+                            '/api/webhook/transform',
+                            false,
+                            { error: 'Invalid API key', apiKeyPrefix: apiKey.substring(0, 10) }
+                        );
+                        
+                        return createResponse(401, JSON.stringify({ 
+                            error: 'Invalid API key',
+                            details: 'The provided API key is not valid'
                         }));
                     }
                     
-                    const { mapping_json, destination_schema_xml, mapping_name } = result.rows[0];
+                    const apiKeyData = keyResult.rows[0];
                     
-                    if (!destination_schema_xml) {
+                    // Check if API key is active
+                    if (!apiKeyData.is_active) {
+                        await logSecurityEvent(
+                            pool,
+                            apiKeyData.user_id,
+                            'authentication_failed',
+                            'api_key',
+                            null,
+                            '/api/webhook/transform',
+                            false,
+                            { error: 'API key is disabled', keyName: apiKeyData.key_name }
+                        );
+                        
+                        return createResponse(403, JSON.stringify({ 
+                            error: 'API key is disabled',
+                            details: 'This API key has been deactivated. Please enable it in API Settings.'
+                        }));
+                    }
+                    
+                    // Check if API key has expired
+                    if (apiKeyData.expires_at && new Date(apiKeyData.expires_at) < new Date()) {
+                        await logSecurityEvent(
+                            pool,
+                            apiKeyData.user_id,
+                            'authentication_failed',
+                            'api_key',
+                            null,
+                            '/api/webhook/transform',
+                            false,
+                            { error: 'API key expired', keyName: apiKeyData.key_name, expiresAt: apiKeyData.expires_at }
+                        );
+                        
+                        return createResponse(403, JSON.stringify({ 
+                            error: 'API key has expired',
+                            details: `This API key expired on ${apiKeyData.expires_at}. Please create a new one.`
+                        }));
+                    }
+                    
+                    // Check if mapping exists
+                    if (!apiKeyData.mapping_json || !apiKeyData.destination_schema_xml) {
                         return createResponse(400, JSON.stringify({ 
-                            error: `Mapping "${mapping_name}" does not have a destination schema configured. Please upload a destination XML schema in API Settings.` 
+                            error: 'No transformation mapping configured',
+                            details: 'Please link a mapping with destination schema to this API key in API Settings.'
                         }));
                     }
+                    
+                    // Update last_used_at timestamp for API key
+                    await client.query(
+                        'UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE api_key = $1',
+                        [apiKey]
+                    );
                     
                     // Parse mapping_json if it's a string (from database it comes as TEXT)
-                    const mappingObject = typeof mapping_json === 'string' ? JSON.parse(mapping_json) : mapping_json;
+                    const mappingObject = typeof apiKeyData.mapping_json === 'string' 
+                        ? JSON.parse(apiKeyData.mapping_json) 
+                        : apiKeyData.mapping_json;
+                    
+                    // Log transformation request to security audit
+                    await logTransformationRequest(
+                        pool,
+                        apiKeyData.user_id,
+                        apiKeyData.source_schema_type,
+                        apiKeyData.destination_schema_type,
+                        sourceXml.length,
+                        event
+                    );
                     
                     // Perform the transformation
                     const transformedXml = transformSingleFile(
                         sourceXml,
-                        destination_schema_xml,
+                        apiKeyData.destination_schema_xml,
                         mappingObject,
                         true // removeEmptyTags
                     );
+                    
+                    console.log(`[API] Transformation successful for user ${apiKeyData.user_id}, mapping: ${apiKeyData.mapping_name}`);
                     
                     return createResponse(200, transformedXml, 'application/xml');
                     
@@ -1782,7 +1862,7 @@ exports.handler = async (event) => {
                     client.release();
                 }
             } catch (err) {
-                console.error('Transformation error:', err);
+                console.error('Webhook transformation error:', err);
                 return createResponse(500, JSON.stringify({ 
                     error: 'Transformation failed', 
                     details: err.message 
