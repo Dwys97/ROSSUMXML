@@ -1802,6 +1802,589 @@ exports.handler = async (event) => {
         }
         // *** FIX ENDS HERE ***
 
+        // ====================================================================
+        // WEBHOOK ENDPOINTS - ROSSUM AI INTEGRATION
+        // ====================================================================
+        // These endpoints handle incoming webhooks from Rossum AI and other
+        // external systems. They use API key authentication (NOT JWT).
+        // 
+        // ARCHITECTURE:
+        // 1. /api/webhook/rossum - Rossum AI-specific webhook (receives JSON)
+        // 2. /api/webhook/transform - Generic XML webhook (receives raw XML)
+        // 3. Both endpoints reuse existing api_keys table infrastructure
+        // ====================================================================
+
+        /**
+         * ENDPOINT: POST /api/webhook/rossum
+         * 
+         * PURPOSE: Receive webhooks from Rossum AI when annotations are exported
+         * 
+         * AUTHENTICATION: API Key in x-api-key header (NO JWT required)
+         * 
+         * FLOW:
+         * 1. Rossum AI exports an annotation (invoice, PO, etc.)
+         * 2. Rossum sends webhook to this endpoint with JSON payload
+         * 3. We fetch the XML export from Rossum API using stored token
+         * 4. Transform XML using user's configured mapping
+         * 5. Optionally forward to destination (CargoWise, Descartes, SAP etc.)
+         * 
+         * REQUEST FORMAT:
+         * Headers:
+         *   x-api-key: your_rossumxml_api_key
+         *   Content-Type: application/json
+         * 
+         * Body (from Rossum):
+         * {
+         *   "action": "annotation_status",
+         *   "event": "export",
+         *   "annotation": {
+         *     "id": 123456,
+         *     "url": "https://api.rossum.ai/v1/annotations/123456",
+         *     "status": "exported"
+         *   },
+         *   "document": {
+         *     "id": 78910,
+         *     "url": "https://api.rossum.ai/v1/documents/78910"
+         *   }
+         * }
+         * 
+         * RESPONSE:
+         * - 200: Transformation successful (returns transformed XML)
+         * - 401: Invalid/missing API key
+         * - 403: API key expired or disabled
+         * - 400: Invalid payload or missing configuration
+         * - 502: Failed to fetch from Rossum API
+         * - 500: Transformation or processing error
+         * 
+         * CONFIGURATION REQUIRED:
+         * - User must have created API key in ROSSUMXML
+         * - API key must have rossum_api_token configured
+         * - API key must be linked to a transformation mapping
+         * - Transformation mapping must have destination schema
+         * 
+         * SETUP IN ROSSUM:
+         * Navigate to: Settings > Webhooks > Add Webhook
+         * URL: https://your-domain.com/api/webhook/rossum
+         * Events: Select "Annotation Status" when status = "exported"
+         * Custom Headers: x-api-key = your_rossumxml_api_key
+         */
+        if (path === '/api/webhook/rossum' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            console.log('[Rossum Webhook] Incoming webhook request');
+            
+            try {
+                // ============================================
+                // STEP 1: AUTHENTICATE REQUEST
+                // ============================================
+                const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+                
+                if (!apiKey) {
+                    console.log('[Rossum Webhook] Missing API key');
+                    return createResponse(401, JSON.stringify({ 
+                        error: 'Missing API key',
+                        message: 'Please provide your ROSSUMXML API key in the x-api-key header',
+                        documentation: 'https://docs.rossumxml.com/webhooks/rossum-integration'
+                    }));
+                }
+                
+                // ============================================
+                // STEP 2: PARSE ROSSUM PAYLOAD
+                // ============================================
+                let rossumPayload;
+                try {
+                    rossumPayload = typeof body === 'string' ? JSON.parse(body) : body;
+                } catch (parseErr) {
+                    console.error('[Rossum Webhook] Invalid JSON payload:', parseErr);
+                    return createResponse(400, JSON.stringify({ 
+                        error: 'Invalid JSON payload',
+                        message: 'Webhook payload must be valid JSON',
+                        details: parseErr.message
+                    }));
+                }
+                
+                // Validate Rossum payload structure
+                if (!rossumPayload.annotation || !rossumPayload.annotation.url) {
+                    console.log('[Rossum Webhook] Invalid Rossum payload structure');
+                    return createResponse(400, JSON.stringify({ 
+                        error: 'Invalid Rossum payload',
+                        message: 'Webhook payload must contain annotation.url',
+                        receivedPayload: rossumPayload
+                    }));
+                }
+                
+                const annotationId = rossumPayload.annotation.id;
+                const annotationUrl = rossumPayload.annotation.url;
+                const documentId = rossumPayload.document?.id;
+                
+                console.log(`[Rossum Webhook] Processing annotation ${annotationId}`);
+                
+                const client = await pool.connect();
+                try {
+                    // ============================================
+                    // STEP 3: VERIFY API KEY & GET CONFIGURATION
+                    // ============================================
+                    const keyResult = await client.query(
+                        `SELECT 
+                            ak.id as api_key_id,
+                            ak.user_id, 
+                            ak.is_active, 
+                            ak.expires_at, 
+                            ak.key_name,
+                            ak.rossum_api_token,
+                            ak.rossum_workspace_id,
+                            ak.rossum_queue_id,
+                            ak.destination_webhook_url,
+                            ak.webhook_timeout_seconds,
+                            tm.id as mapping_id,
+                            tm.mapping_json, 
+                            tm.destination_schema_xml, 
+                            tm.mapping_name,
+                            tm.source_schema_type, 
+                            tm.destination_schema_type,
+                            u.email as user_email
+                         FROM api_keys ak
+                         LEFT JOIN transformation_mappings tm ON tm.id = ak.default_mapping_id
+                         LEFT JOIN users u ON u.id = ak.user_id
+                         WHERE ak.api_key = $1`,
+                        [apiKey]
+                    );
+                    
+                    if (keyResult.rows.length === 0) {
+                        console.log('[Rossum Webhook] Invalid API key');
+                        
+                        // Log failed authentication
+                        await logSecurityEvent(
+                            pool,
+                            null,
+                            'authentication_failed',
+                            'api_key',
+                            null,
+                            '/api/webhook/rossum',
+                            false,
+                            { 
+                                error: 'Invalid API key', 
+                                apiKeyPrefix: apiKey.substring(0, 10),
+                                rossumAnnotationId: annotationId 
+                            }
+                        );
+                        
+                        return createResponse(401, JSON.stringify({ 
+                            error: 'Invalid API key',
+                            message: 'The provided API key is not valid or does not exist'
+                        }));
+                    }
+                    
+                    const config = keyResult.rows[0];
+                    
+                    // Check if API key is active
+                    if (!config.is_active) {
+                        console.log(`[Rossum Webhook] API key disabled: ${config.key_name}`);
+                        
+                        await logSecurityEvent(
+                            pool,
+                            config.user_id,
+                            'authentication_failed',
+                            'api_key',
+                            null,
+                            '/api/webhook/rossum',
+                            false,
+                            { 
+                                error: 'API key is disabled', 
+                                keyName: config.key_name,
+                                rossumAnnotationId: annotationId 
+                            }
+                        );
+                        
+                        return createResponse(403, JSON.stringify({ 
+                            error: 'API key is disabled',
+                            message: `API key "${config.key_name}" has been deactivated. Please enable it in API Settings.`
+                        }));
+                    }
+                    
+                    // Check if API key has expired
+                    if (config.expires_at && new Date(config.expires_at) < new Date()) {
+                        console.log(`[Rossum Webhook] API key expired: ${config.key_name}`);
+                        
+                        await logSecurityEvent(
+                            pool,
+                            config.user_id,
+                            'authentication_failed',
+                            'api_key',
+                            null,
+                            '/api/webhook/rossum',
+                            false,
+                            { 
+                                error: 'API key expired', 
+                                keyName: config.key_name, 
+                                expiresAt: config.expires_at,
+                                rossumAnnotationId: annotationId 
+                            }
+                        );
+                        
+                        return createResponse(403, JSON.stringify({ 
+                            error: 'API key has expired',
+                            message: `API key expired on ${config.expires_at}. Please create a new one.`
+                        }));
+                    }
+                    
+                    // Check if Rossum API token is configured
+                    if (!config.rossum_api_token) {
+                        console.log('[Rossum Webhook] Rossum API token not configured');
+                        return createResponse(400, JSON.stringify({ 
+                            error: 'Rossum API token not configured',
+                            message: 'Please configure your Rossum API token in API Settings to enable Rossum webhooks',
+                            instructions: 'Go to API Settings > Edit API Key > Add Rossum API Token'
+                        }));
+                    }
+                    
+                    // Check if transformation mapping exists
+                    if (!config.mapping_json || !config.destination_schema_xml) {
+                        console.log('[Rossum Webhook] No transformation mapping configured');
+                        return createResponse(400, JSON.stringify({ 
+                            error: 'No transformation mapping configured',
+                            message: 'Please link a transformation mapping to this API key in API Settings',
+                            instructions: 'Go to API Settings > Edit API Key > Link Mapping'
+                        }));
+                    }
+                    
+                    // ============================================
+                    // STEP 4: CREATE WEBHOOK EVENT LOG (PENDING)
+                    // ============================================
+                    const webhookEventResult = await client.query(
+                        `INSERT INTO webhook_events (
+                            api_key_id, user_id, event_type, source_system,
+                            rossum_annotation_id, rossum_document_id, rossum_queue_id,
+                            status, request_payload
+                         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                         RETURNING id`,
+                        [
+                            config.api_key_id,
+                            config.user_id,
+                            'rossum_received',
+                            'rossum',
+                            annotationId?.toString(),
+                            documentId?.toString(),
+                            config.rossum_queue_id,
+                            'pending',
+                            JSON.stringify(rossumPayload)
+                        ]
+                    );
+                    
+                    const webhookEventId = webhookEventResult.rows[0].id;
+                    const startTime = Date.now();
+                    
+                    console.log(`[Rossum Webhook] Created webhook event: ${webhookEventId}`);
+                    
+                    // Update last_used_at timestamp for API key
+                    await client.query(
+                        'UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE api_key = $1',
+                        [apiKey]
+                    );
+                    
+                    // ============================================
+                    // STEP 5: FETCH XML FROM ROSSUM API
+                    // ============================================
+                    console.log(`[Rossum Webhook] Fetching XML from: ${annotationUrl}`);
+                    
+                    // Update webhook event status to processing
+                    await client.query(
+                        'UPDATE webhook_events SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                        ['processing', webhookEventId]
+                    );
+                    
+                    // Construct Rossum export URL
+                    // Rossum provides XML export via /export endpoint with format parameter
+                    const exportUrl = `${annotationUrl}/export?format=xml`;
+                    
+                    let sourceXml;
+                    try {
+                        const rossumResponse = await fetch(exportUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${config.rossum_api_token}`,
+                                'Accept': 'application/xml',
+                                'User-Agent': 'ROSSUMXML-Webhook/1.0'
+                            },
+                            timeout: (config.webhook_timeout_seconds || 30) * 1000
+                        });
+                        
+                        if (!rossumResponse.ok) {
+                            const errorText = await rossumResponse.text();
+                            console.error(`[Rossum Webhook] Rossum API error: ${rossumResponse.status}`, errorText);
+                            
+                            // Update webhook event with error
+                            await client.query(
+                                `UPDATE webhook_events 
+                                 SET status = $1, error_message = $2, http_status_code = $3, 
+                                     response_payload = $4, updated_at = CURRENT_TIMESTAMP 
+                                 WHERE id = $5`,
+                                [
+                                    'failed',
+                                    `Failed to fetch XML from Rossum: ${rossumResponse.status}`,
+                                    rossumResponse.status,
+                                    errorText,
+                                    webhookEventId
+                                ]
+                            );
+                            
+                            return createResponse(502, JSON.stringify({ 
+                                error: 'Failed to fetch XML from Rossum API',
+                                message: `Rossum API returned status ${rossumResponse.status}`,
+                                details: errorText,
+                                annotationUrl: annotationUrl
+                            }));
+                        }
+                        
+                        sourceXml = await rossumResponse.text();
+                        console.log(`[Rossum Webhook] Fetched XML: ${sourceXml.length} bytes`);
+                        
+                    } catch (fetchErr) {
+                        console.error('[Rossum Webhook] Error fetching from Rossum:', fetchErr);
+                        
+                        // Update webhook event with error
+                        await client.query(
+                            `UPDATE webhook_events 
+                             SET status = $1, error_message = $2, updated_at = CURRENT_TIMESTAMP 
+                             WHERE id = $3`,
+                            [
+                                'failed',
+                                `Network error fetching from Rossum: ${fetchErr.message}`,
+                                webhookEventId
+                            ]
+                        );
+                        
+                        return createResponse(502, JSON.stringify({ 
+                            error: 'Network error connecting to Rossum API',
+                            message: fetchErr.message,
+                            annotationUrl: exportUrl
+                        }));
+                    }
+                    
+                    // ============================================
+                    // STEP 6: TRANSFORM XML
+                    // ============================================
+                    console.log(`[Rossum Webhook] Transforming XML using mapping: ${config.mapping_name}`);
+                    
+                    let transformedXml;
+                    try {
+                        // Parse mapping_json if it's a string
+                        const mappingObject = typeof config.mapping_json === 'string' 
+                            ? JSON.parse(config.mapping_json) 
+                            : config.mapping_json;
+                        
+                        // Perform transformation
+                        transformedXml = transformSingleFile(
+                            sourceXml,
+                            config.destination_schema_xml,
+                            mappingObject,
+                            true // removeEmptyTags
+                        );
+                        
+                        console.log(`[Rossum Webhook] Transformation successful: ${transformedXml.length} bytes`);
+                        
+                    } catch (transformErr) {
+                        console.error('[Rossum Webhook] Transformation error:', transformErr);
+                        
+                        // Update webhook event with error
+                        await client.query(
+                            `UPDATE webhook_events 
+                             SET status = $1, error_message = $2, source_xml_size = $3, 
+                                 processing_time_ms = $4, updated_at = CURRENT_TIMESTAMP 
+                             WHERE id = $5`,
+                            [
+                                'failed',
+                                `Transformation error: ${transformErr.message}`,
+                                sourceXml.length,
+                                Date.now() - startTime,
+                                webhookEventId
+                            ]
+                        );
+                        
+                        return createResponse(500, JSON.stringify({ 
+                            error: 'XML transformation failed',
+                            message: transformErr.message,
+                            annotationId: annotationId
+                        }));
+                    }
+                    
+                    // ============================================
+                    // STEP 7: OPTIONALLY FORWARD TO DESTINATION
+                    // ============================================
+                    if (config.destination_webhook_url) {
+                        console.log(`[Rossum Webhook] Forwarding to destination: ${config.destination_webhook_url}`);
+                        
+                        try {
+                            const deliveryResponse = await fetch(config.destination_webhook_url, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/xml',
+                                    'X-Source': 'ROSSUMXML',
+                                    'X-Rossum-Annotation-Id': annotationId?.toString() || '',
+                                    'User-Agent': 'ROSSUMXML-Webhook/1.0'
+                                },
+                                body: transformedXml,
+                                timeout: (config.webhook_timeout_seconds || 30) * 1000
+                            });
+                            
+                            const deliverySuccess = deliveryResponse.ok;
+                            const deliveryStatus = deliveryResponse.status;
+                            const deliveryText = await deliveryResponse.text();
+                            
+                            console.log(`[Rossum Webhook] Delivery to destination: ${deliverySuccess ? 'SUCCESS' : 'FAILED'} (${deliveryStatus})`);
+                            
+                            // Update webhook event with delivery results
+                            await client.query(
+                                `UPDATE webhook_events 
+                                 SET status = $1, event_type = $2, source_xml_size = $3, 
+                                     transformed_xml_size = $4, processing_time_ms = $5,
+                                     http_status_code = $6, response_payload = $7,
+                                     updated_at = CURRENT_TIMESTAMP 
+                                 WHERE id = $8`,
+                                [
+                                    deliverySuccess ? 'success' : 'failed',
+                                    deliverySuccess ? 'delivery_success' : 'delivery_failed',
+                                    sourceXml.length,
+                                    transformedXml.length,
+                                    Date.now() - startTime,
+                                    deliveryStatus,
+                                    deliveryText.substring(0, 5000), // Limit response size
+                                    webhookEventId
+                                ]
+                            );
+                            
+                            if (!deliverySuccess) {
+                                return createResponse(502, JSON.stringify({ 
+                                    error: 'Failed to deliver to destination webhook',
+                                    message: `Destination returned status ${deliveryStatus}`,
+                                    details: deliveryText,
+                                    transformedXmlAvailable: true
+                                }));
+                            }
+                            
+                        } catch (deliveryErr) {
+                            console.error('[Rossum Webhook] Delivery error:', deliveryErr);
+                            
+                            await client.query(
+                                `UPDATE webhook_events 
+                                 SET status = $1, event_type = $2, error_message = $3,
+                                     source_xml_size = $4, transformed_xml_size = $5,
+                                     processing_time_ms = $6, updated_at = CURRENT_TIMESTAMP 
+                                 WHERE id = $7`,
+                                [
+                                    'failed',
+                                    'delivery_failed',
+                                    `Delivery error: ${deliveryErr.message}`,
+                                    sourceXml.length,
+                                    transformedXml.length,
+                                    Date.now() - startTime,
+                                    webhookEventId
+                                ]
+                            );
+                            
+                            return createResponse(502, JSON.stringify({ 
+                                error: 'Error delivering to destination webhook',
+                                message: deliveryErr.message,
+                                transformedXmlAvailable: true
+                            }));
+                        }
+                    } else {
+                        // No destination webhook - just log success
+                        await client.query(
+                            `UPDATE webhook_events 
+                             SET status = $1, event_type = $2, source_xml_size = $3, 
+                                 transformed_xml_size = $4, processing_time_ms = $5,
+                                 updated_at = CURRENT_TIMESTAMP 
+                             WHERE id = $6`,
+                            [
+                                'success',
+                                'transformation_success',
+                                sourceXml.length,
+                                transformedXml.length,
+                                Date.now() - startTime,
+                                webhookEventId
+                            ]
+                        );
+                    }
+                    
+                    // ============================================
+                    // STEP 8: LOG TO SECURITY AUDIT
+                    // ============================================
+                    await logTransformationRequest(
+                        pool,
+                        config.user_id,
+                        'ROSSUM_EXPORT',
+                        config.destination_schema_type || 'UNKNOWN',
+                        sourceXml.length,
+                        event
+                    );
+                    
+                    // ============================================
+                    // STEP 9: RETURN SUCCESS RESPONSE
+                    // ============================================
+                    console.log(`[Rossum Webhook] Processing complete for annotation ${annotationId}`);
+                    
+                    return createResponse(200, JSON.stringify({
+                        success: true,
+                        message: 'Rossum webhook processed successfully',
+                        annotationId: annotationId,
+                        documentId: documentId,
+                        webhookEventId: webhookEventId,
+                        transformationStats: {
+                            sourceXmlSize: sourceXml.length,
+                            transformedXmlSize: transformedXml.length,
+                            processingTimeMs: Date.now() - startTime,
+                            mapping: config.mapping_name,
+                            destinationType: config.destination_schema_type
+                        },
+                        delivered: !!config.destination_webhook_url
+                    }), 'application/json');
+                    
+                } finally {
+                    client.release();
+                }
+                
+            } catch (err) {
+                console.error('[Rossum Webhook] Unexpected error:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Internal server error processing Rossum webhook',
+                    message: err.message,
+                    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+                }));
+            }
+        }
+
+        /**
+         * ENDPOINT: POST /api/webhook/transform
+         * 
+         * PURPOSE: Generic XML transformation webhook (raw XML in body)
+         * 
+         * AUTHENTICATION: API Key in x-api-key header (NO JWT required)
+         * 
+         * USE CASES:
+         * - Direct XML transformation without Rossum AI
+         * - Custom integrations that send XML directly
+         * - Testing transformations via API
+         * - Non-Rossum webhook systems
+         * 
+         * REQUEST FORMAT:
+         * Headers:
+         *   x-api-key: your_rossumxml_api_key
+         *   Content-Type: application/xml
+         * 
+         * Body: <raw XML content>
+         * 
+         * RESPONSE:
+         * - 200: Returns transformed XML
+         * - 401: Invalid/missing API key
+         * - 403: API key expired or disabled
+         * - 400: Missing XML or configuration
+         * - 500: Transformation error
+         * 
+         * DIFFERENCE FROM /api/webhook/rossum:
+         * - This endpoint expects RAW XML in request body
+         * - Rossum endpoint expects JSON and fetches XML from Rossum API
+         * - This is for direct XML transformation
+         * - Rossum endpoint is specifically for Rossum AI webhooks
+         */
         // Transform XML using API key's linked mapping (for webhooks and API integrations)
         // This is separate from the frontend /api/transform endpoint
         // AUTH: API key only (no JWT required) - designed for external webhooks like Rossum AI
