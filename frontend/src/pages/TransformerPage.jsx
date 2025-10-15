@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import FileDropzone from '../components/common/FileDropzone';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
+import { useAuth } from '../contexts/useAuth';
 
 function TransformerPage() {
+    const { token } = useAuth(); // Get auth token to determine which endpoint to use
     const [sourceFiles, setSourceFiles] = useState([]);
     const [destinationXml, setDestinationXml] = useState(null);
     const [mappingJson, setMappingJson] = useState(null);
@@ -26,11 +28,23 @@ function TransformerPage() {
 
         setStatus('Transforming...');
         try {
-            // In a real multi-file scenario, you would zip the files or send them one by one.
-            // For this like-for-like, we'll just send the first file as per script.js.
-            const response = await fetch('/api/transform', {
+            // Choose endpoint based on authentication status
+            // Authenticated users get better rate limits and usage tracking
+            const endpoint = token ? '/api/transform/authenticated' : '/api/transform';
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            // Add JWT token if user is authenticated
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            console.log(`[Transform] Using endpoint: ${endpoint} (authenticated: ${!!token})`);
+            
+            const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: headers,
                 body: JSON.stringify({
                     sourceXml: sourceFiles[0].content,
                     destinationXml: destinationXml.content,

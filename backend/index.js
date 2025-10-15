@@ -1126,13 +1126,62 @@ exports.handler = async (event) => {
             return createResponse(200, JSON.stringify({ transformed }), 'application/json');
         }
 
-        // Frontend Transformer Page endpoint (expects JSON body with sourceXml, destinationXml, mappingJson)
+        // Frontend Transformer Page endpoint - PUBLIC (no auth required)
+        // This is intentionally public for marketing/demo purposes
+        // TODO: Add rate limiting in Phase 5 (10 requests/hour per IP)
         if (path === '/api/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
             if (!sourceXml || !destinationXml || !mappingJson)
                 return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
+            
+            // Log anonymous transformation for analytics
+            console.log('[PUBLIC TRANSFORM] Anonymous transformation request');
+            
             const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
             return createResponse(200, transformed, 'application/xml');
+        }
+
+        // Authenticated Transform endpoint - JWT REQUIRED
+        // For logged-in users with higher rate limits and usage tracking
+        if (path === '/api/transform/authenticated' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                // Verify JWT token
+                const user = await verifyJWT(event);
+                
+                const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
+                if (!sourceXml || !destinationXml || !mappingJson) {
+                    return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
+                }
+                
+                // Log authenticated transformation to security audit
+                await logTransformationRequest(
+                    pool,
+                    user.id,
+                    'USER_UPLOAD', // source type
+                    'USER_UPLOAD', // destination type
+                    sourceXml.length,
+                    event
+                );
+                
+                console.log(`[AUTHENTICATED TRANSFORM] User ${user.id} (${user.email}) transformation request`);
+                
+                const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
+                
+                return createResponse(200, transformed, 'application/xml');
+                
+            } catch (err) {
+                console.error('Authenticated transformation error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ 
+                        error: 'Authentication required',
+                        details: 'Please log in to use the authenticated transformation endpoint'
+                    }));
+                }
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Transformation failed', 
+                    details: err.message 
+                }));
+            }
         }
         
         // FIX: Path no longer expects '/api' or '/prod/api'
