@@ -1126,23 +1126,53 @@ exports.handler = async (event) => {
             return createResponse(200, JSON.stringify({ transformed }), 'application/json');
         }
 
-        // Frontend Transformer Page endpoint - PUBLIC (no auth required)
-        // This is intentionally public for marketing/demo purposes
-        // TODO: Add rate limiting in Phase 5 (10 requests/hour per IP)
+        // Frontend Transformer Page endpoint - JWT REQUIRED
+        // For registered users on FREE subscription tier (10 transforms/day)
+        // TODO: Add rate limiting in Phase 5 (10 requests/day for free tier)
         if (path === '/api/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
-            const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
-            if (!sourceXml || !destinationXml || !mappingJson)
-                return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
-            
-            // Log anonymous transformation for analytics
-            console.log('[PUBLIC TRANSFORM] Anonymous transformation request');
-            
-            const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
-            return createResponse(200, transformed, 'application/xml');
+            try {
+                // Verify JWT token - all users must be registered
+                const user = await verifyJWT(event);
+                
+                const { sourceXml, destinationXml, mappingJson, removeEmptyTags } = body;
+                if (!sourceXml || !destinationXml || !mappingJson) {
+                    return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
+                }
+                
+                // Log transformation for free tier users
+                await logTransformationRequest(
+                    pool,
+                    user.id,
+                    'USER_UPLOAD',
+                    'USER_UPLOAD',
+                    sourceXml.length,
+                    event
+                );
+                
+                console.log(`[FREE TIER TRANSFORM] User ${user.id} (${user.email}) - Free tier transformation`);
+                
+                const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
+                
+                return createResponse(200, transformed, 'application/xml');
+                
+            } catch (err) {
+                console.error('Free tier transformation error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ 
+                        error: 'Authentication required',
+                        details: 'Please log in to use the transformation tool. Register for free at /register'
+                    }));
+                }
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Transformation failed', 
+                    details: err.message 
+                }));
+            }
         }
 
         // Authenticated Transform endpoint - JWT REQUIRED
-        // For logged-in users with higher rate limits and usage tracking
+        // For PAID subscription tiers with higher rate limits
+        // TODO: Add rate limiting in Phase 5 (1000+ requests/day for paid tiers)
         if (path === '/api/transform/authenticated' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
                 // Verify JWT token
@@ -1163,14 +1193,14 @@ exports.handler = async (event) => {
                     event
                 );
                 
-                console.log(`[AUTHENTICATED TRANSFORM] User ${user.id} (${user.email}) transformation request`);
+                console.log(`[PAID TIER TRANSFORM] User ${user.id} (${user.email}) - Paid tier transformation`);
                 
                 const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
                 
                 return createResponse(200, transformed, 'application/xml');
                 
             } catch (err) {
-                console.error('Authenticated transformation error:', err);
+                console.error('Paid tier transformation error:', err);
                 if (err.message.includes('token')) {
                     return createResponse(401, JSON.stringify({ 
                         error: 'Authentication required',

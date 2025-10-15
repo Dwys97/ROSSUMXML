@@ -26,21 +26,24 @@ function TransformerPage() {
             return;
         }
 
+        // Check if user is authenticated - transformation requires login
+        if (!token) {
+            alert('Please log in to use the transformation tool. Free accounts get 10 transformations per day!');
+            return;
+        }
+
         setStatus('Transforming...');
         try {
-            // Choose endpoint based on authentication status
-            // Authenticated users get better rate limits and usage tracking
-            const endpoint = token ? '/api/transform/authenticated' : '/api/transform';
+            // All transformations now require JWT authentication
+            // Free tier users use /api/transform (10/day limit)
+            // Paid tier users can use /api/transform/authenticated (higher limits)
+            const endpoint = '/api/transform';
             const headers = {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             };
             
-            // Add JWT token if user is authenticated
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-            
-            console.log(`[Transform] Using endpoint: ${endpoint} (authenticated: ${!!token})`);
+            console.log(`[Transform] Using endpoint: ${endpoint} (authenticated)`);
             
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -55,6 +58,13 @@ function TransformerPage() {
 
             if (!response.ok) {
                 const errorText = await response.text();
+                
+                // Handle authentication errors
+                if (response.status === 401) {
+                    alert('Your session has expired. Please log in again.');
+                    return;
+                }
+                
                 throw new Error(`Server error: ${response.status} - ${errorText}`);
             }
 
