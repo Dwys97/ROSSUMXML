@@ -25,7 +25,10 @@ function MappingsList({
         }
     };
 
-    const getDisplayName = (path) => path.split(' > ').pop().replace(/\[.*?\]/g, '');
+    const getDisplayName = (path) => {
+        if (!path) return '(no path)';
+        return path.split(' > ').pop().replace(/\[.*?\]/g, '');
+    };
 
     return (
         <div className="schema-card mappings-card">

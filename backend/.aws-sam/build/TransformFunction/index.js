@@ -1507,7 +1507,16 @@ exports.handler = async (event) => {
         if (path.endsWith('/api-settings/mappings') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
                 const user = await verifyJWT(event);
-                const { mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml, is_default } = body;
+                const { 
+                    mapping_name, 
+                    description, 
+                    source_schema_type, 
+                    destination_schema_type, 
+                    mapping_json, 
+                    destination_schema_xml, 
+                    is_default,
+                    template_id  // NEW: Optional template ID from schema library
+                } = body;
                 
                 if (!mapping_name || !mapping_json) {
                     return createResponse(400, JSON.stringify({ error: 'Mapping name and mapping JSON are required' }));
@@ -1516,6 +1525,30 @@ exports.handler = async (event) => {
                 const client = await pool.connect();
                 try {
                     await client.query('BEGIN');
+                    
+                    // If template_id is provided, fetch the template XML
+                    let finalDestinationXml = destination_schema_xml;
+                    let finalDestinationType = destination_schema_type;
+                    
+                    if (template_id && !destination_schema_xml) {
+                        const templateResult = await client.query(
+                            'SELECT template_xml, schema_type, system_code FROM schema_templates WHERE id = $1 AND is_public = true',
+                            [template_id]
+                        );
+                        
+                        if (templateResult.rows.length === 0) {
+                            await client.query('ROLLBACK');
+                            return createResponse(404, JSON.stringify({ 
+                                error: 'Template not found or not publicly available' 
+                            }));
+                        }
+                        
+                        finalDestinationXml = templateResult.rows[0].template_xml;
+                        // Auto-set destination_schema_type from template if not provided
+                        if (!finalDestinationType) {
+                            finalDestinationType = `${templateResult.rows[0].system_code}-${templateResult.rows[0].schema_type}`;
+                        }
+                    }
                     
                     // If this is set as default, unset other defaults
                     if (is_default) {
@@ -1527,10 +1560,21 @@ exports.handler = async (event) => {
                     
                     const result = await client.query(
                         `INSERT INTO transformation_mappings 
-                         (user_id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml, is_default)
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                         (user_id, mapping_name, description, source_schema_type, destination_schema_type, 
+                          mapping_json, destination_schema_xml, template_id, is_default)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                          RETURNING *`,
-                        [user.id, mapping_name, description, source_schema_type, destination_schema_type, mapping_json, destination_schema_xml || null, is_default || false]
+                        [
+                            user.id, 
+                            mapping_name, 
+                            description, 
+                            source_schema_type, 
+                            finalDestinationType, 
+                            mapping_json, 
+                            finalDestinationXml || null,
+                            template_id || null,
+                            is_default || false
+                        ]
                     );
                     
                     const mappingId = result.rows[0].id;
@@ -1863,6 +1907,166 @@ exports.handler = async (event) => {
                 console.error('AI access check error:', err);
                 return createResponse(500, JSON.stringify({ 
                     error: 'Failed to check AI access', 
+                    details: err.message 
+                }));
+            }
+        }
+
+        // ============================================================================
+        // SCHEMA TEMPLATE LIBRARY API
+        // Pre-built XML schemas for common ERP/logistics systems (CargoWise, SAP, Oracle, etc.)
+        // NOTE: More specific routes MUST come before generic routes to avoid UUID parsing errors
+        // ============================================================================
+
+        // GET /api/templates/categories - Get available template categories
+        if (path === '/api/templates/categories' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(`
+                        SELECT DISTINCT category, COUNT(*) as template_count
+                        FROM schema_templates
+                        WHERE is_public = true
+                        GROUP BY category
+                        ORDER BY category
+                    `);
+                    
+                    return createResponse(200, JSON.stringify({ 
+                        categories: result.rows 
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Error fetching categories:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to fetch categories', 
+                    details: err.message 
+                }));
+            }
+        }
+
+        // GET /api/templates/systems - Get available systems grouped by code
+        if (path === '/api/templates/systems' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(`
+                        SELECT DISTINCT 
+                            system_code, 
+                            system_name,
+                            COUNT(*) as schema_count,
+                            array_agg(DISTINCT category) as categories
+                        FROM schema_templates
+                        WHERE is_public = true
+                        GROUP BY system_code, system_name
+                        ORDER BY system_name
+                    `);
+                    
+                    return createResponse(200, JSON.stringify({ 
+                        systems: result.rows 
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Error fetching systems:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to fetch systems', 
+                    details: err.message 
+                }));
+            }
+        }
+
+        // GET /api/templates - List all available schema templates
+        if (path === '/api/templates' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                // No authentication required - public templates are available to all
+                // Parse query parameters for filtering
+                const queryParams = event.queryStringParameters || {};
+                const category = queryParams.category;
+                const systemCode = queryParams.system_code;
+                
+                let query = `
+                    SELECT 
+                        id, system_name, system_code, schema_type, version,
+                        category, display_name, description, namespace,
+                        metadata_json, is_public, created_at
+                    FROM schema_templates
+                    WHERE is_public = true
+                `;
+                const params = [];
+                
+                if (category) {
+                    params.push(category);
+                    query += ` AND category = $${params.length}`;
+                }
+                
+                if (systemCode) {
+                    params.push(systemCode);
+                    query += ` AND system_code = $${params.length}`;
+                }
+                
+                query += ` ORDER BY system_name, schema_type`;
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(query, params);
+                    
+                    // Parse metadata_json for each template
+                    const templates = result.rows.map(row => ({
+                        ...row,
+                        metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null
+                    }));
+                    
+                    return createResponse(200, JSON.stringify({ 
+                        templates,
+                        count: templates.length
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Error fetching schema templates:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to fetch schema templates', 
+                    details: err.message 
+                }));
+            }
+        }
+
+        // GET /api/templates/:id - Get a specific template with full XML content
+        if (path.startsWith('/api/templates/') && path.split('/').length === 4 && 
+            (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const templateId = path.split('/')[3];
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        `SELECT * FROM schema_templates WHERE id = $1 AND is_public = true`,
+                        [templateId]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ 
+                            error: 'Template not found or not publicly available' 
+                        }));
+                    }
+                    
+                    const template = {
+                        ...result.rows[0],
+                        metadata: result.rows[0].metadata_json ? JSON.parse(result.rows[0].metadata_json) : null
+                    };
+                    
+                    return createResponse(200, JSON.stringify({ template }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Error fetching template:', err);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to fetch template', 
                     details: err.message 
                 }));
             }

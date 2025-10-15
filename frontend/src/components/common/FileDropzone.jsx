@@ -1,6 +1,11 @@
 import React, { useState, useCallback, useRef } from 'react';
 
-function FileDropzone({ onFileSelect, children, multiple = false }) {
+function FileDropzone({ 
+    onFileSelect, 
+    children, 
+    multiple = false,
+    savedOptionsDropdown = null // New prop for integrated dropdown
+}) {
     const [isDragOver, setIsDragOver] = useState(false);
     const [fileName, setFileName] = useState('');
     const inputRef = useRef(null);
@@ -46,7 +51,11 @@ function FileDropzone({ onFileSelect, children, multiple = false }) {
         processFiles(e.target.files);
     };
 
-    const handleClick = () => {
+    const handleClick = (e) => {
+        // Don't trigger file input if clicking on dropdown or its children
+        if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') {
+            return;
+        }
         inputRef.current.click();
     };
 
@@ -70,6 +79,16 @@ function FileDropzone({ onFileSelect, children, multiple = false }) {
             />
             {children}
             {fileName && <div className="file-name-display">✔ {fileName}</div>}
+            
+            {/* Integrated dropdown at bottom of dropzone */}
+            {savedOptionsDropdown && (
+                <div 
+                    className="dropzone-selector"
+                    onClick={(e) => e.stopPropagation()} // Prevent triggering file upload
+                >
+                    {savedOptionsDropdown}
+                </div>
+            )}
         </div>
     );
 }

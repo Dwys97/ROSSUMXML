@@ -54,9 +54,14 @@ function EditorPage() {
     const [selectedSourceCollection, setSelectedSourceCollection] = useState(null);
     const [selectedTargetCollection, setSelectedTargetCollection] = useState(null);
     const [isMappingFileLoaded, setIsMappingFileLoaded] = useState(false);
-    const [sourceXmlContent, setSourceXmlContent] = useState(null);
-    const [targetXmlContent, setTargetXmlContent] = useState(null);
+    const [sourceXmlContent, setSourceXmlContent] = useState(null); // Stores raw source XML for future schema validation/API submission
+    const [targetXmlContent, setTargetXmlContent] = useState(null); // Stores raw target XML, used in handleSaveToApiSettings
     const [saveStatus, setSaveStatus] = useState(null);
+
+    // --- SAVED MAPPINGS STATE (from API Settings) ---
+    const [savedMappings, setSavedMappings] = useState([]);
+    const [selectedSavedSchema, setSelectedSavedSchema] = useState('');
+    const [selectedSavedMappingJson, setSelectedSavedMappingJson] = useState('');
 
     // --- AI FEATURE STATE ---
     const { hasAccess: hasAIAccess, loading: aiAccessLoading } = useAIFeatures();
@@ -92,6 +97,52 @@ function EditorPage() {
             return () => clearTimeout(timer);
         }
     }, [isMappingFileLoaded]);
+
+    // Fetch saved mappings from API Settings on component mount
+    useEffect(() => {
+        const fetchSavedMappings = async () => {
+            try {
+                // Get JWT token from storage
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                if (!token) {
+                    console.log('⚠️  [Fetch Mappings] No auth token found, skipping saved mappings fetch');
+                    return;
+                }
+
+                console.log('🔍 [Fetch Mappings] Fetching from /api/api-settings/mappings...');
+                const response = await fetch('/api/api-settings/mappings', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('✅ [Fetch Mappings] Received', data?.length || 0, 'mappings from API');
+                    if (data && data.length > 0) {
+                        console.log('📋 [Fetch Mappings] First mapping sample:', {
+                            id: data[0].id,
+                            name: data[0].mapping_name,
+                            has_schema: !!data[0].destination_schema_xml,
+                            has_mapping: !!data[0].mapping_json,
+                            schema_length: data[0].destination_schema_xml?.length || 0,
+                            mapping_length: data[0].mapping_json?.length || 0
+                        });
+                        console.log('📊 [Fetch Mappings] Full first mapping keys:', Object.keys(data[0]));
+                        console.log('📊 [Fetch Mappings] Raw first mapping:', data[0]);
+                    }
+                    setSavedMappings(data || []);
+                } else {
+                    console.error('❌ [Fetch Mappings] Failed to load saved mappings:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('❌ [Fetch Mappings] Error fetching saved mappings:', error);
+            }
+        };
+        
+        fetchSavedMappings();
+    }, []);
 
     const registerNodeRef = useCallback((path, element) => {
         if (element) {
@@ -140,8 +191,219 @@ function EditorPage() {
         }
     };
 
+    // Handler to load ONLY destination schema from saved mappings
+    const handleSavedSchemaSelect = async (e) => {
+        const mappingId = e.target.value;
+        console.log('🔍 [Schema Select] Mapping ID selected:', mappingId);
+        setSelectedSavedSchema(mappingId);
+        
+        if (!mappingId) {
+            console.log('⚠️  [Schema Select] No mapping ID, clearing selection');
+            return;
+        }
+        
+        // 🛑 VALIDATION: Prevent loading destination before source
+        if (!sourceTree) {
+            alert('⚠️ Please upload or select a Source XML file first before loading the destination schema.');
+            setSelectedSavedSchema(''); // Reset the selector
+            e.target.value = ''; // Reset dropdown UI
+            return;
+        }
+        
+        try {
+            // Fetch the full mapping details from the API (includes destination_schema_xml and mapping_json)
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            if (!token) {
+                console.error('❌ [Schema Select] No auth token found');
+                return;
+            }
+            
+            console.log(`🔍 [Schema Select] Fetching full mapping details for ID: ${mappingId}...`);
+            const response = await fetch(`/api/api-settings/mappings/${mappingId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch mapping: ${response.status} ${response.statusText}`);
+            }
+            
+            const fullMapping = await response.json();
+            console.log('✅ [Schema Select] Full mapping loaded:', fullMapping.mapping_name);
+            console.log('📄 [Schema Select] Has destination_schema_xml:', !!fullMapping.destination_schema_xml);
+            console.log('📏 [Schema Select] Schema XML length:', fullMapping.destination_schema_xml?.length || 0);
+            
+            if (fullMapping.destination_schema_xml) {
+                console.log('🚀 [Schema Select] Calling handleFile with schema XML...');
+                await handleFile(fullMapping.destination_schema_xml, setTargetTree, false);
+                setTargetXmlContent(fullMapping.destination_schema_xml);
+                console.log('✅ [Schema Select] Successfully loaded destination schema from:', fullMapping.mapping_name);
+            } else {
+                console.warn('⚠️  [Schema Select] No destination_schema_xml in mapping');
+                alert('This mapping does not have a destination schema saved.');
+            }
+        } catch (error) {
+            console.error('❌ [Schema Select] Error loading saved schema:', error);
+            alert('Failed to load saved schema. Please check the console for details.');
+        }
+    };
+
+    // Handler to load ONLY mapping JSON from saved mappings
+    const handleSavedMappingJsonSelect = async (e) => {
+        const mappingId = e.target.value;
+        console.log('🔍 [Mapping Select] Mapping ID selected:', mappingId);
+        setSelectedSavedMappingJson(mappingId);
+        
+        if (!mappingId) {
+            console.log('⚠️  [Mapping Select] No mapping ID, clearing selection');
+            return;
+        }
+        
+        // 🛑 VALIDATION: Prevent loading mapping before source
+        if (!sourceTree) {
+            alert('⚠️ Please upload or select a Source XML file first before loading the mapping.');
+            setSelectedSavedMappingJson(''); // Reset the selector
+            e.target.value = ''; // Reset dropdown UI
+            return;
+        }
+        
+        // 🛑 VALIDATION: Prevent loading mapping before destination
+        if (!targetTree) {
+            alert('⚠️ Please upload or select a Destination XML file first before loading the mapping.');
+            setSelectedSavedMappingJson(''); // Reset the selector
+            e.target.value = ''; // Reset dropdown UI
+            return;
+        }
+        
+        try {
+            // Fetch the full mapping details from the API (includes destination_schema_xml and mapping_json)
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            if (!token) {
+                console.error('❌ [Mapping Select] No auth token found');
+                return;
+            }
+            
+            console.log(`🔍 [Mapping Select] Fetching full mapping details for ID: ${mappingId}...`);
+            const response = await fetch(`/api/api-settings/mappings/${mappingId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch mapping: ${response.status} ${response.statusText}`);
+            }
+            
+            const fullMapping = await response.json();
+            console.log('✅ [Mapping Select] Full mapping loaded:', fullMapping.mapping_name);
+            console.log('📄 [Mapping Select] Has mapping_json:', !!fullMapping.mapping_json);
+            console.log('📏 [Mapping Select] Mapping JSON length:', fullMapping.mapping_json?.length || 0);
+            
+            if (fullMapping.mapping_json) {
+                console.log('🔍 [Mapping Select] Parsing mapping JSON...');
+                const mappingData = JSON.parse(fullMapping.mapping_json);
+                console.log('✅ [Mapping Select] Parsed mapping data:', Object.keys(mappingData).length, 'entries');
+                
+                // Handle different mapping formats (saved vs exported)
+                let convertedMappings = [];
+                
+                // Check if this is a structured format with staticMappings/collectionMappings
+                if (mappingData.staticMappings || mappingData.collectionMappings) {
+                    console.log('📋 [Mapping Select] Detected structured mapping format');
+                    
+                    // Process static mappings
+                    const staticMappings = (mappingData.staticMappings || []).map(m => ({
+                        id: Date.now() + Math.random(),
+                        source: m.source,
+                        target: m.target,
+                        type: m.type || 'element',
+                        value: m.value,
+                        transformation: m.transformation || 'direct'
+                    }));
+                    
+                    // Process collection mappings
+                    const collectionMappings = [];
+                    (mappingData.collectionMappings || []).forEach(cm => {
+                        const mappingsInCollection = (cm.mappings || [])
+                            .filter(m => m.type !== 'generated_line_number')
+                            .map(m => {
+                                const sourceItemName = (cm.sourceItemElementName || '').split('[')[0];
+                                const targetItemName = (cm.targetItemElementName || '').split('[')[0];
+                                return {
+                                    id: Date.now() + Math.random(),
+                                    source: m.source ? `${cm.sourceCollectionPath} > ${sourceItemName}[0] > ${m.source}` : undefined,
+                                    target: m.target ? `${cm.targetCollectionPath} > ${targetItemName}[0] > ${m.target}` : undefined,
+                                    type: m.type || 'element',
+                                    value: m.value,
+                                    transformation: m.transformation || 'direct'
+                                };
+                            })
+                            .filter(m => m.target && m.source);
+                        
+                        collectionMappings.push(...mappingsInCollection);
+                    });
+                    
+                    convertedMappings = [...staticMappings, ...collectionMappings];
+                } else {
+                    // Handle flat mapping format (xpath-based)
+                    console.log('📋 [Mapping Select] Detected flat mapping format');
+                    convertedMappings = Object.entries(mappingData)
+                        .map(([targetPath, config]) => ({
+                            id: Date.now() + Math.random(),
+                            source: config.xpath || config.sourcePath,
+                            target: targetPath,
+                            type: config.type || 'element',
+                            value: config.value,
+                            transformation: config.transform || config.transformation || 'direct'
+                        }))
+                        .filter(mapping => mapping.source); // Only include mappings with a source path
+                }
+                
+                console.log('🔄 [Mapping Select] Converted to', convertedMappings.length, 'visual mappings');
+                if (convertedMappings.length > 0) {
+                    console.log('Sample mapping:', convertedMappings[0]);
+                }
+                
+                setMappings(convertedMappings);
+                setIsMappingFileLoaded(true);
+                console.log('✅ [Mapping Select] Successfully loaded mapping JSON from:', fullMapping.mapping_name);
+                
+                // 🎨 Trigger SVG line update after a short delay
+                setTimeout(() => {
+                    if (mappingSVGRef.current) {
+                        console.log('🎨 [Mapping Select] Triggering SVG line update');
+                        mappingSVGRef.current.updateLines();
+                    }
+                }, 200);
+            } else {
+                console.warn('⚠️  [Mapping Select] No mapping_json in mapping');
+                alert('This mapping does not have mapping JSON saved.');
+            }
+        } catch (error) {
+            console.error('❌ [Mapping Select] Error loading saved mapping JSON:', error);
+            console.error('Error details:', error);
+            alert('Failed to load saved mapping. Please check the console for details.');
+        }
+    };
+
     const handleMappingFile = (content) => {
         if (!content) return;
+        
+        // 🛑 VALIDATION: Prevent loading mapping file before source
+        if (!sourceTree) {
+            alert('⚠️ Please upload or select a Source XML file first before loading the mapping file.');
+            return;
+        }
+        
+        // 🛑 VALIDATION: Prevent loading mapping file before destination
+        if (!targetTree) {
+            alert('⚠️ Please upload or select a Destination XML file first before loading the mapping file.');
+            return;
+        }
+        
         try {
             const imported = JSON.parse(content);
             setHistory([]);
@@ -206,6 +468,14 @@ function EditorPage() {
             // Combine static and collection mappings
             setMappings([...staticMappings, ...allCollectionMappings]);
             setIsMappingFileLoaded(true);
+            
+            // 🎨 Trigger SVG line update after a short delay
+            setTimeout(() => {
+                if (mappingSVGRef.current) {
+                    console.log('🎨 [Mapping File] Triggering SVG line update');
+                    mappingSVGRef.current.updateLines();
+                }
+            }, 200);
         } catch (error) {
             console.error('Invalid mapping JSON:', error);
             alert(`Failed to parse mapping file: ${error.message}`);
@@ -379,28 +649,6 @@ function EditorPage() {
 
     // --- BATCH AI SUGGESTION HANDLERS ---
     
-    // Helper function to collect all elements from a tree
-    const collectAllElements = useCallback((tree) => {
-        const elements = [];
-        
-        const traverse = (node) => {
-            if (node) {
-                elements.push({
-                    name: node.name,
-                    path: node.path,
-                    type: node.type
-                });
-                
-                if (node.children) {
-                    node.children.forEach(traverse);
-                }
-            }
-        };
-        
-        traverse(tree);
-        return elements;
-    }, []);
-
     // Helper function to collect only leaf elements (elements with values, not parent containers)
     // Helper function to get parent path context from a full path
     const getParentPath = (fullPath) => {
@@ -1111,6 +1359,7 @@ function EditorPage() {
                 </div>
 
                 <div className="upload-section">
+                {/* Source XML Dropzone */}
                 <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setSourceTree, true)}>
                     <div className="icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1123,7 +1372,27 @@ function EditorPage() {
                     <h3>Source XML</h3>
                     <p>Upload your source XML schema</p>
                 </FileDropzone>
-                <FileDropzone onFileSelect={(files) => handleFile(files[0]?.content, setTargetTree, false)}>
+                
+                {/* Destination Schema Dropzone with integrated selector */}
+                <FileDropzone 
+                    onFileSelect={(files) => handleFile(files[0]?.content, setTargetTree, false)}
+                    savedOptionsDropdown={savedMappings.length > 0 ? (
+                        <>
+                            <div className="dropzone-selector-divider">or select saved</div>
+                            <select 
+                                value={selectedSavedSchema}
+                                onChange={handleSavedSchemaSelect}
+                            >
+                                <option value="">-- Select Saved Schema --</option>
+                                {savedMappings.map(mapping => (
+                                    <option key={`schema-${mapping.id}`} value={mapping.id}>
+                                        {mapping.mapping_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </>
+                    ) : null}
+                >
                     <div className="icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1133,10 +1402,30 @@ function EditorPage() {
                             <path d="M10 9H9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                     </div>
-                    <h3>Target XML</h3>
-                    <p>Upload your target XML schema</p>
+                    <h3>Destination Schema</h3>
+                    <p>Upload destination XML schema</p>
                 </FileDropzone>
-                <FileDropzone onFileSelect={(files) => handleMappingFile(files[0]?.content)}>
+                
+                {/* Mapping JSON Dropzone with integrated selector */}
+                <FileDropzone 
+                    onFileSelect={(files) => handleMappingFile(files[0]?.content)}
+                    savedOptionsDropdown={savedMappings.length > 0 ? (
+                        <>
+                            <div className="dropzone-selector-divider">or select saved</div>
+                            <select 
+                                value={selectedSavedMappingJson}
+                                onChange={handleSavedMappingJsonSelect}
+                            >
+                                <option value="">-- Select Saved Mapping --</option>
+                                {savedMappings.map(mapping => (
+                                    <option key={`mapping-${mapping.id}`} value={mapping.id}>
+                                        {mapping.mapping_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </>
+                    ) : null}
+                >
                     <div className="icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
