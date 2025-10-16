@@ -9,11 +9,20 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}   Auto-Export XML Watcher${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-echo -e "${GREEN}Monitoring database for new webhooks...${NC}"
-echo -e "${YELLOW}Press Ctrl+C to stop${NC}\n"
+# Log file
+LOG_FILE="/tmp/auto-export-xmls.log"
+
+# Function to log with timestamp (both to terminal and file)
+log() {
+    echo -e "$1" | tee -a "$LOG_FILE"
+}
+
+log "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+log "${BLUE}   Auto-Export XML Watcher${NC}"
+log "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+log "${GREEN}Monitoring database for new webhooks...${NC}"
+log "${YELLOW}Press Ctrl+C to stop${NC}"
+log "${BLUE}Log file: ${LOG_FILE}${NC}\n"
 
 # Ensure directories exist
 mkdir -p webhook-xmls/source webhook-xmls/transformed
@@ -40,7 +49,7 @@ export_webhook() {
         
         if [ -s "$SOURCE_FILE" ]; then
             SIZE=$(stat -f%z "$SOURCE_FILE" 2>/dev/null || stat -c%s "$SOURCE_FILE" 2>/dev/null)
-            echo -e "$(date '+%H:%M:%S') ${GREEN}✅ Exported source XML:${NC} ${ANNOTATION_ID} (${SIZE} bytes)"
+            log "$(date '+%H:%M:%S') ${GREEN}✅ Exported source XML:${NC} ${ANNOTATION_ID} (${SIZE} bytes)"
         else
             rm -f "$SOURCE_FILE"
         fi
@@ -57,7 +66,7 @@ export_webhook() {
         
         if [ -s "$TRANSFORMED_FILE" ]; then
             SIZE=$(stat -f%z "$TRANSFORMED_FILE" 2>/dev/null || stat -c%s "$TRANSFORMED_FILE" 2>/dev/null)
-            echo -e "$(date '+%H:%M:%S') ${GREEN}✅ Exported transformed XML:${NC} ${ANNOTATION_ID} (${SIZE} bytes)"
+            log "$(date '+%H:%M:%S') ${GREEN}✅ Exported transformed XML:${NC} ${ANNOTATION_ID} (${SIZE} bytes)"
         else
             rm -f "$TRANSFORMED_FILE"
         fi
@@ -83,10 +92,10 @@ while true; do
         # Check if this is a new webhook
         if [ "$WEBHOOK_ID" != "$LAST_WEBHOOK_ID" ]; then
             if [ "$STATUS" = "success" ]; then
-                echo -e "$(date '+%H:%M:%S') ${BLUE}📥 New webhook detected:${NC} ${ANNOTATION_ID}"
+                log "$(date '+%H:%M:%S') ${BLUE}📥 New webhook detected:${NC} ${ANNOTATION_ID}"
                 export_webhook "$ANNOTATION_ID" "$WEBHOOK_ID"
             else
-                echo -e "$(date '+%H:%M:%S') ${YELLOW}⚠️  Webhook failed:${NC} ${ANNOTATION_ID} (status: ${STATUS})"
+                log "$(date '+%H:%M:%S') ${YELLOW}⚠️  Webhook failed:${NC} ${ANNOTATION_ID} (status: ${STATUS})"
             fi
             LAST_WEBHOOK_ID="$WEBHOOK_ID"
         fi
