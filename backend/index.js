@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
 
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 const { parseXmlToTree } = require('./services/xmlParser.service');
@@ -1733,6 +1734,14 @@ exports.handler = async (event) => {
                     
                     const mappingId = result.rows[0].id;
                     
+                    // If this is set as default, update all user's API keys to use this mapping
+                    if (is_default) {
+                        await client.query(
+                            'UPDATE api_keys SET default_mapping_id = $1 WHERE user_id = $2',
+                            [mappingId, user.id]
+                        );
+                    }
+                    
                     await client.query('COMMIT');
                     
                     // Log mapping creation
@@ -1790,6 +1799,14 @@ exports.handler = async (event) => {
                     if (result.rows.length === 0) {
                         await client.query('ROLLBACK');
                         return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                    }
+                    
+                    // If this is set as default, update all user's API keys to use this mapping
+                    if (is_default) {
+                        await client.query(
+                            'UPDATE api_keys SET default_mapping_id = $1 WHERE user_id = $2',
+                            [mappingId, user.id]
+                        );
                     }
                     
                     await client.query('COMMIT');
@@ -2187,6 +2204,32 @@ exports.handler = async (event) => {
                         console.log(sourceXml);
                         console.log(`========== END SOURCE XML ==========\n`);
                         
+                        // Save source XML to file
+                        try {
+                            // In Lambda, use /tmp; in local dev, use workspace directory
+                            // SAM Local mounts the backend directory, so we can use __dirname
+                            const baseDir = process.env.LAMBDA_TASK_ROOT 
+                                ? '/tmp/webhook-xmls' 
+                                : '/workspaces/ROSSUMXML/webhook-xmls';
+                            const sourceDir = `${baseDir}/source`;
+                            const transformedDir = `${baseDir}/transformed`;
+                            
+                            // Create directories if they don't exist
+                            if (!fs.existsSync(sourceDir)) {
+                                fs.mkdirSync(sourceDir, { recursive: true });
+                            }
+                            if (!fs.existsSync(transformedDir)) {
+                                fs.mkdirSync(transformedDir, { recursive: true });
+                            }
+                            
+                            const sourceXmlPath = `${sourceDir}/source-${annotationId}.xml`;
+                            fs.writeFileSync(sourceXmlPath, sourceXml, 'utf8');
+                            console.log(`[Rossum Webhook] Saved source XML to: ${sourceXmlPath}`);
+                        } catch (fileErr) {
+                            console.warn(`[Rossum Webhook] Could not save source XML file: ${fileErr.message}`);
+                            // Continue processing even if file save fails
+                        }
+                        
                     } catch (conversionErr) {
                         console.error('[Rossum Webhook] Error converting Rossum data to XML:', conversionErr);
                         
@@ -2233,6 +2276,26 @@ exports.handler = async (event) => {
                         console.log(`\n========== TRANSFORMED XML (output) ==========`);
                         console.log(transformedXml);
                         console.log(`========== END TRANSFORMED XML ==========\n`);
+                        
+                        // Save transformed XML to file
+                        try {
+                            const baseDir = process.env.LAMBDA_TASK_ROOT 
+                                ? '/tmp/webhook-xmls' 
+                                : '/workspaces/ROSSUMXML/webhook-xmls';
+                            const transformedDir = `${baseDir}/transformed`;
+                            
+                            // Create directory if it doesn't exist
+                            if (!fs.existsSync(transformedDir)) {
+                                fs.mkdirSync(transformedDir, { recursive: true });
+                            }
+                            
+                            const transformedXmlPath = `${transformedDir}/transformed-${annotationId}.xml`;
+                            fs.writeFileSync(transformedXmlPath, transformedXml, 'utf8');
+                            console.log(`[Rossum Webhook] Saved transformed XML to: ${transformedXmlPath}`);
+                        } catch (fileErr) {
+                            console.warn(`[Rossum Webhook] Could not save transformed XML file: ${fileErr.message}`);
+                            // Continue processing even if file save fails
+                        }
                         
                     } catch (transformErr) {
                         console.error('[Rossum Webhook] Transformation error:', transformErr);
@@ -2340,19 +2403,22 @@ exports.handler = async (event) => {
                             }));
                         }
                     } else {
-                        // No destination webhook - just log success
+                        // No destination webhook - store both source and transformed XML
                         await client.query(
                             `UPDATE webhook_events 
                              SET status = $1, event_type = $2, source_xml_size = $3, 
                                  transformed_xml_size = $4, processing_time_ms = $5,
+                                 source_xml_payload = $6, response_payload = $7,
                                  updated_at = CURRENT_TIMESTAMP 
-                             WHERE id = $6`,
+                             WHERE id = $8`,
                             [
                                 'success',
                                 'transformation_success',
                                 sourceXml.length,
                                 transformedXml.length,
                                 Date.now() - startTime,
+                                sourceXml, // Store the source XML (converted from Rossum JSON)
+                                transformedXml, // Store the transformed XML
                                 webhookEventId
                             ]
                         );

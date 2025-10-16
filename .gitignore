@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 frontend/build/
 backend/*.zip
+
+# Webhook XML files (runtime-generated)
+webhook-xmls/source/
+webhook-xmls/transformed/
