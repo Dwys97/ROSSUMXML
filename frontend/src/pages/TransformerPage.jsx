@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import FileDropzone from '../components/common/FileDropzone';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
+import TransformationLimitModal from '../components/TransformationLimitModal';
 import { useAuth } from '../contexts/useAuth';
 import { tokenStorage } from '../utils/tokenStorage';
 
 function TransformerPage() {
     const { user } = useAuth(); // Get user to check if logged in
+    const navigate = useNavigate();
     const [sourceFiles, setSourceFiles] = useState([]);
     const [destinationXml, setDestinationXml] = useState(null);
     const [mappingJson, setMappingJson] = useState(null);
-    const [xsdSchema, setXsdSchema] = useState(null);
+    const [_xsdSchema, setXsdSchema] = useState(null); // For future XSD validation
 
     const [removeEmptyTags, setRemoveEmptyTags] = useState(true);
     const [useXPath, setUseXPath] = useState(false);
@@ -20,6 +22,15 @@ function TransformerPage() {
     const [outputXml, setOutputXml] = useState('');
     const [status, setStatus] = useState('Ready');
     const [sourceCount, setSourceCount] = useState(0);
+
+    // Usage tracking state
+    const [usageInfo, setUsageInfo] = useState({
+        used: 0,
+        limit: 0,
+        remaining: 0,
+        subscriptionLevel: 'free'
+    });
+    const [showLimitModal, setShowLimitModal] = useState(false);
 
     const handleTransform = async () => {
         if (sourceFiles.length === 0 || !destinationXml || !mappingJson) {
@@ -36,9 +47,6 @@ function TransformerPage() {
 
         setStatus('Transforming...');
         try {
-            // All transformations now require JWT authentication
-            // Free tier users use /api/transform (10/day limit)
-            // Paid tier users can use /api/transform/authenticated (higher limits)
             const endpoint = '/api/transform';
             const headers = {
                 'Content-Type': 'application/json',
@@ -58,21 +66,53 @@ function TransformerPage() {
                 }),
             });
 
+            // Handle rate limit errors (429)
+            if (response.status === 429) {
+                const errorData = await response.json();
+                console.log('Rate limit response:', errorData);
+                
+                // Handle both possible response formats
+                const usage = errorData.usage || errorData.details || {};
+                
+                setUsageInfo({
+                    used: usage.used || 0,
+                    limit: usage.limit || 10,
+                    remaining: usage.remaining || 0,
+                    subscriptionLevel: usage.subscription_level || errorData.subscription_level || 'free'
+                });
+                setShowLimitModal(true);
+                setStatus('Rate limit exceeded');
+                return;
+            }
+
+            // Handle authentication errors
+            if (response.status === 401) {
+                alert('Your session has expired. Please log in again.');
+                return;
+            }
+
             if (!response.ok) {
                 const errorText = await response.text();
-                
-                // Handle authentication errors
-                if (response.status === 401) {
-                    alert('Your session has expired. Please log in again.');
-                    return;
-                }
-                
                 throw new Error(`Server error: ${response.status} - ${errorText}`);
             }
 
+            // Extract usage info from headers
+            const usageLimit = parseInt(response.headers.get('X-Usage-Limit') || '0');
+            const usageCount = parseInt(response.headers.get('X-Usage-Count') || '0');
+            const usageRemaining = parseInt(response.headers.get('X-Usage-Remaining') || '0');
+            const subscriptionLevel = response.headers.get('X-Subscription-Level') || 'free';
+
+            // Update usage info state
+            setUsageInfo({
+                used: usageCount,
+                limit: usageLimit,
+                remaining: usageRemaining,
+                subscriptionLevel: subscriptionLevel
+            });
+
             const transformed = await response.text();
             setOutputXml(transformed);
-            setStatus('Transformation successful!');
+            setStatus(`Transformation successful! (${usageCount}/${usageLimit} used today)`);
         } catch (err) {
             alert('Error: ' + err.message);
             setStatus('Error during transformation.');
@@ -87,9 +127,26 @@ function TransformerPage() {
         }
     };
 
+    const handleUpgrade = () => {
+        setShowLimitModal(false);
+        navigate('/pricing');
+    };
+
     return (
         <>
             <TopNav />
+            
+            {/* Transformation Limit Modal */}
+            <TransformationLimitModal
+                show={showLimitModal}
+                subscriptionLevel={usageInfo.subscriptionLevel}
+                used={usageInfo.used}
+                limit={usageInfo.limit}
+                remaining={usageInfo.remaining}
+                onClose={() => setShowLimitModal(false)}
+                onUpgrade={handleUpgrade}
+            />
+            
             <div className="app-container extra-spacing" style={{ paddingTop: '100px' }}>
                 <section className="how-to-use" style={{ marginTop: '0' }}>
                 <div className="steps-container">

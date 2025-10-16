@@ -1204,7 +1204,7 @@ exports.handler = async (event) => {
 
         // Frontend Transformer Page endpoint - JWT REQUIRED
         // For registered users on FREE subscription tier (10 transforms/day)
-        // TODO: Add rate limiting in Phase 5 (10 requests/day for free tier)
+        // Rate limiting implemented: 10 requests/day for free tier, unlimited for paid tiers
         if (path === '/api/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
                 // Verify JWT token - all users must be registered
@@ -1215,24 +1215,123 @@ exports.handler = async (event) => {
                     return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
                 }
                 
-                // Log transformation for free tier users
-                await logTransformationRequest(
-                    pool,
-                    user.id,
-                    'USER_UPLOAD',
-                    'USER_UPLOAD',
-                    sourceXml.length,
-                    event
-                );
-                
-                console.log(`[FREE TIER TRANSFORM] User ${user.id} (${user.email}) - Free tier transformation`);
-                
-                const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
-                
-                return createResponse(200, transformed, 'application/xml');
+                // Get user's subscription level
+                const client = await pool.connect();
+                try {
+                    const subResult = await client.query(
+                        'SELECT level FROM subscriptions WHERE user_id = $1',
+                        [user.id]
+                    );
+                    
+                    const subscriptionLevel = subResult.rows[0]?.level || 'free';
+                    
+                    // Rate limiting for free tier users
+                    if (subscriptionLevel === 'free') {
+                        // Count transformations in the last 24 hours
+                        const countResult = await client.query(`
+                            SELECT COUNT(*) as count
+                            FROM security_audit_log
+                            WHERE user_id = $1
+                              AND event_type = 'transformation'
+                              AND resource_type IN ('USER_UPLOAD', 'ROSSUM_EXPORT')
+                              AND created_at >= NOW() - INTERVAL '24 hours'
+                        `, [user.id]);
+                        
+                        const transformCount = parseInt(countResult.rows[0].count);
+                        const freeLimit = 10;
+                        
+                        console.log(`[RATE LIMIT] User ${user.email} - ${transformCount}/${freeLimit} transformations used today`);
+                        
+                        if (transformCount >= freeLimit) {
+                            // Log rate limit exceeded
+                            await logSecurityEvent(
+                                pool,
+                                user.id,
+                                'rate_limit_exceeded',
+                                'transformation',
+                                null,
+                                'free_tier_limit',
+                                false,
+                                {
+                                    limit: freeLimit,
+                                    current_count: transformCount,
+                                    subscription_level: subscriptionLevel
+                                }
+                            );
+                            
+                            return createResponse(429, JSON.stringify({
+                                error: 'Rate limit exceeded',
+                                message: 'You have reached your free tier limit of 10 transformations per day.',
+                                details: {
+                                    limit: freeLimit,
+                                    used: transformCount,
+                                    remaining: 0,
+                                    subscription_level: subscriptionLevel,
+                                    reset_time: 'Limit resets every 24 hours'
+                                },
+                                upgrade_url: '/pricing'
+                            }));
+                        }
+                    }
+                    
+                    // Log transformation
+                    await logTransformationRequest(
+                        pool,
+                        user.id,
+                        'USER_UPLOAD',
+                        'USER_UPLOAD',
+                        sourceXml.length,
+                        event
+                    );
+                    
+                    console.log(`[TRANSFORM] User ${user.id} (${user.email}) - ${subscriptionLevel} tier transformation`);
+                    
+                    const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
+                    
+                    // Count again to get updated usage
+                    const updatedCountResult = await client.query(`
+                        SELECT COUNT(*) as count
+                        FROM security_audit_log
+                        WHERE user_id = $1
+                          AND event_type = 'transformation'
+                          AND resource_type IN ('USER_UPLOAD', 'ROSSUM_EXPORT')
+                          AND created_at >= NOW() - INTERVAL '24 hours'
+                    `, [user.id]);
+                    
+                    const updatedCount = parseInt(updatedCountResult.rows[0].count);
+                    const limit = subscriptionLevel === 'free' ? 10 : 999999;
+                    
+                    // Return transformed XML with usage info in custom header
+                    return {
+                        statusCode: 200,
+                        body: transformed,
+                        headers: {
+                            "Content-Type": "application/xml",
+                            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                            "Access-Control-Allow-Origin": "*",
+                            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+                            "Access-Control-Expose-Headers": "X-Usage-Limit,X-Usage-Count,X-Usage-Remaining,X-Subscription-Level",
+                            "X-Usage-Limit": String(limit),
+                            "X-Usage-Count": String(updatedCount),
+                            "X-Usage-Remaining": String(Math.max(0, limit - updatedCount)),
+                            "X-Subscription-Level": subscriptionLevel,
+                            // Security Headers
+                            "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+                            "X-Content-Type-Options": "nosniff",
+                            "X-Frame-Options": "DENY",
+                            "X-XSS-Protection": "1; mode=block",
+                            "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:3000 http://localhost:5173; font-src 'self' data:; object-src 'none'; frame-src 'none'",
+                            "Referrer-Policy": "strict-origin-when-cross-origin",
+                            "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
+                        }
+                    };
+                    
+                } finally {
+                    client.release();
+                }
                 
             } catch (err) {
-                console.error('Free tier transformation error:', err);
+                console.error('Transformation error:', err);
                 if (err.message.includes('token')) {
                     return createResponse(401, JSON.stringify({ 
                         error: 'Authentication required',
