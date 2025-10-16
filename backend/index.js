@@ -4154,7 +4154,385 @@ exports.handler = async (event) => {
             }
         }
 
-        // ENDPOINT 10: GET /api/admin/subscriptions - List all subscriptions
+        // ============================================================
+        // TRANSFORMATION MONITORING ENDPOINTS
+        // ============================================================
+
+        // ENDPOINT 10: GET /api/admin/transformations - List all transformations with filtering
+        if (path === '/api/admin/transformations' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
+            }
+
+            try {
+                const queryParams = event.queryStringParameters || {};
+                const page = parseInt(queryParams.page) || 1;
+                const limit = Math.min(parseInt(queryParams.limit) || 20, 100); // Max 100 per page
+                const offset = (page - 1) * limit;
+
+                // Filters
+                const dateFrom = queryParams.dateFrom || null;
+                const dateTo = queryParams.dateTo || null;
+                const status = queryParams.status || null; // 'success', 'failed', or null for all
+                const userId = queryParams.userId || null;
+                const annotationId = queryParams.annotationId || null;
+                const sortBy = queryParams.sortBy || 'created_at';
+                const sortOrder = (queryParams.sortOrder || 'DESC').toUpperCase();
+
+                // Build WHERE clause
+                let whereClauses = [];
+                let queryParamsArray = [];
+                let paramCount = 1;
+
+                if (dateFrom) {
+                    whereClauses.push(`w.created_at >= $${paramCount}`);
+                    queryParamsArray.push(dateFrom);
+                    paramCount++;
+                }
+
+                if (dateTo) {
+                    whereClauses.push(`w.created_at <= $${paramCount}`);
+                    queryParamsArray.push(dateTo);
+                    paramCount++;
+                }
+
+                if (status) {
+                    whereClauses.push(`w.status = $${paramCount}`);
+                    queryParamsArray.push(status);
+                    paramCount++;
+                }
+
+                if (userId) {
+                    whereClauses.push(`w.user_id = $${paramCount}`);
+                    queryParamsArray.push(userId);
+                    paramCount++;
+                }
+
+                if (annotationId) {
+                    whereClauses.push(`w.rossum_annotation_id ILIKE $${paramCount}`);
+                    queryParamsArray.push(`%${annotationId}%`);
+                    paramCount++;
+                }
+
+                const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+                // Allowed sort columns
+                const allowedSortColumns = ['created_at', 'processing_time_ms', 'source_xml_size', 'transformed_xml_size'];
+                const sortColumn = allowedSortColumns.includes(sortBy) ? sortBy : 'created_at';
+                const sortDirection = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
+                // Count total records
+                const countResult = await pool.query(`
+                    SELECT COUNT(*) as total
+                    FROM webhook_events w
+                    ${whereClause}
+                `, queryParamsArray);
+
+                const total = parseInt(countResult.rows[0].total);
+
+                // Fetch transformations with user details
+                const result = await pool.query(`
+                    SELECT 
+                        w.id,
+                        w.rossum_annotation_id as annotation_id,
+                        w.created_at,
+                        w.processing_time_ms,
+                        w.status,
+                        w.error_message,
+                        w.source_xml_size,
+                        w.transformed_xml_size,
+                        w.event_type,
+                        w.rossum_document_id,
+                        w.rossum_queue_id,
+                        u.email as user_email,
+                        u.name as user_name,
+                        ak.key_name as api_key_name,
+                        SUBSTRING(ak.api_secret, 1, 12) || '...' as api_key_prefix
+                    FROM webhook_events w
+                    LEFT JOIN users u ON w.user_id = u.id
+                    LEFT JOIN api_keys ak ON w.api_key_id = ak.id
+                    ${whereClause}
+                    ORDER BY w.${sortColumn} ${sortDirection}
+                    LIMIT $${paramCount} OFFSET $${paramCount + 1}
+                `, [...queryParamsArray, limit, offset]);
+
+                // Calculate line counts for each transformation
+                const transformations = result.rows.map(row => {
+                    // Estimate lines from XML size (rough approximation: ~60 bytes per line)
+                    const estimatedSourceLines = row.source_xml_size ? Math.round(row.source_xml_size / 60) : 0;
+                    const estimatedTransformedLines = row.transformed_xml_size ? Math.round(row.transformed_xml_size / 60) : 0;
+
+                    return {
+                        ...row,
+                        source_lines: estimatedSourceLines,
+                        transformed_lines: estimatedTransformedLines,
+                        created_at: row.created_at?.toISOString(),
+                    };
+                });
+
+                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_logs', null, 'list_transformations', true);
+
+                return createResponse(200, JSON.stringify({
+                    transformations,
+                    pagination: {
+                        total,
+                        page,
+                        limit,
+                        pages: Math.ceil(total / limit)
+                    }
+                }));
+
+            } catch (err) {
+                console.error('[Admin] Error fetching transformations:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformations',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ENDPOINT 11: GET /api/admin/transformations/stats - Transformation statistics
+        if (path === '/api/admin/transformations/stats' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
+            }
+
+            try {
+                const queryParams = event.queryStringParameters || {};
+                const dateFrom = queryParams.dateFrom || null;
+                const dateTo = queryParams.dateTo || null;
+
+                // Build WHERE clause for date filtering
+                let whereClauses = [];
+                let queryParamsArray = [];
+                let paramCount = 1;
+
+                if (dateFrom) {
+                    whereClauses.push(`created_at >= $${paramCount}`);
+                    queryParamsArray.push(dateFrom);
+                    paramCount++;
+                }
+
+                if (dateTo) {
+                    whereClauses.push(`created_at <= $${paramCount}`);
+                    queryParamsArray.push(dateTo);
+                    paramCount++;
+                }
+
+                const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+                // Get comprehensive statistics
+                const statsResult = await pool.query(`
+                    SELECT 
+                        COUNT(*) as total_transformations,
+                        COUNT(*) FILTER (WHERE status = 'success') as successful,
+                        COUNT(*) FILTER (WHERE status != 'success') as failed,
+                        ROUND(AVG(processing_time_ms)::numeric, 2) as avg_processing_time_ms,
+                        SUM(source_xml_size) as total_source_volume_bytes,
+                        SUM(transformed_xml_size) as total_transformed_volume_bytes,
+                        MAX(COALESCE(source_xml_size, 0) + COALESCE(transformed_xml_size, 0)) as largest_transformation_bytes,
+                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as transformations_today,
+                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE AND status != 'success') as failed_today
+                    FROM webhook_events
+                    ${whereClause}
+                `, queryParamsArray);
+
+                const stats = statsResult.rows[0];
+
+                // Calculate success rate
+                const successRate = stats.total_transformations > 0
+                    ? ((stats.successful / stats.total_transformations) * 100).toFixed(2)
+                    : 0;
+
+                // Calculate average lines per document (estimation)
+                const avgSourceSize = stats.total_transformations > 0
+                    ? stats.total_source_volume_bytes / stats.total_transformations
+                    : 0;
+                const avgLinesPerDocument = Math.round(avgSourceSize / 60);
+
+                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_stats', null, 'view_stats', true);
+
+                return createResponse(200, JSON.stringify({
+                    total_transformations: parseInt(stats.total_transformations),
+                    successful: parseInt(stats.successful),
+                    failed: parseInt(stats.failed),
+                    success_rate: parseFloat(successRate),
+                    avg_processing_time_ms: parseFloat(stats.avg_processing_time_ms) || 0,
+                    total_source_volume_bytes: parseInt(stats.total_source_volume_bytes) || 0,
+                    total_transformed_volume_bytes: parseInt(stats.total_transformed_volume_bytes) || 0,
+                    avg_lines_per_document: avgLinesPerDocument,
+                    transformations_today: parseInt(stats.transformations_today),
+                    failed_today: parseInt(stats.failed_today),
+                    largest_transformation_bytes: parseInt(stats.largest_transformation_bytes) || 0
+                }));
+
+            } catch (err) {
+                console.error('[Admin] Error fetching transformation stats:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation statistics',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ENDPOINT 12: GET /api/admin/transformations/:id - Get single transformation details
+        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)$/) && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
+            }
+
+            try {
+                const transformationId = path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)$/)[1];
+
+                const result = await pool.query(`
+                    SELECT 
+                        w.id,
+                        w.rossum_annotation_id as annotation_id,
+                        w.created_at,
+                        w.updated_at,
+                        w.processing_time_ms,
+                        w.status,
+                        w.error_message,
+                        w.event_type,
+                        w.source_xml_size,
+                        w.transformed_xml_size,
+                        w.source_xml_payload,
+                        w.response_payload,
+                        w.rossum_document_id,
+                        w.rossum_queue_id,
+                        w.http_status_code,
+                        u.id as user_id,
+                        u.email as user_email,
+                        u.name as user_name,
+                        ak.id as api_key_id,
+                        ak.key_name as api_key_name,
+                        SUBSTRING(ak.api_secret, 1, 12) || '...' as api_key_prefix
+                    FROM webhook_events w
+                    LEFT JOIN users u ON w.user_id = u.id
+                    LEFT JOIN api_keys ak ON w.api_key_id = ak.id
+                    WHERE w.id = $1
+                `, [transformationId]);
+
+                if (result.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({ error: 'Transformation not found' }));
+                }
+
+                const transformation = result.rows[0];
+
+                // Estimate line counts
+                const estimatedSourceLines = transformation.source_xml_size ? Math.round(transformation.source_xml_size / 60) : 0;
+                const estimatedTransformedLines = transformation.transformed_xml_size ? Math.round(transformation.transformed_xml_size / 60) : 0;
+
+                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_detail', transformationId, 'view_details', true);
+
+                return createResponse(200, JSON.stringify({
+                    ...transformation,
+                    source_lines: estimatedSourceLines,
+                    transformed_lines: estimatedTransformedLines,
+                    created_at: transformation.created_at?.toISOString(),
+                    updated_at: transformation.updated_at?.toISOString(),
+                    user: {
+                        id: transformation.user_id,
+                        email: transformation.user_email,
+                        name: transformation.user_name
+                    },
+                    api_key: {
+                        id: transformation.api_key_id,
+                        key_name: transformation.api_key_name,
+                        key_prefix: transformation.api_key_prefix
+                    }
+                }));
+
+            } catch (err) {
+                console.error('[Admin] Error fetching transformation details:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation details',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ENDPOINT 13: GET /api/admin/transformations/:id/download - Download XML files
+        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)\/download$/) && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
+            }
+
+            try {
+                const transformationId = path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)\/download$/)[1];
+                const queryParams = event.queryStringParameters || {};
+                const type = queryParams.type || 'transformed'; // 'source' or 'transformed'
+
+                const column = type === 'source' ? 'source_xml_payload' : 'response_payload';
+
+                const result = await pool.query(`
+                    SELECT 
+                        ${column} as xml_payload,
+                        rossum_annotation_id
+                    FROM webhook_events
+                    WHERE id = $1 AND ${column} IS NOT NULL
+                `, [transformationId]);
+
+                if (result.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({ error: 'XML not found' }));
+                }
+
+                const xmlPayload = result.rows[0].xml_payload;
+                const annotationId = result.rows[0].rossum_annotation_id;
+                const filename = `${type}-${annotationId}.xml`;
+
+                await logSecurityEvent(pool, user.id, 'data_access', 'xml_download', transformationId, `download_${type}_xml`, true);
+
+                return {
+                    statusCode: 200,
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'Content-Disposition': `attachment; filename="${filename}"`,
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Headers': '*',
+                        ...SECURITY_HEADERS
+                    },
+                    body: xmlPayload
+                };
+
+            } catch (err) {
+                console.error('[Admin] Error downloading XML:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to download XML',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ============================================================
+        // END TRANSFORMATION MONITORING ENDPOINTS
+        // ============================================================
+
+        // ENDPOINT 14: GET /api/admin/subscriptions - List all subscriptions
         if (path === '/api/admin/subscriptions' && method === 'GET') {
             const user = await verifyJWT(event);
             if (!user) {
