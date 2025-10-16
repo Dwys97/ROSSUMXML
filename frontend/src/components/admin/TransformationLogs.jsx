@@ -6,7 +6,8 @@ import styles from './TransformationLogs.module.css';
 
 function TransformationLogs() {
     const [stats, setStats] = useState(null);
-    const [transformations, setTransformations] = useState([]);
+    const [allTransformations, setAllTransformations] = useState([]); // Store ALL unfiltered data
+    const [transformations, setTransformations] = useState([]); // Filtered/paginated display data
     const [selectedTransformation, setSelectedTransformation] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -16,6 +17,8 @@ function TransformationLogs() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    
+    const itemsPerPage = 20;
     
     // Filters (non-date filters that affect transformations list only)
     const [filters, setFilters] = useState({
@@ -32,15 +35,11 @@ function TransformationLogs() {
         dateTo: ''
     });
 
-    // Fetch stats
+    // Fetch stats (overall stats - no filtering)
     const fetchStats = async () => {
         try {
             const token = localStorage.getItem('token');
-            const queryParams = new URLSearchParams();
-            if (dateFilters.dateFrom) queryParams.append('dateFrom', dateFilters.dateFrom);
-            if (dateFilters.dateTo) queryParams.append('dateTo', dateFilters.dateTo);
-
-            const response = await fetch(`/api/admin/transformations/stats?${queryParams}`, {
+            const response = await fetch(`/api/admin/transformations/stats`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -57,28 +56,20 @@ function TransformationLogs() {
         }
     };
 
-    // Fetch transformations
+    // Fetch ALL transformations once (no server-side filtering)
     const fetchTransformations = async () => {
         try {
             setLoading(true);
             setError(null);
 
             const token = localStorage.getItem('token');
+            // Fetch ALL transformations with no filters, large limit
             const queryParams = new URLSearchParams({
-                page: currentPage,
-                limit: 20,
-                sortBy: filters.sortBy,
-                sortOrder: filters.sortOrder
+                page: 1,
+                limit: 1000, // Get all recent transformations
+                sortBy: 'created_at',
+                sortOrder: 'DESC'
             });
-
-            // Add date filters
-            if (dateFilters.dateFrom) queryParams.append('dateFrom', dateFilters.dateFrom);
-            if (dateFilters.dateTo) queryParams.append('dateTo', dateFilters.dateTo);
-            
-            // Add other filters
-            if (filters.status) queryParams.append('status', filters.status);
-            if (filters.userId) queryParams.append('userId', filters.userId);
-            if (filters.annotationId) queryParams.append('annotationId', filters.annotationId);
 
             const response = await fetch(`/api/admin/transformations?${queryParams}`, {
                 headers: {
@@ -91,14 +82,12 @@ function TransformationLogs() {
             }
 
             const data = await response.json();
-            setTransformations(data.transformations);
-            setTotalPages(data.pagination.pages);
-            setTotal(data.pagination.total);
+            setAllTransformations(data.transformations || []);
+            setLoading(false);
 
         } catch (err) {
             console.error('Error fetching transformations:', err);
             setError(err.message);
-        } finally {
             setLoading(false);
         }
     };
@@ -175,32 +164,72 @@ function TransformationLogs() {
         }
     };
 
-    // Initial load - fetch stats and users once
+    // Initial load - fetch all data once
     useEffect(() => {
         fetchStats();
         fetchUsers();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        fetchTransformations();
     }, []);
 
-    // Fetch transformations when page or filters change
+    // Client-side filtering whenever filters or allTransformations change
     useEffect(() => {
-        console.log('📄 Filters or page changed - fetching transformations', {
-            page: currentPage,
-            filters,
-            dateFilters
-        });
-        fetchTransformations();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, filters, dateFilters]);
+        let filtered = [...allTransformations];
 
-    // Refetch stats ONLY when date filters change
-    useEffect(() => {
-        console.log('🔄 Date filters changed - refetching stats', {
-            dateFilters
+        // Date range filter
+        if (dateFilters.dateFrom) {
+            const fromDate = new Date(dateFilters.dateFrom);
+            filtered = filtered.filter(t => new Date(t.created_at) >= fromDate);
+        }
+        if (dateFilters.dateTo) {
+            const toDate = new Date(dateFilters.dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(t => new Date(t.created_at) <= toDate);
+        }
+
+        // Status filter
+        if (filters.status) {
+            filtered = filtered.filter(t => 
+                t.status?.toLowerCase() === filters.status.toLowerCase()
+            );
+        }
+
+        // User filter
+        if (filters.userId) {
+            filtered = filtered.filter(t => t.user_id === filters.userId);
+        }
+
+        // Annotation ID filter
+        if (filters.annotationId) {
+            filtered = filtered.filter(t => 
+                t.rossum_annotation_id?.toString().includes(filters.annotationId)
+            );
+        }
+
+        // Sorting
+        filtered.sort((a, b) => {
+            const aVal = a[filters.sortBy];
+            const bVal = b[filters.sortBy];
+            
+            if (filters.sortOrder === 'ASC') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
         });
-        fetchStats();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateFilters]);
+
+        // Update total and pages
+        setTotal(filtered.length);
+        const pages = Math.ceil(filtered.length / itemsPerPage);
+        setTotalPages(pages || 1);
+
+        // Paginate
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginated = filtered.slice(startIndex, endIndex);
+
+        setTransformations(paginated);
+        
+    }, [allTransformations, filters, dateFilters, currentPage]);
 
     // Refresh button
     const handleRefresh = () => {
