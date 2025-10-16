@@ -35,10 +35,15 @@ export_webhook() {
     local ANNOTATION_ID=$1
     local WEBHOOK_ID=$2
     
+    # Clean up old XML files (keep only latest annotation)
+    log "$(date '+%H:%M:%S') ${YELLOW}🗑️  Cleaning up old XML files...${NC}"
+    rm -f webhook-xmls/source/source-*.xml
+    rm -f webhook-xmls/transformed/transformed-*.xml
+    
     SOURCE_FILE="webhook-xmls/source/source-${ANNOTATION_ID}.xml"
     TRANSFORMED_FILE="webhook-xmls/transformed/transformed-${ANNOTATION_ID}.xml"
     
-    # Export source XML if not exists
+    # Export source XML
     if [ ! -f "$SOURCE_FILE" ]; then
         docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
         SELECT source_xml_payload 
@@ -55,7 +60,7 @@ export_webhook() {
         fi
     fi
     
-    # Export transformed XML if not exists
+    # Export transformed XML
     if [ ! -f "$TRANSFORMED_FILE" ]; then
         docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
         SELECT response_payload 
