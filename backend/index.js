@@ -4249,6 +4249,45 @@ exports.handler = async (event) => {
             }
         }
 
+        // ENDPOINT 10.5: GET /api/admin/transformations/users - Get unique users from transformations
+        if (path === '/api/admin/transformations/users' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
+            }
+
+            try {
+                // Get distinct users who have webhook events
+                const result = await pool.query(`
+                    SELECT DISTINCT
+                        u.id,
+                        u.email,
+                        u.username
+                    FROM webhook_events w
+                    INNER JOIN users u ON w.user_id = u.id
+                    ORDER BY u.email
+                `);
+
+                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_users', null, 'list_users', true);
+
+                return createResponse(200, JSON.stringify({
+                    users: result.rows
+                }));
+
+            } catch (err) {
+                console.error('[Admin] Error fetching transformation users:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch users',
+                    details: err.message
+                }));
+            }
+        }
+
         // ENDPOINT 10: GET /api/admin/transformations - List all transformations with filtering
         if (path === '/api/admin/transformations' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             const user = await verifyJWT(event);

@@ -85,11 +85,33 @@ function TransformationLogs() {
             setTransformations(data.transformations);
             setTotalPages(data.pagination.pages);
             setTotal(data.pagination.total);
+
         } catch (err) {
             console.error('Error fetching transformations:', err);
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Fetch unique users from transformations
+    const fetchUsers = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/admin/transformations/users', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch users');
+            }
+
+            const data = await response.json();
+            setUsers(data.users || []);
+        } catch (err) {
+            console.error('Error fetching users:', err);
         }
     };
 
@@ -112,27 +134,6 @@ function TransformationLogs() {
         } catch (err) {
             console.error('Error fetching transformation details:', err);
             alert('Failed to load transformation details: ' + err.message);
-        }
-    };
-
-    // Fetch users for filter dropdown
-    const fetchUsers = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch('/api/admin/users', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch users');
-            }
-
-            const data = await response.json();
-            setUsers(data.users || []);
-        } catch (err) {
-            console.error('Error fetching users:', err);
         }
     };
 
@@ -165,13 +166,26 @@ function TransformationLogs() {
         }
     };
 
-    // Initial load
+    // Initial load - fetch stats and users once
     useEffect(() => {
         fetchStats();
-        fetchTransformations();
         fetchUsers();
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Fetch transformations when page or filters change
+    useEffect(() => {
+        fetchTransformations();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPage, filters]);
+
+    // Refetch stats only when date filters change
+    useEffect(() => {
+        if (filters.dateFrom || filters.dateTo) {
+            fetchStats();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters.dateFrom, filters.dateTo]);
 
     // Refresh button
     const handleRefresh = () => {
