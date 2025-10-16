@@ -4158,8 +4158,99 @@ exports.handler = async (event) => {
         // TRANSFORMATION MONITORING ENDPOINTS
         // ============================================================
 
+        // ENDPOINT 11: GET /api/admin/transformations/stats - Transformation statistics
+        // (Must be checked BEFORE general /transformations route)
+        if (path === '/api/admin/transformations/stats' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
+            }
+
+            try {
+                const queryParams = event.queryStringParameters || {};
+                const dateFrom = queryParams.dateFrom || null;
+                const dateTo = queryParams.dateTo || null;
+
+                // Build WHERE clause for date filtering
+                let whereClauses = [];
+                let queryParamsArray = [];
+                let paramCount = 1;
+
+                if (dateFrom) {
+                    whereClauses.push(`created_at >= $${paramCount}`);
+                    queryParamsArray.push(dateFrom);
+                    paramCount++;
+                }
+
+                if (dateTo) {
+                    whereClauses.push(`created_at <= $${paramCount}`);
+                    queryParamsArray.push(dateTo);
+                    paramCount++;
+                }
+
+                const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+                // Get comprehensive statistics
+                const statsResult = await pool.query(`
+                    SELECT 
+                        COUNT(*) as total_transformations,
+                        COUNT(*) FILTER (WHERE status = 'success') as successful,
+                        COUNT(*) FILTER (WHERE status != 'success') as failed,
+                        ROUND(AVG(processing_time_ms)::numeric, 2) as avg_processing_time_ms,
+                        SUM(source_xml_size) as total_source_volume_bytes,
+                        SUM(transformed_xml_size) as total_transformed_volume_bytes,
+                        MAX(COALESCE(source_xml_size, 0) + COALESCE(transformed_xml_size, 0)) as largest_transformation_bytes,
+                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as transformations_today,
+                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE AND status != 'success') as failed_today
+                    FROM webhook_events
+                    ${whereClause}
+                `, queryParamsArray);
+
+                const stats = statsResult.rows[0];
+
+                // Calculate success rate
+                const successRate = stats.total_transformations > 0
+                    ? ((stats.successful / stats.total_transformations) * 100).toFixed(2)
+                    : 0;
+
+                // Calculate average lines per document (estimation)
+                const avgSourceSize = stats.total_transformations > 0
+                    ? stats.total_source_volume_bytes / stats.total_transformations
+                    : 0;
+                const avgLinesPerDocument = Math.round(avgSourceSize / 60);
+
+                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_stats', null, 'view_stats', true);
+
+                return createResponse(200, JSON.stringify({
+                    total_transformations: parseInt(stats.total_transformations),
+                    successful: parseInt(stats.successful),
+                    failed: parseInt(stats.failed),
+                    success_rate: parseFloat(successRate),
+                    avg_processing_time_ms: parseFloat(stats.avg_processing_time_ms) || 0,
+                    total_source_volume_bytes: parseInt(stats.total_source_volume_bytes) || 0,
+                    total_transformed_volume_bytes: parseInt(stats.total_transformed_volume_bytes) || 0,
+                    avg_lines_per_document: avgLinesPerDocument,
+                    transformations_today: parseInt(stats.transformations_today),
+                    failed_today: parseInt(stats.failed_today),
+                    largest_transformation_bytes: parseInt(stats.largest_transformation_bytes) || 0
+                }));
+
+            } catch (err) {
+                console.error('[Admin] Error fetching transformation stats:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation statistics',
+                    details: err.message
+                }));
+            }
+        }
+
         // ENDPOINT 10: GET /api/admin/transformations - List all transformations with filtering
-        if (path === '/api/admin/transformations' && method === 'GET') {
+        if (path === '/api/admin/transformations' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             const user = await verifyJWT(event);
             if (!user) {
                 return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
@@ -4251,7 +4342,7 @@ exports.handler = async (event) => {
                         w.rossum_document_id,
                         w.rossum_queue_id,
                         u.email as user_email,
-                        u.name as user_name,
+                        u.username as user_name,
                         ak.key_name as api_key_name,
                         SUBSTRING(ak.api_secret, 1, 12) || '...' as api_key_prefix
                     FROM webhook_events w
@@ -4297,98 +4388,8 @@ exports.handler = async (event) => {
             }
         }
 
-        // ENDPOINT 11: GET /api/admin/transformations/stats - Transformation statistics
-        if (path === '/api/admin/transformations/stats' && method === 'GET') {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
-            if (!permissionCheck.authorized) {
-                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
-            }
-
-            try {
-                const queryParams = event.queryStringParameters || {};
-                const dateFrom = queryParams.dateFrom || null;
-                const dateTo = queryParams.dateTo || null;
-
-                // Build WHERE clause for date filtering
-                let whereClauses = [];
-                let queryParamsArray = [];
-                let paramCount = 1;
-
-                if (dateFrom) {
-                    whereClauses.push(`created_at >= $${paramCount}`);
-                    queryParamsArray.push(dateFrom);
-                    paramCount++;
-                }
-
-                if (dateTo) {
-                    whereClauses.push(`created_at <= $${paramCount}`);
-                    queryParamsArray.push(dateTo);
-                    paramCount++;
-                }
-
-                const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-                // Get comprehensive statistics
-                const statsResult = await pool.query(`
-                    SELECT 
-                        COUNT(*) as total_transformations,
-                        COUNT(*) FILTER (WHERE status = 'success') as successful,
-                        COUNT(*) FILTER (WHERE status != 'success') as failed,
-                        ROUND(AVG(processing_time_ms)::numeric, 2) as avg_processing_time_ms,
-                        SUM(source_xml_size) as total_source_volume_bytes,
-                        SUM(transformed_xml_size) as total_transformed_volume_bytes,
-                        MAX(COALESCE(source_xml_size, 0) + COALESCE(transformed_xml_size, 0)) as largest_transformation_bytes,
-                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as transformations_today,
-                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE AND status != 'success') as failed_today
-                    FROM webhook_events
-                    ${whereClause}
-                `, queryParamsArray);
-
-                const stats = statsResult.rows[0];
-
-                // Calculate success rate
-                const successRate = stats.total_transformations > 0
-                    ? ((stats.successful / stats.total_transformations) * 100).toFixed(2)
-                    : 0;
-
-                // Calculate average lines per document (estimation)
-                const avgSourceSize = stats.total_transformations > 0
-                    ? stats.total_source_volume_bytes / stats.total_transformations
-                    : 0;
-                const avgLinesPerDocument = Math.round(avgSourceSize / 60);
-
-                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_stats', null, 'view_stats', true);
-
-                return createResponse(200, JSON.stringify({
-                    total_transformations: parseInt(stats.total_transformations),
-                    successful: parseInt(stats.successful),
-                    failed: parseInt(stats.failed),
-                    success_rate: parseFloat(successRate),
-                    avg_processing_time_ms: parseFloat(stats.avg_processing_time_ms) || 0,
-                    total_source_volume_bytes: parseInt(stats.total_source_volume_bytes) || 0,
-                    total_transformed_volume_bytes: parseInt(stats.total_transformed_volume_bytes) || 0,
-                    avg_lines_per_document: avgLinesPerDocument,
-                    transformations_today: parseInt(stats.transformations_today),
-                    failed_today: parseInt(stats.failed_today),
-                    largest_transformation_bytes: parseInt(stats.largest_transformation_bytes) || 0
-                }));
-
-            } catch (err) {
-                console.error('[Admin] Error fetching transformation stats:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch transformation statistics',
-                    details: err.message
-                }));
-            }
-        }
-
         // ENDPOINT 12: GET /api/admin/transformations/:id - Get single transformation details
-        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)$/) && method === 'GET') {
+        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             const user = await verifyJWT(event);
             if (!user) {
                 return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
@@ -4421,7 +4422,7 @@ exports.handler = async (event) => {
                         w.http_status_code,
                         u.id as user_id,
                         u.email as user_email,
-                        u.name as user_name,
+                        u.username as user_name,
                         ak.id as api_key_id,
                         ak.key_name as api_key_name,
                         SUBSTRING(ak.api_secret, 1, 12) || '...' as api_key_prefix
@@ -4471,7 +4472,7 @@ exports.handler = async (event) => {
         }
 
         // ENDPOINT 13: GET /api/admin/transformations/:id/download - Download XML files
-        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)\/download$/) && method === 'GET') {
+        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)\/download$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             const user = await verifyJWT(event);
             if (!user) {
                 return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
