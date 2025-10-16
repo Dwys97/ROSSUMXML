@@ -17,10 +17,8 @@ function TransformationLogs() {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     
-    // Filters
+    // Filters (non-date filters that affect transformations list only)
     const [filters, setFilters] = useState({
-        dateFrom: '',
-        dateTo: '',
         status: '',
         userId: '',
         annotationId: '',
@@ -28,13 +26,19 @@ function TransformationLogs() {
         sortOrder: 'DESC'
     });
 
+    // Date filters (managed separately to avoid triggering stats refresh on other filter changes)
+    const [dateFilters, setDateFilters] = useState({
+        dateFrom: '',
+        dateTo: ''
+    });
+
     // Fetch stats
     const fetchStats = async () => {
         try {
             const token = localStorage.getItem('token');
             const queryParams = new URLSearchParams();
-            if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
-            if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+            if (dateFilters.dateFrom) queryParams.append('dateFrom', dateFilters.dateFrom);
+            if (dateFilters.dateTo) queryParams.append('dateTo', dateFilters.dateTo);
 
             const response = await fetch(`/api/admin/transformations/stats?${queryParams}`, {
                 headers: {
@@ -63,13 +67,18 @@ function TransformationLogs() {
             const queryParams = new URLSearchParams({
                 page: currentPage,
                 limit: 20,
-                ...filters
+                sortBy: filters.sortBy,
+                sortOrder: filters.sortOrder
             });
 
-            // Remove empty filters
-            Object.keys(filters).forEach(key => {
-                if (!filters[key]) queryParams.delete(key);
-            });
+            // Add date filters
+            if (dateFilters.dateFrom) queryParams.append('dateFrom', dateFilters.dateFrom);
+            if (dateFilters.dateTo) queryParams.append('dateTo', dateFilters.dateTo);
+            
+            // Add other filters
+            if (filters.status) queryParams.append('status', filters.status);
+            if (filters.userId) queryParams.append('userId', filters.userId);
+            if (filters.annotationId) queryParams.append('annotationId', filters.annotationId);
 
             const response = await fetch(`/api/admin/transformations?${queryParams}`, {
                 headers: {
@@ -175,17 +184,23 @@ function TransformationLogs() {
 
     // Fetch transformations when page or filters change
     useEffect(() => {
+        console.log('📄 Filters or page changed - fetching transformations', {
+            page: currentPage,
+            filters,
+            dateFilters
+        });
         fetchTransformations();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, filters]);
+    }, [currentPage, filters, dateFilters]);
 
-    // Refetch stats only when date filters change
+    // Refetch stats ONLY when date filters change
     useEffect(() => {
-        if (filters.dateFrom || filters.dateTo) {
-            fetchStats();
-        }
+        console.log('🔄 Date filters changed - refetching stats', {
+            dateFilters
+        });
+        fetchStats();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters.dateFrom, filters.dateTo]);
+    }, [dateFilters]);
 
     // Refresh button
     const handleRefresh = () => {
@@ -195,7 +210,22 @@ function TransformationLogs() {
 
     // Filter change
     const handleFilterChange = (newFilters) => {
-        setFilters({ ...filters, ...newFilters });
+        // Separate date filters from other filters
+        const { dateFrom, dateTo, ...otherFilters } = newFilters;
+        
+        // Update date filters if they changed
+        if (dateFrom !== undefined || dateTo !== undefined) {
+            setDateFilters(prev => ({
+                dateFrom: dateFrom !== undefined ? dateFrom : prev.dateFrom,
+                dateTo: dateTo !== undefined ? dateTo : prev.dateTo
+            }));
+        }
+        
+        // Update other filters if any
+        if (Object.keys(otherFilters).length > 0) {
+            setFilters({ ...filters, ...otherFilters });
+        }
+        
         setCurrentPage(1); // Reset to first page
     };
 
@@ -235,7 +265,7 @@ function TransformationLogs() {
             <TransformationTable
                 transformations={transformations}
                 loading={loading}
-                filters={filters}
+                filters={{ ...filters, ...dateFilters }}
                 users={users}
                 onFilterChange={handleFilterChange}
                 onRowClick={handleRowClick}
