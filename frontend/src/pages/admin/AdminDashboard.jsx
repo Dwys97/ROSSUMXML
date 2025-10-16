@@ -4,6 +4,7 @@ import Footer from '../../components/common/Footer';
 import UserManagement from '../../components/admin/UserManagement';
 import SubscriptionManagement from '../../components/admin/SubscriptionManagement';
 import SecurityDashboard from '../../components/admin/SecurityDashboard';
+import TransformationLogs from '../../components/admin/TransformationLogs';
 import styles from './AdminDashboard.module.css';
 
 function AdminDashboard() {
@@ -37,12 +38,19 @@ function AdminDashboard() {
                     >
                         🔒 Security
                     </button>
+                    <button
+                        className={activeTab === 'transformations' ? styles.tabActive : styles.tab}
+                        onClick={() => setActiveTab('transformations')}
+                    >
+                        📊 Transformations
+                    </button>
                 </div>
 
                 <div className={styles.tabContent}>
                     {activeTab === 'users' && <UserManagement />}
                     {activeTab === 'subscriptions' && <SubscriptionManagement />}
                     {activeTab === 'security' && <SecurityDashboard />}
+                    {activeTab === 'transformations' && <TransformationLogs />}
                 </div>
             </div>
             <Footer />
