@@ -193,15 +193,19 @@ function TransformationLogs() {
             );
         }
 
-        // User filter
+        // User filter (compare by user email since backend doesn't return user_id)
         if (filters.userId) {
-            filtered = filtered.filter(t => t.user_id === filters.userId);
+            // Find the selected user's email
+            const selectedUser = users.find(u => u.id === filters.userId);
+            if (selectedUser) {
+                filtered = filtered.filter(t => t.user_email === selectedUser.email);
+            }
         }
 
-        // Annotation ID filter
+        // Annotation ID filter (backend aliases as annotation_id, not rossum_annotation_id)
         if (filters.annotationId) {
             filtered = filtered.filter(t => 
-                t.rossum_annotation_id?.toString().includes(filters.annotationId)
+                t.annotation_id?.toString().includes(filters.annotationId)
             );
         }
 
@@ -229,7 +233,7 @@ function TransformationLogs() {
 
         setTransformations(paginated);
         
-    }, [allTransformations, filters, dateFilters, currentPage]);
+    }, [allTransformations, filters, dateFilters, currentPage, users, itemsPerPage]);
 
     // Refresh button
     const handleRefresh = () => {
