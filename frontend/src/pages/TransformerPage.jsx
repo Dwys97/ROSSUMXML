@@ -4,9 +4,10 @@ import FileDropzone from '../components/common/FileDropzone';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
 import { useAuth } from '../contexts/useAuth';
+import { tokenStorage } from '../utils/tokenStorage';
 
 function TransformerPage() {
-    const { token } = useAuth(); // Get auth token to determine which endpoint to use
+    const { user } = useAuth(); // Get user to check if logged in
     const [sourceFiles, setSourceFiles] = useState([]);
     const [destinationXml, setDestinationXml] = useState(null);
     const [mappingJson, setMappingJson] = useState(null);
@@ -27,7 +28,8 @@ function TransformerPage() {
         }
 
         // Check if user is authenticated - transformation requires login
-        if (!token) {
+        const token = tokenStorage.getToken();
+        if (!token || !user) {
             alert('Please log in to use the transformation tool. Free accounts get 10 transformations per day!');
             return;
         }
