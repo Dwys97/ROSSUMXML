@@ -16,6 +16,7 @@ import ContactPage from './pages/ContactPage';
 import ApiDocsPage from './pages/ApiDocsPage';
 import UserProfile from './components/profile/UserProfile';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
 import './App.css';
 
 function App() {
@@ -57,6 +58,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <UserProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/analytics" 
+              element={
+                <ProtectedRoute>
+                  <AnalyticsDashboardPage />
                 </ProtectedRoute>
               } 
             />

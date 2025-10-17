@@ -16,15 +16,7 @@ const Footer = () => {
           <div className={styles.links}>
             <Link to="/about" className={styles.link}>About</Link>
             <Link to="/solutions" className={styles.link}>Solutions</Link>
-            <Link to="/contact" className={styles.link}>Contact</Link>
-            <a 
-              href="https://github.com/Dwys97/ROSSUMXML" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className={styles.link}
-            >
-              GitHub
-            </a>
+            <Link to="/contact" className={styles.link}>Contact</Link> 
           </div>
         </div>
         <div className={styles.versionInfo}>

@@ -9,6 +9,7 @@ const fs = require('fs');
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 const { parseXmlToTree } = require('./services/xmlParser.service');
 const { generateMappingSuggestion, generateBatchMappingSuggestions, checkAIFeatureAccess } = require('./services/aiMapping.service');
+const analyticsRoutes = require('./routes/analytics.routes');
 const db = require('./db');
 const userService = require('./services/user.service');
 
@@ -4818,6 +4819,141 @@ exports.handler = async (event) => {
                 console.error('[Admin] Error updating subscription:', err);
                 return createResponse(500, JSON.stringify({
                     error: 'Failed to update subscription',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ============================================================================
+        // USER ANALYTICS ENDPOINTS - Dashboard & Reporting
+        // ============================================================================
+
+        // GET /api/analytics/dashboard/summary - Get dashboard summary
+        if (path === '/api/analytics/dashboard/summary' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            try {
+                const summary = await analyticsRoutes.getDashboardSummary(pool, user.id);
+                return createResponse(200, JSON.stringify(summary));
+            } catch (err) {
+                console.error('[Analytics] Error fetching dashboard summary:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch dashboard summary',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/transformations/stats - Get transformation statistics
+        if (path === '/api/analytics/transformations/stats' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            try {
+                const queryParams = event.queryStringParameters || {};
+                const period = queryParams.period || 'daily';
+                const startDate = queryParams.startDate || null;
+                const endDate = queryParams.endDate || null;
+
+                const stats = await analyticsRoutes.getTransformationStats(
+                    pool, 
+                    user.id, 
+                    period, 
+                    startDate, 
+                    endDate
+                );
+                return createResponse(200, JSON.stringify(stats));
+            } catch (err) {
+                console.error('[Analytics] Error fetching transformation stats:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation statistics',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/mappings/activity - Get mapping activity statistics
+        if (path === '/api/analytics/mappings/activity' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            try {
+                const queryParams = event.queryStringParameters || {};
+                const period = queryParams.period || 'daily';
+
+                const activity = await analyticsRoutes.getMappingActivity(pool, user.id, period);
+                return createResponse(200, JSON.stringify(activity));
+            } catch (err) {
+                console.error('[Analytics] Error fetching mapping activity:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch mapping activity',
+                    details: err.message
+                }));
+            }
+        }
+
+        // POST /api/analytics/reports/custom - Generate custom report
+        if (path === '/api/analytics/reports/custom' && method === 'POST') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            try {
+                const { tags, period, startDate, endDate } = body;
+                
+                const report = await analyticsRoutes.getCustomReport(
+                    pool, 
+                    user.id, 
+                    tags, 
+                    period, 
+                    startDate, 
+                    endDate
+                );
+                return createResponse(200, JSON.stringify(report));
+            } catch (err) {
+                console.error('[Analytics] Error generating custom report:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to generate custom report',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/transformations/history - Get transformation history
+        if (path === '/api/analytics/transformations/history' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            try {
+                const queryParams = event.queryStringParameters || {};
+                const page = parseInt(queryParams.page) || 1;
+                const limit = parseInt(queryParams.limit) || 50;
+                const status = queryParams.status || null;
+                const resourceType = queryParams.resourceType || null;
+
+                const history = await analyticsRoutes.getTransformationHistory(
+                    pool, 
+                    user.id, 
+                    page, 
+                    limit, 
+                    status, 
+                    resourceType
+                );
+                return createResponse(200, JSON.stringify(history));
+            } catch (err) {
+                console.error('[Analytics] Error fetching transformation history:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation history',
                     details: err.message
                 }));
             }

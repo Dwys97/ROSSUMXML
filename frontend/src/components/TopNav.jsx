@@ -99,6 +99,7 @@ const TopNav = memo(function TopNav() {
                             </>
                         ) : user ? (
                             <>
+                                <NavLink to="/analytics" className={styles.navLink}>📊 Analytics</NavLink>
                                 <button 
                                     onClick={() => setShowApiSettings(true)} 
                                     className={styles.apiSettingsButton}
@@ -180,6 +181,9 @@ const TopNav = memo(function TopNav() {
                             </>
                         ) : user ? (
                             <>
+                                <NavLink to="/analytics" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    📊 Analytics
+                                </NavLink>
                                 <button 
                                     onClick={() => {
                                         setShowApiSettings(true);

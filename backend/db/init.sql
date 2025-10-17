@@ -13,9 +13,13 @@ CREATE TABLE IF NOT EXISTS users (
     city VARCHAR(100),
     country VARCHAR(100),
     zip_code VARCHAR(20),
+    organization_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add organization_id column if it doesn't exist
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id UUID;
 
 -- Таблица подписок
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -78,3 +82,24 @@ CREATE TRIGGER update_billing_details_modtime
     BEFORE UPDATE ON billing_details
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Таблица аудита безопасности (для аналитики)
+CREATE TABLE IF NOT EXISTS security_audit_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    resource_type VARCHAR(50),
+    resource_id UUID,
+    success BOOLEAN DEFAULT true,
+    ip_address VARCHAR(45),
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_event_type CHECK (event_type IN ('transformation', 'mapping_create', 'mapping_update', 'mapping_delete', 'login', 'logout', 'api_call'))
+);
+
+-- Индексы для ускорения аналитических запросов
+CREATE INDEX IF NOT EXISTS idx_audit_user_id ON security_audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_event_type ON security_audit_log(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_created_at ON security_audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_success ON security_audit_log(success);
+CREATE INDEX IF NOT EXISTS idx_audit_resource_type ON security_audit_log(resource_type);
