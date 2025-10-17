@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
+import { useDataPreload } from '../../contexts/DataPreloadContext';
 import { tokenStorage } from '../../utils/tokenStorage';
 import styles from './UserProfile.module.css';
 
@@ -204,6 +205,13 @@ const COUNTRIES = [
 function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { 
+        userProfile: preloadedProfile, 
+        setUserProfile: setPreloadedProfile, 
+        userProfileLoading,
+        loadUserProfile 
+    } = useDataPreload();
+    
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -270,19 +278,9 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         }
         
         if (isOpen && user) {
-            setLoading(true);
-            fetch('/api/user/profile', {
-                headers: {
-                    'Authorization': `Bearer ${tokenStorage.getToken()}`
-                }
-            })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}: Profile endpoint not implemented yet`);
-                }
-                return res.json();
-            })
-            .then(data => {
+            // Try to use preloaded data first
+            if (preloadedProfile) {
+                const data = preloadedProfile;
                 setUserData(data);
                 setEditForm({
                     fullName: data.fullName || '',
@@ -304,14 +302,57 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                     cardExpiry: data.card_expiry || ''
                 }));
                 setError(null);
-            })
-            .catch(err => {
-                setError(`Failed to load profile: ${err.message}`);
-                console.error('Failed to load profile:', err);
-            })
-            .finally(() => setLoading(false));
+                
+                // If data is missing or stale, trigger reload in background
+                if (!preloadedProfile && !userProfileLoading) {
+                    loadUserProfile(true);
+                }
+            } else {
+                // No preloaded data, load from API
+                setLoading(true);
+                fetch('/api/user/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${tokenStorage.getToken()}`
+                    }
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: Profile endpoint not implemented yet`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    setUserData(data);
+                    setPreloadedProfile(data); // Update context
+                    setEditForm({
+                        fullName: data.fullName || '',
+                        phone: data.phone || '',
+                        address: data.address || '',
+                        city: data.city || '',
+                        country: data.country || '',
+                        zipCode: data.zipCode || '',
+                        company: data.company || ''
+                    });
+                    setBillingForm(prev => ({
+                        ...prev,
+                        billingAddress: data.billing_address || '',
+                        billingAddress2: data.billing_address2 || '',
+                        billingCity: data.billing_city || '',
+                        billingState: data.billing_state || '',
+                        billingCountry: data.billing_country || '',
+                        billingZip: data.billing_zip || '',
+                        cardExpiry: data.card_expiry || ''
+                    }));
+                    setError(null);
+                })
+                .catch(err => {
+                    setError(`Failed to load profile: ${err.message}`);
+                    console.error('Failed to load profile:', err);
+                })
+                .finally(() => setLoading(false));
+            }
         }
-    }, [user, navigate, isOpen, isLoggingOut, onLogout]);
+    }, [user, navigate, isOpen, isLoggingOut, onLogout, preloadedProfile, userProfileLoading, loadUserProfile, setPreloadedProfile]);
 
     // Remove the internal handleLogout - always use the parent's onLogout
 

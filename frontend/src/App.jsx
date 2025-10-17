@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { DataPreloadProvider } from './contexts/DataPreloadContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import EditorPage from './pages/EditorPage';
@@ -21,6 +22,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <DataPreloadProvider>
           <Routes>
             {/* Публичные маршруты */}
             <Route path="/" element={<LandingPage />} />
@@ -67,6 +69,7 @@ function App() {
               } 
             />
           </Routes>
+        </DataPreloadProvider>
       </AuthProvider>
     </BrowserRouter>
   );

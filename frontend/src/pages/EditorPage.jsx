@@ -11,6 +11,7 @@ import { LoadingSpinner } from '../components/editor/LoadingSpinner';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
 import { useAIFeatures, generateAISuggestion, generateBatchAISuggestions } from '../hooks/useAIFeatures';
+import { useDataPreload } from '../contexts/DataPreloadContext';
 import styles from './EditorPage.module.css';
 
 // --- Helper Functions (moved outside the component for clarity) ---
@@ -46,6 +47,9 @@ const findNodeByPath = (tree, path) => {
 
 
 function EditorPage() {
+    // --- DATA PRELOAD CONTEXT ---
+    const { mappings: preloadedMappings } = useDataPreload();
+    
     // --- STATE MANAGEMENT ---
     const [sourceTree, setSourceTree] = useState(null);
     const [targetTree, setTargetTree] = useState(null);
@@ -98,51 +102,21 @@ function EditorPage() {
         }
     }, [isMappingFileLoaded]);
 
-    // Fetch saved mappings from API Settings on component mount
+    // Use preloaded mappings from context instead of fetching
     useEffect(() => {
-        const fetchSavedMappings = async () => {
-            try {
-                // Get JWT token from storage
-                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                if (!token) {
-                    console.log('⚠️  [Fetch Mappings] No auth token found, skipping saved mappings fetch');
-                    return;
-                }
-
-                console.log('🔍 [Fetch Mappings] Fetching from /api/api-settings/mappings...');
-                const response = await fetch('/api/api-settings/mappings', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
+        if (preloadedMappings && preloadedMappings.length >= 0) {
+            console.log('✅ [Editor] Using preloaded mappings:', preloadedMappings.length, 'items');
+            if (preloadedMappings.length > 0) {
+                console.log('📋 [Editor] First mapping sample:', {
+                    id: preloadedMappings[0].id,
+                    name: preloadedMappings[0].mapping_name,
+                    has_schema: !!preloadedMappings[0].destination_schema_xml,
+                    has_mapping: !!preloadedMappings[0].mapping_json
                 });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('✅ [Fetch Mappings] Received', data?.length || 0, 'mappings from API');
-                    if (data && data.length > 0) {
-                        console.log('📋 [Fetch Mappings] First mapping sample:', {
-                            id: data[0].id,
-                            name: data[0].mapping_name,
-                            has_schema: !!data[0].destination_schema_xml,
-                            has_mapping: !!data[0].mapping_json,
-                            schema_length: data[0].destination_schema_xml?.length || 0,
-                            mapping_length: data[0].mapping_json?.length || 0
-                        });
-                        console.log('📊 [Fetch Mappings] Full first mapping keys:', Object.keys(data[0]));
-                        console.log('📊 [Fetch Mappings] Raw first mapping:', data[0]);
-                    }
-                    setSavedMappings(data || []);
-                } else {
-                    console.error('❌ [Fetch Mappings] Failed to load saved mappings:', response.status, response.statusText);
-                }
-            } catch (error) {
-                console.error('❌ [Fetch Mappings] Error fetching saved mappings:', error);
             }
-        };
-        
-        fetchSavedMappings();
-    }, []);
+            setSavedMappings(preloadedMappings);
+        }
+    }, [preloadedMappings]);
 
     const registerNodeRef = useCallback((path, element) => {
         if (element) {

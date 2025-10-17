@@ -1,9 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { tokenStorage } from '../../utils/tokenStorage';
+import { useDataPreload } from '../../contexts/DataPreloadContext';
 import styles from './ApiSettingsModal.module.css';
 
 const ApiSettingsModal = ({ isOpen, onClose }) => {
-    // API Keys state
+    // Get preloaded data from context
+    const {
+        apiKeys: preloadedApiKeys,
+        setApiKeys: setPreloadedApiKeys,
+        webhookSettings: preloadedWebhookSettings,
+        setWebhookSettings: setPreloadedWebhookSettings,
+        deliverySettings: preloadedDeliverySettings,
+        setDeliverySettings: setPreloadedDeliverySettings,
+        mappings: preloadedMappings,
+        setMappings: setPreloadedMappings,
+        apiSettingsLoading,
+        loadApiSettings
+    } = useDataPreload();
+    
+    // Local state for API Keys
     const [apiKeys, setApiKeys] = useState([]);
     const [newKeyName, setNewKeyName] = useState('');
     const [newKeyExpiry, setNewKeyExpiry] = useState('never');
@@ -51,12 +66,46 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
     const [message, setMessage] = useState(null);
     const [showSecretModal, setShowSecretModal] = useState(false);
 
+    // Load preloaded data into local state when modal opens
     useEffect(() => {
         if (isOpen) {
-            loadApiKeys();
-            loadWebhookSettings();
-            loadDeliverySettings();
-            loadMappings();
+            // Use preloaded data if available, otherwise trigger load
+            if (preloadedApiKeys && preloadedApiKeys.length >= 0) {
+                setApiKeys(preloadedApiKeys);
+            }
+            
+            if (preloadedWebhookSettings) {
+                setWebhookSettings({
+                    webhook_url: preloadedWebhookSettings.webhook_url || '',
+                    webhook_secret: preloadedWebhookSettings.webhook_secret || '',
+                    is_enabled: preloadedWebhookSettings.is_enabled || false,
+                    events: preloadedWebhookSettings.events || []
+                });
+            }
+            
+            if (preloadedDeliverySettings) {
+                setDeliverySettings({
+                    ftp_host: preloadedDeliverySettings.ftp_host || '',
+                    ftp_port: preloadedDeliverySettings.ftp_port || 21,
+                    ftp_username: preloadedDeliverySettings.ftp_username || '',
+                    ftp_password: preloadedDeliverySettings.ftp_password || '',
+                    ftp_path: preloadedDeliverySettings.ftp_path || '/',
+                    ftp_use_ssl: preloadedDeliverySettings.ftp_use_ssl !== false,
+                    email_recipients: preloadedDeliverySettings.email_recipients || [],
+                    email_subject: preloadedDeliverySettings.email_subject || 'XML Transformation Result',
+                    email_include_attachment: preloadedDeliverySettings.email_include_attachment !== false
+                });
+                setDeliveryMethod(preloadedDeliverySettings.delivery_method || 'download');
+            }
+            
+            if (preloadedMappings && preloadedMappings.length >= 0) {
+                setMappings(preloadedMappings);
+            }
+            
+            // If data is stale or missing, trigger a reload
+            if (!preloadedApiKeys && !apiSettingsLoading) {
+                loadApiSettings(true);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
@@ -85,6 +134,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         try {
             const keys = await apiCall('/keys');
             setApiKeys(keys);
+            setPreloadedApiKeys(keys); // Update context
         } catch (err) {
             console.error('Error loading API keys:', err);
         }
@@ -147,10 +197,12 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
 
     // ============== WEBHOOK ==============
     
+    // eslint-disable-next-line no-unused-vars
     const loadWebhookSettings = async () => {
         try {
             const settings = await apiCall('/webhook');
             setWebhookSettings(settings);
+            setPreloadedWebhookSettings(settings); // Update context
         } catch (err) {
             console.error('Error loading webhook settings:', err);
         }
@@ -166,6 +218,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                 body: JSON.stringify(webhookSettings)
             });
             setMessage({ type: 'success', text: 'Webhook settings saved successfully' });
+            setPreloadedWebhookSettings(webhookSettings); // Update context after save
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         } finally {
@@ -183,11 +236,13 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
 
     // ============== OUTPUT DELIVERY ==============
     
+    // eslint-disable-next-line no-unused-vars
     const loadDeliverySettings = async () => {
         try {
             const settings = await apiCall('/output-delivery');
             setDeliveryMethod(settings.delivery_method || 'download');
             setDeliverySettings(settings);
+            setPreloadedDeliverySettings(settings); // Update context
         } catch (err) {
             console.error('Error loading delivery settings:', err);
         }
@@ -198,11 +253,13 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         setMessage(null);
         
         try {
+            const savedSettings = { ...deliverySettings, delivery_method: deliveryMethod };
             await apiCall('/output-delivery', {
                 method: 'POST',
-                body: JSON.stringify({ ...deliverySettings, delivery_method: deliveryMethod })
+                body: JSON.stringify(savedSettings)
             });
             setMessage({ type: 'success', text: 'Output delivery settings saved successfully' });
+            setPreloadedDeliverySettings(savedSettings); // Update context after save
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         } finally {
@@ -242,6 +299,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         try {
             const data = await apiCall('/mappings');
             setMappings(data);
+            setPreloadedMappings(data); // Update context
         } catch (err) {
             console.error('Error loading mappings:', err);
         }
