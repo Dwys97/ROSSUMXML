@@ -1,0 +1,529 @@
+/* API Documentation Page Styles - Extends PlaceholderPage.module.css */
+
+/* Header Section */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.versionBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(29, 114, 243, 0.1);
+    border: 1px solid rgba(29, 114, 243, 0.3);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.875rem;
+    margin-top: 12px;
+}
+
+.badgeLabel {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.badgeValue {
+    color: #1d72f3;
+    font-weight: 600;
+}
+
+/* Navigation Tabs */
+.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 40px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(29, 114, 243, 0.2);
+}
+
+.tab {
+    background: rgba(30, 42, 58, 0.5);
+    border: 1px solid rgba(29, 114, 243, 0.2);
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.tab:hover {
+    background: rgba(29, 114, 243, 0.1);
+    border-color: rgba(29, 114, 243, 0.5);
+    color: #1d72f3;
+}
+
+.tab.active {
+    background: rgba(29, 114, 243, 0.2);
+    border-color: #1d72f3;
+    color: #ffffff;
+    box-shadow: 0 0 20px rgba(29, 114, 243, 0.3);
+}
+
+/* Content Section */
+.content {
+    background: rgba(30, 42, 58, 0.3);
+    border: 1px solid rgba(29, 114, 243, 0.2);
+    border-radius: 16px;
+    padding: 40px;
+    backdrop-filter: blur(10px);
+}
+
+.section {
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.section h2 {
+    font-size: 2rem;
+    color: #ffffff;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid rgba(29, 114, 243, 0.3);
+}
+
+.section h3 {
+    font-size: 1.5rem;
+    color: #1d72f3;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.section h4 {
+    font-size: 1.125rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
+
+.section p {
+    color: #a5a9b5;
+    line-height: 1.8;
+    margin-bottom: 16px;
+}
+
+.intro {
+    font-size: 1.125rem;
+    margin-bottom: 32px;
+}
+
+/* Integration Grid */
+.integrationGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin: 32px 0;
+}
+
+.integrationCard {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(29, 114, 243, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.integrationCard:hover {
+    transform: translateY(-4px);
+    border-color: #1d72f3;
+    box-shadow: 0 8px 24px rgba(29, 114, 243, 0.2);
+}
+
+.methodBadge {
+    display: inline-block;
+    background: rgba(29, 114, 243, 0.2);
+    color: #1d72f3;
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+.integrationCard h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1.25rem;
+}
+
+.endpointPath {
+    display: block;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: #8b5cf6;
+    margin: 12px 0;
+    overflow-x: auto;
+}
+
+.cardFooter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.authType,
+.rateLimit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Info Boxes */
+.infoBox {
+    background: rgba(29, 114, 243, 0.05);
+    border: 1px solid rgba(29, 114, 243, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+}
+
+.infoBox h3 {
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.warning {
+    background: rgba(251, 191, 36, 0.05);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+}
+
+.warning h4 {
+    color: #fbbf24;
+    margin-top: 0;
+}
+
+.warning ul {
+    margin: 12px 0;
+    padding-left: 20px;
+}
+
+.warning li {
+    color: rgba(255, 255, 255, 0.7);
+    margin: 8px 0;
+}
+
+.note {
+    background: rgba(139, 92, 246, 0.05);
+    border-left: 4px solid #8b5cf6;
+    border-radius: 4px;
+    padding: 16px;
+    margin: 16px 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Code Blocks */
+.codeBlock {
+    position: relative;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+    overflow-x: auto;
+}
+
+.codeBlock pre {
+    margin: 0;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #e5e7eb;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.codeBlock code {
+    font-family: 'Monaco', 'Courier New', monospace;
+    color: #8b5cf6;
+}
+
+.copyButton {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(29, 114, 243, 0.2);
+    border: 1px solid rgba(29, 114, 243, 0.3);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #1d72f3;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.copyButton:hover {
+    background: rgba(29, 114, 243, 0.3);
+    border-color: #1d72f3;
+}
+
+/* Endpoint Cards */
+.endpointCard {
+    background: rgba(29, 114, 243, 0.05);
+    border: 1px solid rgba(29, 114, 243, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 24px 0;
+}
+
+.endpointHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.method {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    font-weight: 700;
+    font-size: 0.875rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+
+.endpointUrl {
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 1rem;
+    color: #8b5cf6;
+}
+
+/* Tables */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table thead {
+    background: rgba(29, 114, 243, 0.1);
+}
+
+.table th {
+    padding: 12px;
+    text-align: left;
+    color: #1d72f3;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.table td {
+    padding: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.table tbody tr:hover {
+    background: rgba(29, 114, 243, 0.05);
+}
+
+.table code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: #8b5cf6;
+}
+
+/* Lists */
+.checklist {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+}
+
+.checklist li {
+    padding: 8px 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+}
+
+.stepList {
+    padding-left: 20px;
+    margin: 16px 0;
+}
+
+.stepList li {
+    margin: 12px 0;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+}
+
+/* Auth & Webhook Sections */
+.authSection,
+.webhookSection {
+    margin: 40px 0;
+    padding-bottom: 40px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.authSection:last-child,
+.webhookSection:last-child {
+    border-bottom: none;
+}
+
+/* Example Sections */
+.exampleSection {
+    margin: 40px 0;
+    padding-bottom: 40px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.exampleSection:last-child {
+    border-bottom: none;
+}
+
+/* Footer */
+.docsFooter {
+    text-align: center;
+    margin-top: 60px;
+    padding-top: 40px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.footerLinks {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.footerLink {
+    color: #1d72f3;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.footerLink:hover {
+    color: #8b5cf6;
+    text-decoration: underline;
+}
+
+.footerText {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.875rem;
+}
+
+.footerText a {
+    color: #1d72f3;
+    text-decoration: none;
+}
+
+.footerText a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .title {
+        font-size: 2rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .headerContent {
+        padding: 24px;
+    }
+
+    .content {
+        padding: 24px;
+    }
+
+    .tabs {
+        flex-wrap: nowrap;
+        overflow-x: scroll;
+    }
+
+    .tab {
+        padding: 10px 16px;
+        font-size: 0.875rem;
+    }
+
+    .integrationGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .endpointHeader {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .table {
+        font-size: 0.875rem;
+    }
+
+    .codeBlock {
+        padding: 12px;
+    }
+
+    .codeBlock pre {
+        font-size: 0.75rem;
+    }
+
+    .copyButton {
+        position: static;
+        display: block;
+        width: 100%;
+        margin-top: 12px;
+    }
+
+    .footerLinks {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* Scrollbar Styling */
+.codeBlock::-webkit-scrollbar,
+.tabs::-webkit-scrollbar {
+    height: 8px;
+}
+
+.codeBlock::-webkit-scrollbar-track,
+.tabs::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.codeBlock::-webkit-scrollbar-thumb,
+.tabs::-webkit-scrollbar-thumb {
+    background: rgba(29, 114, 243, 0.3);
+    border-radius: 4px;
+}
+
+.codeBlock::-webkit-scrollbar-thumb:hover,
+.tabs::-webkit-scrollbar-thumb:hover {
+    background: rgba(29, 114, 243, 0.5);
+}

@@ -9,7 +9,7 @@ import logo from '../assets/logo-light.svg';
 const TopNav = memo(function TopNav() {
     const { user, checkAuth, logout } = useAuth();
     const location = useLocation();
-    const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact'].includes(location.pathname);
+    const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact', '/api-docs'].includes(location.pathname);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showApiSettings, setShowApiSettings] = useState(false);
@@ -79,6 +79,7 @@ const TopNav = memo(function TopNav() {
                             <>
                                 <NavLink to="/solutions" className={styles.navLink}>Solutions</NavLink>
                                 <NavLink to="/enterprise" className={styles.navLink}>Enterprise</NavLink>
+                                <NavLink to="/api-documentation" className={styles.navLink}>API Docs</NavLink>
                                 <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
                                 <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
                                 {user ? (
@@ -148,6 +149,9 @@ const TopNav = memo(function TopNav() {
                                 </NavLink>
                                 <NavLink to="/enterprise" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
                                     Enterprise
+                                </NavLink>
+                                <NavLink to="/api-docs" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    API Docs
                                 </NavLink>
                                 <NavLink to="/about" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
                                     About Us
