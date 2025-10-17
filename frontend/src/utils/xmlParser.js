@@ -1,6 +1,7 @@
 /**
  * Client-side XML Parser - Optimized for performance
  * Parses XML to tree structure without backend API call
+ * IMPORTANT: Path generation must match backend/services/xmlParser.service.js
  */
 
 /**
@@ -24,7 +25,17 @@ export function parseXMLToTree(xmlString) {
             throw new Error('No root element found in XML');
         }
 
-        return buildTreeNode(rootElement, '');
+        // Check for <annotation><content> structure (Rossum format)
+        let startNode = rootElement;
+        const annotationNodes = rootElement.getElementsByTagName('annotation');
+        if (annotationNodes.length > 0) {
+            const contentNodes = annotationNodes[0].getElementsByTagName('content');
+            if (contentNodes.length > 0) {
+                startNode = contentNodes[0];
+            }
+        }
+
+        return buildTree(startNode);
     } catch (error) {
         console.error('XML parsing error:', error);
         throw error;
@@ -32,78 +43,84 @@ export function parseXMLToTree(xmlString) {
 }
 
 /**
- * Recursively build tree node from XML element
- * @param {Element} element - XML DOM element
- * @param {string} parentPath - Parent node path
- * @returns {Object} Tree node object
+ * Get node name for display (with schema_id and value if present)
+ * Matches backend getNodeName() function
  */
-function buildTreeNode(element, parentPath) {
-    const nodeName = element.nodeName;
-    const path = parentPath ? `${parentPath} > ${nodeName}` : nodeName;
-    
-    // Get text content (if it's a leaf node)
-    const textContent = getTextContent(element);
-    
-    // Display name includes value if present
-    let displayName = nodeName;
-    if (textContent) {
-        displayName = `${nodeName}: "${textContent}"`;
+function getNodeName(node) {
+    const schemaId = node.getAttribute('schema_id');
+    const localName = node.localName || node.nodeName;
+    const value = getTextContent(node);
+
+    let displayValue = '';
+    // If node has no element children and has text, show the value
+    const hasElementChildren = Array.from(node.childNodes).some(n => n.nodeType === 1);
+    if (!hasElementChildren && value) {
+        const truncatedValue = value.length > 60
+            ? `${value.substring(0, 57)}...`
+            : value;
+        displayValue = `: "${truncatedValue}"`;
     }
-    
-    // Get attributes
-    const attributes = {};
-    if (element.attributes) {
-        for (let i = 0; i < element.attributes.length; i++) {
-            const attr = element.attributes[i];
-            attributes[attr.name] = attr.value;
-        }
-    }
-    
-    // Process child elements
-    const children = [];
-    const childElements = Array.from(element.children);
-    
-    if (childElements.length > 0) {
-        // Group children by tag name to detect arrays/collections
-        const childGroups = {};
-        
-        for (const child of childElements) {
-            const tagName = child.nodeName;
-            if (!childGroups[tagName]) {
-                childGroups[tagName] = [];
-            }
-            childGroups[tagName].push(child);
-        }
-        
-        // Process each group
-        for (const [tagName, elements] of Object.entries(childGroups)) {
-            if (elements.length > 1) {
-                // Array/collection - create a wrapper node
-                const collectionPath = `${path} > ${tagName}[0]`;
-                const collectionNode = {
-                    name: `${tagName}[0]`,
-                    path: collectionPath,
-                    children: elements.map((el, idx) => 
-                        buildTreeNode(el, collectionPath, idx)
-                    ),
-                    attributes: {},
-                    isCollection: true
-                };
-                children.push(collectionNode);
-            } else {
-                // Single element
-                children.push(buildTreeNode(elements[0], path));
-            }
-        }
-    }
-    
+
+    const namePart = localName;
+    const schemaPart = schemaId ? `[schema_id=${schemaId}]` : '';
+
+    return `${namePart} ${schemaPart} ${displayValue}`.trim();
+}
+
+/**
+ * Get node path name (used for building the full path)
+ * Matches backend getNodePathName() function
+ */
+function getNodePathName(node) {
+    const schemaId = node.getAttribute('schema_id');
+    const localName = node.localName || node.nodeName;
+    return schemaId ? `${localName}[schema_id=${schemaId}]` : localName;
+}
+
+/**
+ * Build tree structure from root node
+ */
+function buildTree(startNode) {
+    const rootPathName = getNodePathName(startNode);
+    const rootPath = `${rootPathName}[0]`;
+
     return {
-        name: displayName,
-        path: path,
-        children: children,
-        attributes: attributes,
-        textContent: textContent || null
+        name: getNodeName(startNode),
+        path: rootPath,
+        pathName: rootPathName,
+        children: processChildren(startNode, rootPath)
     };
+}
+
+/**
+ * Recursively process all children
+ * Matches backend processChildren() function
+ */
+function processChildren(parentNode, parentPath) {
+    if (!parentNode.childNodes) return [];
+
+    const children = Array.from(parentNode.childNodes).filter(c => c.nodeType === 1); // Only element nodes
+    const siblingCounters = {};
+
+    return children.map(childNode => {
+        const pathName = getNodePathName(childNode);
+
+        // Count siblings with same name (for indexing)
+        const count = siblingCounters[pathName] || 0;
+        const indexedNameForPath = `${pathName}[${count}]`;
+        siblingCounters[pathName] = count + 1;
+
+        const childPath = parentPath
+            ? `${parentPath} > ${indexedNameForPath}`
+            : indexedNameForPath;
+
+        return {
+            name: getNodeName(childNode),
+            path: childPath,
+            pathName: pathName,
+            children: processChildren(childNode, childPath)
+        };
+    });
 }
 
 /**

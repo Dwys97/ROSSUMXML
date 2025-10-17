@@ -119,6 +119,26 @@ function EditorPage() {
         }
     }, [preloadedMappings]);
 
+    // 🎨 AUTO-UPDATE SVG LINES: Trigger SVG line updates whenever trees or mappings change
+    useEffect(() => {
+        // Only update if we have both trees and mappings
+        if (sourceTree && targetTree && mappings.length > 0 && mappingSVGRef.current) {
+            console.log('🎨 [Auto-Update] Trees and mappings ready, updating SVG lines');
+            console.log('📊 [Auto-Update] Node refs count:', nodeRefs.current.size);
+            console.log('📊 [Auto-Update] Mappings count:', mappings.length);
+            
+            // Longer delay to ensure all TreeNode components have registered their refs
+            const timeoutId = setTimeout(() => {
+                if (mappingSVGRef.current) {
+                    console.log('🔄 [Auto-Update] Calling updateLines(), nodeRefs:', nodeRefs.current.size);
+                    mappingSVGRef.current.updateLines();
+                }
+            }, 500); // Increased from 100ms to 500ms
+            
+            return () => clearTimeout(timeoutId);
+        }
+    }, [sourceTree, targetTree, mappings]);
+
     const registerNodeRef = useCallback((path, element) => {
         if (element) {
             nodeRefs.current.set(path, element);
@@ -206,7 +226,7 @@ function EditorPage() {
             
             if (fullMapping.destination_schema_xml) {
                 console.log('🚀 [Schema Select] Calling handleFile with schema XML...');
-                await handleFile(fullMapping.destination_schema_xml, setTargetTree, false);
+                handleFile(fullMapping.destination_schema_xml, setTargetTree, false);
                 setTargetXmlContent(fullMapping.destination_schema_xml);
                 console.log('✅ [Schema Select] Successfully loaded destination schema from:', fullMapping.mapping_name);
             } else {
@@ -339,14 +359,6 @@ function EditorPage() {
                 setMappings(convertedMappings);
                 setIsMappingFileLoaded(true);
                 console.log('✅ [Mapping Select] Successfully loaded mapping JSON from:', fullMapping.mapping_name);
-                
-                // 🎨 Trigger SVG line update after a short delay
-                setTimeout(() => {
-                    if (mappingSVGRef.current) {
-                        console.log('🎨 [Mapping Select] Triggering SVG line update');
-                        mappingSVGRef.current.updateLines();
-                    }
-                }, 200);
             } else {
                 console.warn('⚠️  [Mapping Select] No mapping_json in mapping');
                 alert('This mapping does not have mapping JSON saved.');
