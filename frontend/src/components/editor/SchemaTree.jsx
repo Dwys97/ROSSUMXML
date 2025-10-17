@@ -46,4 +46,6 @@ const SchemaTree = React.forwardRef(({
     );
 });
 
-export default SchemaTree;
+SchemaTree.displayName = 'SchemaTree';
+
+export default React.memo(SchemaTree);

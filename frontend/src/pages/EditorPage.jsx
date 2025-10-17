@@ -12,6 +12,7 @@ import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
 import { useAIFeatures, generateAISuggestion, generateBatchAISuggestions } from '../hooks/useAIFeatures';
 import { useDataPreload } from '../contexts/DataPreloadContext';
+import { parseXMLToTree } from '../utils/xmlParser';
 import styles from './EditorPage.module.css';
 
 // --- Helper Functions (moved outside the component for clarity) ---
@@ -139,7 +140,7 @@ function EditorPage() {
     };
 
     // --- FILE HANDLERS ---
-    const handleFile = async (content, setTree, isSource = null) => {
+    const handleFile = useCallback((content, setTree, isSource = null) => {
         if (!content) return;
         
         // Store the raw XML content
@@ -150,20 +151,14 @@ function EditorPage() {
         }
         
         try {
-            const response = await fetch('/api/schema/parse', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ xmlString: content }),
-            });
-            if (!response.ok) throw new Error(`Server responded with ${response.status}`);
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            setTree(data.tree);
+            // Parse XML client-side for instant tree rendering
+            const tree = parseXMLToTree(content);
+            setTree(tree);
         } catch (error) {
             console.error('Error parsing XML:', error);
             alert(`Failed to parse XML: ${error.message}`);
         }
-    };
+    }, []);
 
     // Handler to load ONLY destination schema from saved mappings
     const handleSavedSchemaSelect = async (e) => {
