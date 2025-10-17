@@ -13,7 +13,6 @@ import EnterprisePage from './pages/EnterprisePage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import ApiDocsPage from './pages/ApiDocsPage';
-import APIDocumentationPage from './pages/APIDocumentationPage';
 import UserProfile from './components/profile/UserProfile';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import './App.css';
@@ -30,10 +29,9 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/request-demo" element={<RequestDemoPage />} />
             <Route path="/solutions" element={<SolutionsPage />} />
+            <Route path="/enterprise" element={<EnterprisePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
-            <Route path="/api-docs" element={<ApiDocsPage />} />
-            <Route path="/api-documentation" element={<APIDocumentationPage />} />
             <Route path="/api-docs" element={<ApiDocsPage />} />
             
             {/* Защищенные маршруты */}
