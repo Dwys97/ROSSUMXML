@@ -1,891 +1,602 @@
 import React, { useState } from 'react';
 import TopNav from '../components/TopNav';
 import Footer from '../components/common/Footer';
-import styles from './PlaceholderPage.module.css';
 import apiStyles from './ApiDocsPage.module.css';
 
 function ApiDocsPage() {
-    const [activeTab, setActiveTab] = useState('overview');
-    const [copiedEndpoint, setCopiedEndpoint] = useState(null);
+    const [activeEndpoint, setActiveEndpoint] = useState('rossum-webhook');
+    const [copiedCode, setCopiedCode] = useState(null);
 
     const baseUrl = window.location.origin.includes('localhost') 
         ? 'http://localhost:3000' 
         : 'https://api.rossumxml.com';
 
-    const copyToClipboard = (text, endpoint) => {
+    const copyToClipboard = (text, id) => {
         navigator.clipboard.writeText(text);
-        setCopiedEndpoint(endpoint);
-        setTimeout(() => setCopiedEndpoint(null), 2000);
+        setCopiedCode(id);
+        setTimeout(() => setCopiedCode(null), 2000);
     };
 
-    const endpoints = {
-        restApi: {
-            title: 'REST API - User Authentication',
-            endpoint: '/api/transform',
-            method: 'POST',
-            description: 'Transform XML using JWT authentication. For registered users with rate limiting based on subscription tier.',
-            authentication: 'JWT Bearer Token',
-            rateLimit: 'Free: 10/day | Pro: 1000/day | Enterprise: Unlimited',
-        },
-        webhookRossum: {
-            title: 'Rossum AI Webhook',
-            endpoint: '/api/webhook/rossum',
-            method: 'POST',
-            description: 'Specialized webhook for Rossum AI integration. Automatically fetches invoice data from Rossum and transforms it.',
-            authentication: 'API Key (x-api-key header)',
-            rateLimit: 'Based on API key subscription',
-        },
-        webhookTransform: {
-            title: 'Generic XML Webhook',
-            endpoint: '/api/webhook/transform',
-            method: 'POST',
-            description: 'Direct XML transformation via webhook. Send raw XML in request body for immediate transformation.',
-            authentication: 'API Key (x-api-key header)',
-            rateLimit: 'Based on API key subscription',
+    const scrollToSection = (sectionId) => {
+        setActiveEndpoint(sectionId);
+        const element = document.getElementById(sectionId);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     };
 
     return (
         <>
             <TopNav />
-            <div className={styles.placeholderContainer}>
-                <div className={styles.placeholderContent}>
+            <div className={apiStyles.apiDocsContainer}>
+                
+                {/* Left Sidebar Navigation */}
+                <aside className={apiStyles.sidebar}>
+                    <div className={apiStyles.sidebarHeader}>
+                        <h2 className={apiStyles.sidebarTitle}>RossumXML API Documentation</h2>
+                    </div>
                     
-                    {/* Header */}
-                    <header className={apiStyles.header}>
-                        <h1 className={styles.placeholderTitle}>API Documentation</h1>
-                        <p className={styles.placeholderSubtitle}>
-                            Connect your systems to RossumXML transformation service via Webhooks
-                        </p>
-                        <div className={apiStyles.versionBadge}>
-                            <span className={apiStyles.badgeLabel}>Version</span>
-                            <span className={apiStyles.badgeValue}>1.0</span>
-                        </div>
-                    </header>
-
-                    {/* Navigation Tabs */}
-                    <nav className={apiStyles.tabs}>
-                        <button 
-                            className={`${apiStyles.tab} ${activeTab === 'overview' ? apiStyles.active : ''}`}
-                            onClick={() => setActiveTab('overview')}
-                        >
-                            Overview
-                        </button>
-                        <button 
-                            className={`${apiStyles.tab} ${activeTab === 'authentication' ? apiStyles.active : ''}`}
-                            onClick={() => setActiveTab('authentication')}
-                        >
-                            Authentication
-                        </button>
-                        <button 
-                            className={`${apiStyles.tab} ${activeTab === 'webhooks' ? apiStyles.active : ''}`}
-                            onClick={() => setActiveTab('webhooks')}
-                        >
-                            Webhooks
-                        </button>
-                        <button 
-                            className={`${apiStyles.tab} ${activeTab === 'examples' ? apiStyles.active : ''}`}
-                            onClick={() => setActiveTab('examples')}
-                        >
-                            Code Examples
-                        </button>
-                    </nav>
-
-                    {/* Content Area */}
-                    <main className={apiStyles.content}>
-                        
-                        {/* OVERVIEW TAB */}
-                        {activeTab === 'overview' && (
-                            <section className={apiStyles.section}>
-                                <h2>Quick Start Guide</h2>
-                                <p className={apiStyles.intro}>
-                                    RossumXML provides three ways to integrate XML transformation into your workflow:
-                                </p>
-
-                                <div className={apiStyles.integrationGrid}>
-                                    {Object.entries(endpoints).map(([key, endpoint]) => (
-                                        <div key={key} className={apiStyles.integrationCard}>
-                                            <div className={apiStyles.methodBadge}>{endpoint.method}</div>
-                                            <h3>{endpoint.title}</h3>
-                                            <code className={apiStyles.endpointPath}>{endpoint.endpoint}</code>
-                                            <p>{endpoint.description}</p>
-                                            <div className={apiStyles.cardFooter}>
-                                                <span className={apiStyles.authType}>🔐 {endpoint.authentication}</span>
-                                                <span className={apiStyles.rateLimit}>⏱️ {endpoint.rateLimit}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className={apiStyles.infoBox}>
-                                    <h3>📋 Base URL</h3>
-                                    <div className={apiStyles.codeBlock}>
-                                        <code>{baseUrl}</code>
-                                        <button 
-                                            onClick={() => copyToClipboard(baseUrl, 'baseUrl')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'baseUrl' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className={apiStyles.infoBox}>
-                                    <h3>🔍 What You'll Need</h3>
-                                    <ul className={apiStyles.checklist}>
-                                        <li>✓ Source XML schema (the format you're transforming FROM)</li>
-                                        <li>✓ Destination XML schema (the format you're transforming TO)</li>
-                                        <li>✓ Mapping configuration (created in the Editor)</li>
-                                        <li>✓ Authentication credentials (JWT token or API key)</li>
-                                    </ul>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* AUTHENTICATION TAB */}
-                        {activeTab === 'authentication' && (
-                            <section className={apiStyles.section}>
-                                <h2>Authentication Methods</h2>
-
-                                <div className={apiStyles.authSection}>
-                                    <h3>1. JWT Bearer Token (User Authentication)</h3>
-                                    <p>Used for the <code>/api/transform</code> endpoint. Requires user registration.</p>
-                                    
-                                    <h4>Step 1: Register</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`POST ${baseUrl}/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "your_secure_password",
-  "username": "your_username"
-}`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`POST ${baseUrl}/auth/register\nContent-Type: application/json\n\n{\n  "email": "user@example.com",\n  "password": "your_secure_password",\n  "username": "your_username"\n}`, 'register')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'register' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-
-                                    <h4>Step 2: Login</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`POST ${baseUrl}/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "your_secure_password"
-}
-
-Response:
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "username": "your_username"
-  }
-}`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`POST ${baseUrl}/auth/login\nContent-Type: application/json\n\n{\n  "email": "user@example.com",\n  "password": "your_secure_password"\n}`, 'login')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'login' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-
-                                    <h4>Step 3: Use Token</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`}</pre>
-                                    </div>
-
-                                    <div className={apiStyles.note}>
-                                        <strong>⚠️ Token Expiration:</strong> JWT tokens expire after 24 hours. Store securely and refresh when needed.
-                                    </div>
-                                </div>
-
-                                <div className={apiStyles.authSection}>
-                                    <h3>2. API Key (Webhook Authentication)</h3>
-                                    <p>Used for <code>/api/webhook/transform</code> and <code>/api/webhook/rossum</code> endpoints.</p>
-                                    
-                                    <h4>Generate API Key</h4>
-                                    <ol>
-                                        <li>Log in to your RossumXML account</li>
-                                        <li>Navigate to <strong>API Settings</strong> in the top navigation</li>
-                                        <li>Click <strong>Create New API Key</strong></li>
-                                        <li>Select a default mapping configuration</li>
-                                        <li>Copy and securely store your API key (starts with <code>rxml_</code>)</li>
-                                    </ol>
-
-                                    <h4>Use API Key</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`x-api-key: rxml_1234567890abcdef1234567890abcdef`}</pre>
-                                    </div>
-
-                                    <div className={apiStyles.warning}>
-                                        <strong>🔒 Security Best Practices:</strong>
-                                        <ul>
-                                            <li>Never commit API keys to version control</li>
-                                            <li>Use environment variables to store keys</li>
-                                            <li>Rotate keys regularly</li>
-                                            <li>Set expiration dates when possible</li>
-                                            <li>Disable unused keys immediately</li>
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                <div className={apiStyles.authSection}>
-                                    <h3>Rate Limiting</h3>
-                                    <table className={apiStyles.table}>
-                                        <thead>
-                                            <tr>
-                                                <th>Tier</th>
-                                                <th>Daily Limit</th>
-                                                <th>Response Headers</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>Free</td>
-                                                <td>10 transformations/day</td>
-                                                <td>X-Usage-Limit, X-Usage-Count, X-Usage-Remaining</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Pro</td>
-                                                <td>1,000 transformations/day</td>
-                                                <td>X-Usage-Limit, X-Usage-Count, X-Usage-Remaining</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Enterprise</td>
-                                                <td>Unlimited</td>
-                                                <td>Custom limits available</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-
-                                    <p className={apiStyles.note}>
-                                        <strong>💡 Tip:</strong> Check response headers to monitor your usage in real-time.
-                                    </p>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* REST API TAB */}
-                        {activeTab === 'rest-api' && (
-                            <section className={apiStyles.section}>
-                                <h2>REST API Endpoint</h2>
-
-                                <div className={apiStyles.endpointCard}>
-                                    <div className={apiStyles.endpointHeader}>
-                                        <span className={apiStyles.method}>POST</span>
-                                        <code className={apiStyles.endpointUrl}>{baseUrl}/api/transform</code>
-                                    </div>
-                                    <p>Transform XML documents using your registered user account with JWT authentication.</p>
-                                </div>
-
-                                <h3>Request Format</h3>
-                                <div className={apiStyles.codeBlock}>
-                                    <pre>{`POST ${baseUrl}/api/transform
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
-
-{
-  "sourceXml": "<Invoice>...</Invoice>",
-  "destinationXml": "<Order>...</Order>",
-  "mappingJson": {
-    "Invoice/InvoiceNumber": "Order/OrderID",
-    "Invoice/Date": "Order/OrderDate",
-    "Invoice/Customer/Name": "Order/CustomerName"
-  },
-  "removeEmptyTags": true
-}`}</pre>
-                                    <button 
-                                        onClick={() => copyToClipboard(`POST ${baseUrl}/api/transform\nAuthorization: Bearer YOUR_JWT_TOKEN\nContent-Type: application/json\n\n{\n  "sourceXml": "<Invoice>...</Invoice>",\n  "destinationXml": "<Order>...</Order>",\n  "mappingJson": {\n    "Invoice/InvoiceNumber": "Order/OrderID"\n  },\n  "removeEmptyTags": true\n}`, 'restRequest')}
-                                        className={apiStyles.copyButton}
+                    <nav className={apiStyles.sidebarNav}>
+                        <div className={apiStyles.navSection}>
+                            <h3 className={apiStyles.navSectionTitle}>Webhooks</h3>
+                            <ul className={apiStyles.navList}>
+                                <li>
+                                    <button
+                                        className={`${apiStyles.navItem} ${activeEndpoint === 'rossum-webhook' ? apiStyles.active : ''}`}
+                                        onClick={() => scrollToSection('rossum-webhook')}
                                     >
-                                        {copiedEndpoint === 'restRequest' ? '✓ Copied' : '📋 Copy'}
+                                        Rossum AI Webhook
+                                    </button>
+                                </li>
+                                <li>
+                                    <button
+                                        className={`${apiStyles.navItem} ${activeEndpoint === 'transform-webhook' ? apiStyles.active : ''}`}
+                                        onClick={() => scrollToSection('transform-webhook')}
+                                    >
+                                        Transform Webhook
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div className={apiStyles.navSection}>
+                            <h3 className={apiStyles.navSectionTitle}>References</h3>
+                            <ul className={apiStyles.navList}>
+                                <li>
+                                    <button
+                                        className={`${apiStyles.navItem} ${activeEndpoint === 'api-settings' ? apiStyles.active : ''}`}
+                                        onClick={() => scrollToSection('api-settings')}
+                                    >
+                                        API Settings
+                                    </button>
+                                </li>
+                                <li>
+                                    <button
+                                        className={`${apiStyles.navItem} ${activeEndpoint === 'errors' ? apiStyles.active : ''}`}
+                                        onClick={() => scrollToSection('errors')}
+                                    >
+                                        Error Codes
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </nav>
+                </aside>
+
+                {/* Main Content Area */}
+                <main className={apiStyles.mainContent}>
+                    <div className={apiStyles.contentWrapper}>
+                        
+                        {/* Rossum Webhook Endpoint */}
+                        <section id="rossum-webhook" className={apiStyles.endpointSection}>
+                            <div className={apiStyles.endpointHeader}>
+                                <h1 className={apiStyles.endpointTitle}>Rossum AI Webhook</h1>
+                                <span className={apiStyles.methodBadge}>POST</span>
+                                <span className={apiStyles.pathBadge}>/api/webhook/rossum</span>
+                            </div>
+
+                            <p className={apiStyles.endpointDescription}>
+                                Specialized webhook for Rossum AI integration. Automatically fetches invoice data from Rossum and transforms it using your stored mapping configuration.
+                            </p>
+
+                            {/* Query Parameters Section */}
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>QUERY PARAMETERS</h2>
+                                
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>api_key</span>
+                                        <span className={apiStyles.paramType}>required / string</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>Your RossumXML API key (format: rxml_xxxxx). Obtained from API Settings page.</p>
+                                </div>
+                            </div>
+
+                            {/* Request Body Section */}
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>REQUEST BODY</h2>
+                                
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>annotation_id</span>
+                                        <span className={apiStyles.paramType}>required / string</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>The Rossum annotation ID from the webhook payload</p>
+                                </div>
+
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>document_url</span>
+                                        <span className={apiStyles.paramType}>optional / string</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>Direct URL to the document (if annotation_id not provided)</p>
+                                </div>
+                            </div>
+
+                            {/* Responses Section */}
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>RESPONSES</h2>
+                                
+                                <div className={apiStyles.responseCard}>
+                                    <div className={apiStyles.responseHeader}>
+                                        <h3 className={apiStyles.responseCode}>200</h3>
+                                        <span className={apiStyles.responseType}>OBJECT</span>
+                                    </div>
+                                    <p className={apiStyles.responseDescription}>Transformation successful</p>
+
+                                    <div className={apiStyles.responseAttributes}>
+                                        <h4 className={apiStyles.attributesTitle}>Response attributes</h4>
+                                        
+                                        <div className={apiStyles.attributeRow}>
+                                            <span className={apiStyles.attrName}>success</span>
+                                            <span className={apiStyles.attrType}>boolean</span>
+                                            <p className={apiStyles.attrDescription}>Indicates if the transformation was successful</p>
+                                        </div>
+
+                                        <div className={apiStyles.attributeRow}>
+                                            <span className={apiStyles.attrName}>message</span>
+                                            <span className={apiStyles.attrType}>string</span>
+                                            <p className={apiStyles.attrDescription}>Success message description</p>
+                                        </div>
+
+                                        <div className={apiStyles.attributeRow}>
+                                            <span className={apiStyles.attrName}>transformedXml</span>
+                                            <span className={apiStyles.attrType}>string</span>
+                                            <p className={apiStyles.attrDescription}>The transformed XML output</p>
+                                        </div>
+
+                                        <div className={apiStyles.attributeRow}>
+                                            <span className={apiStyles.attrName}>timestamp</span>
+                                            <span className={apiStyles.attrType}>string (ISO 8601)</span>
+                                            <p className={apiStyles.attrDescription}>Timestamp of the transformation</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className={apiStyles.responseCard}>
+                                    <div className={apiStyles.responseHeader}>
+                                        <h3 className={apiStyles.responseCode}>401</h3>
+                                        <span className={apiStyles.responseType}>OBJECT</span>
+                                    </div>
+                                    <p className={apiStyles.responseDescription}>Invalid or missing API key</p>
+                                </div>
+
+                                <div className={apiStyles.responseCard}>
+                                    <div className={apiStyles.responseHeader}>
+                                        <h3 className={apiStyles.responseCode}>404</h3>
+                                        <span className={apiStyles.responseType}>OBJECT</span>
+                                    </div>
+                                    <p className={apiStyles.responseDescription}>Mapping configuration not found for API key</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* Transform Webhook Endpoint */}
+                        <section id="transform-webhook" className={apiStyles.endpointSection}>
+                            <div className={apiStyles.endpointHeader}>
+                                <h1 className={apiStyles.endpointTitle}>Generic Transform Webhook</h1>
+                                <span className={apiStyles.methodBadge}>POST</span>
+                                <span className={apiStyles.pathBadge}>/api/webhook/transform</span>
+                            </div>
+
+                            <p className={apiStyles.endpointDescription}>
+                                Direct XML transformation via webhook. Send raw XML in request body for immediate transformation using your stored mapping configuration.
+                            </p>
+
+                            {/* Query Parameters Section */}
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>QUERY PARAMETERS</h2>
+                                
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>api_key</span>
+                                        <span className={apiStyles.paramType}>required / string</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>Your RossumXML API key (format: rxml_xxxxx)</p>
+                                </div>
+                            </div>
+
+                            {/* Request Body Section */}
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>REQUEST BODY</h2>
+                                
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>Raw XML</span>
+                                        <span className={apiStyles.paramType}>required / application/xml</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>Send the source XML directly in the request body. The system will use your stored destination schema and mapping configuration.</p>
+                                </div>
+                            </div>
+
+                            {/* Responses Section */}
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>RESPONSES</h2>
+                                
+                                <div className={apiStyles.responseCard}>
+                                    <div className={apiStyles.responseHeader}>
+                                        <h3 className={apiStyles.responseCode}>200</h3>
+                                        <span className={apiStyles.responseType}>XML</span>
+                                    </div>
+                                    <p className={apiStyles.responseDescription}>Returns the transformed XML document</p>
+
+                                    <div className={apiStyles.responseAttributes}>
+                                        <h4 className={apiStyles.attributesTitle}>Response format</h4>
+                                        
+                                        <div className={apiStyles.attributeRow}>
+                                            <span className={apiStyles.attrName}>Content-Type</span>
+                                            <span className={apiStyles.attrType}>application/xml</span>
+                                            <p className={apiStyles.attrDescription}>The transformed XML is returned directly in the response body</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className={apiStyles.responseCard}>
+                                    <div className={apiStyles.responseHeader}>
+                                        <h3 className={apiStyles.responseCode}>401</h3>
+                                        <span className={apiStyles.responseType}>OBJECT</span>
+                                    </div>
+                                    <p className={apiStyles.responseDescription}>Invalid or missing API key</p>
+                                </div>
+
+                                <div className={apiStyles.responseCard}>
+                                    <div className={apiStyles.responseHeader}>
+                                        <h3 className={apiStyles.responseCode}>400</h3>
+                                        <span className={apiStyles.responseType}>OBJECT</span>
+                                    </div>
+                                    <p className={apiStyles.responseDescription}>Invalid XML format or missing request body</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* API Settings Section */}
+                        <section id="api-settings" className={apiStyles.endpointSection}>
+                            <div className={apiStyles.endpointHeader}>
+                                <h1 className={apiStyles.endpointTitle}>API Settings Configuration</h1>
+                            </div>
+
+                            <p className={apiStyles.endpointDescription}>
+                                Configure your API settings through the web interface to set up your stored library (destination schema + mapping configuration).
+                            </p>
+
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>STORED LIBRARY</h2>
+                                
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>Destination Schema</span>
+                                        <span className={apiStyles.paramType}>XML Template</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>The target XML structure that your source data will be transformed into. This is stored in your API settings and automatically used for all webhook transformations.</p>
+                                </div>
+
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>Mapping Configuration</span>
+                                        <span className={apiStyles.paramType}>JSON Object</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>XPath-based mapping rules that define how data from the source XML maps to the destination schema. Example: {"{"}"Invoice/InvoiceNumber": "Order/OrderID"{"}"}</p>
+                                </div>
+
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>API Key Management</span>
+                                        <span className={apiStyles.paramType}>rxml_xxxxx</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>Each API key is linked to a specific mapping configuration. You can create multiple API keys for different transformation scenarios.</p>
+                                </div>
+                            </div>
+
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>CONFIGURATION STEPS</h2>
+                                
+                                <div className={apiStyles.infoCard}>
+                                    <h4>1. Create or Select a Mapping</h4>
+                                    <p>Navigate to the Editor page to create your source-to-destination mapping using the visual mapper.</p>
+                                </div>
+
+                                <div className={apiStyles.infoCard}>
+                                    <h4>2. Generate API Key</h4>
+                                    <p>Go to API Settings and click "Generate New API Key". Link it to your saved mapping.</p>
+                                </div>
+
+                                <div className={apiStyles.infoCard}>
+                                    <h4>3. Use in Webhooks</h4>
+                                    <p>Add your API key as a query parameter to webhook URLs: ?api_key=rxml_xxxxx</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* Error Codes Section */}
+                        <section id="errors" className={apiStyles.endpointSection}>
+                            <div className={apiStyles.endpointHeader}>
+                                <h1 className={apiStyles.endpointTitle}>Error Codes</h1>
+                            </div>
+
+                            <p className={apiStyles.endpointDescription}>
+                                RossumXML uses conventional HTTP response codes to indicate the success or failure of an API request.
+                            </p>
+
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>HTTP STATUS CODES</h2>
+                                
+                                <div className={apiStyles.errorCard}>
+                                    <div className={apiStyles.errorHeader}>
+                                        <h3 className={apiStyles.errorCode}>200</h3>
+                                        <span className={apiStyles.errorTitle}>OK</span>
+                                    </div>
+                                    <p className={apiStyles.errorDescription}>The request was successful and the transformation completed.</p>
+                                </div>
+
+                                <div className={apiStyles.errorCard}>
+                                    <div className={apiStyles.errorHeader}>
+                                        <h3 className={apiStyles.errorCode}>400</h3>
+                                        <span className={apiStyles.errorTitle}>Bad Request</span>
+                                    </div>
+                                    <p className={apiStyles.errorDescription}>The request was invalid or malformed. Common causes include invalid XML syntax, missing required parameters, or incorrect mapping configuration.</p>
+                                </div>
+
+                                <div className={apiStyles.errorCard}>
+                                    <div className={apiStyles.errorHeader}>
+                                        <h3 className={apiStyles.errorCode}>401</h3>
+                                        <span className={apiStyles.errorTitle}>Unauthorized</span>
+                                    </div>
+                                    <p className={apiStyles.errorDescription}>Invalid or missing API key. Ensure your api_key query parameter is correct and the key is active.</p>
+                                </div>
+
+                                <div className={apiStyles.errorCard}>
+                                    <div className={apiStyles.errorHeader}>
+                                        <h3 className={apiStyles.errorCode}>403</h3>
+                                        <span className={apiStyles.errorTitle}>Forbidden</span>
+                                    </div>
+                                    <p className={apiStyles.errorDescription}>The API key is valid but does not have permission to perform this action.</p>
+                                </div>
+
+                                <div className={apiStyles.errorCard}>
+                                    <div className={apiStyles.errorHeader}>
+                                        <h3 className={apiStyles.errorCode}>404</h3>
+                                        <span className={apiStyles.errorTitle}>Not Found</span>
+                                    </div>
+                                    <p className={apiStyles.errorDescription}>The requested resource was not found. This could indicate a missing mapping configuration or invalid annotation ID.</p>
+                                </div>
+
+                                <div className={apiStyles.errorCard}>
+                                    <div className={apiStyles.errorHeader}>
+                                        <h3 className={apiStyles.errorCode}>429</h3>
+                                        <span className={apiStyles.errorTitle}>Too Many Requests</span>
+                                    </div>
+                                    <p className={apiStyles.errorDescription}>Rate limit exceeded. Please wait before making additional requests. Rate limits are based on your subscription tier.</p>
+                                </div>
+
+                                <div className={apiStyles.errorCard}>
+                                    <div className={apiStyles.errorHeader}>
+                                        <h3 className={apiStyles.errorCode}>500</h3>
+                                        <span className={apiStyles.errorTitle}>Internal Server Error</span>
+                                    </div>
+                                    <p className={apiStyles.errorDescription}>An error occurred on our servers. Please try again later or contact support if the issue persists.</p>
+                                </div>
+                            </div>
+
+                            <div className={apiStyles.detailsSection}>
+                                <h2 className={apiStyles.sectionTitle}>ERROR RESPONSE FORMAT</h2>
+                                
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>error</span>
+                                        <span className={apiStyles.paramType}>string</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>A human-readable error message describing what went wrong</p>
+                                </div>
+
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>code</span>
+                                        <span className={apiStyles.paramType}>string</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>A machine-readable error code for programmatic handling</p>
+                                </div>
+
+                                <div className={apiStyles.parameterCard}>
+                                    <div className={apiStyles.parameterRow}>
+                                        <span className={apiStyles.paramName}>details</span>
+                                        <span className={apiStyles.paramType}>object (optional)</span>
+                                    </div>
+                                    <p className={apiStyles.paramDescription}>Additional context about the error when available</p>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+
+                    {/* Right Side Code Panel */}
+                    <aside className={apiStyles.codePanel}>
+                        {/* Rossum Webhook Code Example */}
+                        {activeEndpoint === 'rossum-webhook' && (
+                            <>
+                                <div className={apiStyles.codePanelHeader}>
+                                    <button className={`${apiStyles.langTab} ${apiStyles.active}`}>cURL</button>
+                                    <button 
+                                        className={apiStyles.copyBtn}
+                                        onClick={() => copyToClipboard(`curl --request POST \\
+  --url ${baseUrl}/api/webhook/rossum?api_key=YOUR_API_KEY \\
+  --header 'Content-Type: application/json' \\
+  --data '{"annotation_id": "12345"}'`, 'curl-rossum')}
+                                    >
+                                        {copiedCode === 'curl-rossum' ? '✓ Copied' : '📋 Copy'}
                                     </button>
                                 </div>
-
-                                <h3>Request Parameters</h3>
-                                <table className={apiStyles.table}>
-                                    <thead>
-                                        <tr>
-                                            <th>Parameter</th>
-                                            <th>Type</th>
-                                            <th>Required</th>
-                                            <th>Description</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td><code>sourceXml</code></td>
-                                            <td>string</td>
-                                            <td>✓ Yes</td>
-                                            <td>The XML document to transform (as string)</td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>destinationXml</code></td>
-                                            <td>string</td>
-                                            <td>✓ Yes</td>
-                                            <td>The target XML schema structure</td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>mappingJson</code></td>
-                                            <td>object</td>
-                                            <td>✓ Yes</td>
-                                            <td>Field mapping configuration (source path → destination path)</td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>removeEmptyTags</code></td>
-                                            <td>boolean</td>
-                                            <td>✗ No</td>
-                                            <td>Remove empty XML tags from output (default: false)</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-
-                                <h3>Response Formats</h3>
                                 
-                                <h4>Success (200 OK)</h4>
                                 <div className={apiStyles.codeBlock}>
-                                    <pre>{`Content-Type: application/xml
-X-Usage-Limit: 10
-X-Usage-Count: 3
-X-Usage-Remaining: 7
-X-Subscription-Level: free
-
-<Order>
-  <OrderID>INV-2024-001</OrderID>
-  <OrderDate>2024-10-17</OrderDate>
-  <CustomerName>Acme Corp</CustomerName>
-</Order>`}</pre>
+                                    <pre className={apiStyles.codeContent}>{`curl --request POST \\
+  --url ${baseUrl}/api/webhook/rossum?api_key=YOUR_API_KEY \\
+  --header 'Content-Type: application/json' \\
+  --data '{
+    "annotation_id": "12345",
+    "document_url": "https://rossum.ai/..."
+  }'`}</pre>
                                 </div>
 
-                                <h4>Rate Limit Exceeded (429)</h4>
-                                <div className={apiStyles.codeBlock}>
-                                    <pre>{`{
-  "error": "Rate limit exceeded",
-  "message": "You have reached your free tier limit of 10 transformations per day.",
-  "details": {
-    "limit": 10,
-    "used": 10,
-    "remaining": 0,
-    "subscription_level": "free",
-    "reset_time": "Limit resets every 24 hours"
-  },
-  "upgrade_url": "/pricing"
-}`}</pre>
-                                </div>
-
-                                <h4>Authentication Error (401)</h4>
-                                <div className={apiStyles.codeBlock}>
-                                    <pre>{`{
-  "error": "Authentication required",
-  "details": "Please log in to use the transformation tool. Register for free at /register"
-}`}</pre>
-                                </div>
-
-                                <h4>Validation Error (400)</h4>
-                                <div className={apiStyles.codeBlock}>
-                                    <pre>{`{
-  "error": "Missing required fields"
-}`}</pre>
-                                </div>
-
-                                <h4>Server Error (500)</h4>
-                                <div className={apiStyles.codeBlock}>
-                                    <pre>{`{
-  "error": "Transformation failed",
-  "details": "Error message details"
-}`}</pre>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* WEBHOOKS TAB */}
-                        {activeTab === 'webhooks' && (
-                            <section className={apiStyles.section}>
-                                <h2>Webhook Endpoints</h2>
-
-                                <div className={apiStyles.webhookSection}>
-                                    <h3>1. Generic XML Transformation Webhook</h3>
-                                    <div className={apiStyles.endpointCard}>
-                                        <div className={apiStyles.endpointHeader}>
-                                            <span className={apiStyles.method}>POST</span>
-                                            <code className={apiStyles.endpointUrl}>{baseUrl}/api/webhook/transform</code>
-                                        </div>
-                                        <p>Send raw XML directly for immediate transformation using pre-configured mapping.</p>
-                                    </div>
-
-                                    <h4>Request Format</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`POST ${baseUrl}/api/webhook/transform
-x-api-key: rxml_your_api_key_here
-Content-Type: application/xml
-
-<Invoice>
-  <InvoiceNumber>INV-2024-001</InvoiceNumber>
-  <Date>2024-10-17</Date>
-  <Customer>
-    <Name>Acme Corporation</Name>
-    <Email>contact@acme.com</Email>
-  </Customer>
-  <Items>
-    <Item>
-      <Description>Widget A</Description>
-      <Quantity>5</Quantity>
-      <Price>29.99</Price>
-    </Item>
-  </Items>
-  <Total>149.95</Total>
-</Invoice>`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`POST ${baseUrl}/api/webhook/transform\nx-api-key: rxml_your_api_key_here\nContent-Type: application/xml\n\n<Invoice>...</Invoice>`, 'webhookXml')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'webhookXml' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-
-                                    <h4>Success Response (200 OK)</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`Content-Type: application/xml
-
-<Order>
-  <OrderID>INV-2024-001</OrderID>
-  <OrderDate>2024-10-17</OrderDate>
-  <CustomerName>Acme Corporation</CustomerName>
-  <CustomerEmail>contact@acme.com</CustomerEmail>
-  <OrderItems>
-    <OrderItem>
-      <ItemDescription>Widget A</ItemDescription>
-      <ItemQuantity>5</ItemQuantity>
-      <ItemPrice>29.99</ItemPrice>
-    </OrderItem>
-  </OrderItems>
-  <OrderTotal>149.95</OrderTotal>
-</Order>`}</pre>
-                                    </div>
-
-                                    <h4>Key Features</h4>
-                                    <ul>
-                                        <li>✓ Uses API key's default mapping configuration</li>
-                                        <li>✓ Raw XML in request body (no JSON wrapper)</li>
-                                        <li>✓ Returns transformed XML directly</li>
-                                        <li>✓ Ideal for webhook integrations and automation</li>
-                                        <li>✓ No JWT authentication required</li>
-                                    </ul>
-                                </div>
-
-                                <div className={apiStyles.webhookSection}>
-                                    <h3>2. Rossum AI Webhook Integration</h3>
-                                    <div className={apiStyles.endpointCard}>
-                                        <div className={apiStyles.endpointHeader}>
-                                            <span className={apiStyles.method}>POST</span>
-                                            <code className={apiStyles.endpointUrl}>{baseUrl}/api/webhook/rossum</code>
-                                        </div>
-                                        <p>Specialized webhook for Rossum AI. Automatically fetches invoice data and transforms it.</p>
-                                    </div>
-
-                                    <h4>How It Works</h4>
-                                    <ol className={apiStyles.stepList}>
-                                        <li>Rossum AI processes an invoice and triggers webhook</li>
-                                        <li>RossumXML receives annotation ID from Rossum</li>
-                                        <li>Fetches invoice data from Rossum API automatically</li>
-                                        <li>Converts JSON to XML format</li>
-                                        <li>Applies transformation mapping</li>
-                                        <li>Returns transformed XML or delivers to configured endpoint</li>
-                                    </ol>
-
-                                    <h4>Rossum Webhook Payload</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`POST ${baseUrl}/api/webhook/rossum
-x-api-key: rxml_your_api_key_here
-Content-Type: application/json
-
-{
-  "action": "annotation_content",
-  "annotation_id": 123456,
-  "annotation_url": "https://api.elis.rossum.ai/v1/annotations/123456"
-}`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`POST ${baseUrl}/api/webhook/rossum\nx-api-key: rxml_your_api_key_here\nContent-Type: application/json\n\n{\n  "action": "annotation_content",\n  "annotation_id": 123456\n}`, 'webhookRossum')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'webhookRossum' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-
-                                    <h4>Configuration Required</h4>
-                                    <p>Configure in API Settings:</p>
-                                    <ul>
-                                        <li><strong>Rossum API Token:</strong> Your Rossum authentication token</li>
-                                        <li><strong>Default Mapping:</strong> Pre-configured transformation mapping</li>
-                                        <li><strong>Destination Webhook (Optional):</strong> Auto-forward transformed XML</li>
-                                    </ul>
-
-                                    <h4>Success Response</h4>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`{
+                                <div className={apiStyles.responseSection}>
+                                    <h3 className={apiStyles.responseTitle}>Response</h3>
+                                    <div className={apiStyles.responseBlock}>
+                                        <pre className={apiStyles.responseContent}>{`{
   "success": true,
-  "message": "Webhook processed successfully",
-  "annotationId": 123456,
-  "transformationApplied": true,
+  "message": "XML transformed successfully",
+  "transformedXml": "<Order>...</Order>",
+  "timestamp": "2025-10-17T09:13:31.051Z"
+}`}</pre>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Transform Webhook Code Example */}
+                        {activeEndpoint === 'transform-webhook' && (
+                            <>
+                                <div className={apiStyles.codePanelHeader}>
+                                    <button className={`${apiStyles.langTab} ${apiStyles.active}`}>cURL</button>
+                                    <button 
+                                        className={apiStyles.copyBtn}
+                                        onClick={() => copyToClipboard(`curl --request POST \\
+  --url ${baseUrl}/api/webhook/transform?api_key=YOUR_API_KEY \\
+  --header 'Content-Type: application/xml' \\
+  --data '<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>'`, 'curl-transform')}
+                                    >
+                                        {copiedCode === 'curl-transform' ? '✓ Copied' : '📋 Copy'}
+                                    </button>
+                                </div>
+                                
+                                <div className={apiStyles.codeBlock}>
+                                    <pre className={apiStyles.codeContent}>{`curl --request POST \\
+  --url ${baseUrl}/api/webhook/transform?api_key=YOUR_API_KEY \\
+  --header 'Content-Type: application/xml' \\
+  --data '<Invoice>
+    <InvoiceNumber>INV-001</InvoiceNumber>
+    <InvoiceDate>2025-10-17</InvoiceDate>
+    <Amount>1250.00</Amount>
+  </Invoice>'`}</pre>
+                                </div>
+
+                                <div className={apiStyles.responseSection}>
+                                    <h3 className={apiStyles.responseTitle}>Response</h3>
+                                    <div className={apiStyles.responseBlock}>
+                                        <pre className={apiStyles.responseContent}>{`<Order>
+  <OrderID>INV-001</OrderID>
+  <OrderDate>2025-10-17</OrderDate>
+  <TotalAmount>1250.00</TotalAmount>
+</Order>`}</pre>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* API Settings Info */}
+                        {activeEndpoint === 'api-settings' && (
+                            <>
+                                <div className={apiStyles.codePanelHeader}>
+                                    <button className={`${apiStyles.langTab} ${apiStyles.active}`}>Example</button>
+                                </div>
+                                
+                                <div className={apiStyles.codeBlock}>
+                                    <h4 style={{color: '#e4e7eb', fontSize: '0.875rem', marginBottom: '12px'}}>Example Mapping JSON</h4>
+                                    <pre className={apiStyles.codeContent}>{`{
+  "Invoice/InvoiceNumber": "Order/OrderID",
+  "Invoice/InvoiceDate": "Order/OrderDate",
+  "Invoice/Amount": "Order/TotalAmount",
+  "Invoice/Supplier/Name": "Order/Vendor/CompanyName",
+  "Invoice/Supplier/Address": "Order/Vendor/Address"
+}`}</pre>
+                                </div>
+
+                                <div className={apiStyles.responseSection}>
+                                    <h3 className={apiStyles.responseTitle}>Destination Schema Example</h3>
+                                    <div className={apiStyles.responseBlock}>
+                                        <pre className={apiStyles.responseContent}>{`<Order>
+  <OrderID></OrderID>
+  <OrderDate></OrderDate>
+  <TotalAmount></TotalAmount>
+  <Vendor>
+    <CompanyName></CompanyName>
+    <Address></Address>
+  </Vendor>
+</Order>`}</pre>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Error Response Examples */}
+                        {activeEndpoint === 'errors' && (
+                            <>
+                                <div className={apiStyles.codePanelHeader}>
+                                    <button className={`${apiStyles.langTab} ${apiStyles.active}`}>Example</button>
+                                </div>
+                                
+                                <div className={apiStyles.codeBlock}>
+                                    <h4 style={{color: '#e4e7eb', fontSize: '0.875rem', marginBottom: '12px'}}>401 Unauthorized</h4>
+                                    <pre className={apiStyles.codeContent}>{`{
+  "error": "Invalid API key",
+  "code": "INVALID_API_KEY",
   "details": {
-    "sourceXmlSize": 2548,
-    "transformedXmlSize": 1876,
-    "processingTimeMs": 145,
-    "mapping": "Rossum_to_SAP_Invoice",
-    "destinationType": "SAP"
-  },
-  "delivered": true
+    "message": "The provided API key is invalid or has been revoked"
+  }
+}`}</pre>
+                                </div>
+
+                                <div className={apiStyles.responseSection}>
+                                    <h3 className={apiStyles.responseTitle}>400 Bad Request</h3>
+                                    <div className={apiStyles.responseBlock}>
+                                        <pre className={apiStyles.responseContent}>{`{
+  "error": "Invalid XML format",
+  "code": "INVALID_XML",
+  "details": {
+    "line": 5,
+    "column": 12,
+    "message": "Unexpected closing tag"
+  }
 }`}</pre>
                                     </div>
                                 </div>
 
-                                <div className={apiStyles.infoBox}>
-                                    <h3>🔄 Webhook Delivery Options</h3>
-                                    <p>Configure in API Settings to automatically forward transformed XML to your system:</p>
-                                    <ul>
-                                        <li><strong>Webhook URL:</strong> HTTP endpoint to receive transformed data</li>
-                                        <li><strong>FTP/SFTP:</strong> Upload to secure file server</li>
-                                        <li><strong>Email:</strong> Send as attachment to specified address</li>
-                                    </ul>
-                                </div>
-
-                                <div className={apiStyles.warning}>
-                                    <h4>⚠️ Webhook Security</h4>
-                                    <ul>
-                                        <li>Always validate the <code>x-api-key</code> header</li>
-                                        <li>Use HTTPS endpoints only (TLS 1.2+)</li>
-                                        <li>Implement webhook signature verification</li>
-                                        <li>Set appropriate timeout values (recommended: 30s)</li>
-                                        <li>Log all webhook events for audit purposes</li>
-                                    </ul>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* EXAMPLES TAB */}
-                        {activeTab === 'examples' && (
-                            <section className={apiStyles.section}>
-                                <h2>Code Examples</h2>
-
-                                <div className={apiStyles.exampleSection}>
-                                    <h3>JavaScript / Node.js</h3>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`// Using fetch API
-const transformXml = async () => {
-  const response = await fetch('${baseUrl}/api/transform', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer YOUR_JWT_TOKEN',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      sourceXml: '<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>',
-      destinationXml: '<Order><OrderID></OrderID></Order>',
-      mappingJson: {
-        'Invoice/InvoiceNumber': 'Order/OrderID'
-      },
-      removeEmptyTags: true
-    })
-  });
-
-  if (response.status === 429) {
-    const errorData = await response.json();
-    console.log('Rate limit exceeded:', errorData.details);
-    return;
+                                <div className={apiStyles.responseSection} style={{marginTop: '24px'}}>
+                                    <h3 className={apiStyles.responseTitle}>429 Rate Limit</h3>
+                                    <div className={apiStyles.responseBlock}>
+                                        <pre className={apiStyles.responseContent}>{`{
+  "error": "Rate limit exceeded",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "details": {
+    "limit": 100,
+    "remaining": 0,
+    "reset": "2025-10-17T10:00:00Z"
   }
-
-  if (!response.ok) {
-    throw new Error(\`HTTP error! status: \${response.status}\`);
-  }
-
-  // Get usage info from headers
-  const usageLimit = response.headers.get('X-Usage-Limit');
-  const usageCount = response.headers.get('X-Usage-Count');
-  const usageRemaining = response.headers.get('X-Usage-Remaining');
-  
-  console.log(\`Usage: \${usageCount}/\${usageLimit} (Remaining: \${usageRemaining})\`);
-
-  const transformedXml = await response.text();
-  console.log('Transformed XML:', transformedXml);
-  return transformedXml;
-};
-
-// Call the function
-transformXml().catch(console.error);`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`const transformXml = async () => {\n  const response = await fetch('${baseUrl}/api/transform', {\n    method: 'POST',\n    headers: {\n      'Authorization': 'Bearer YOUR_JWT_TOKEN',\n      'Content-Type': 'application/json'\n    },\n    body: JSON.stringify({\n      sourceXml: '<Invoice>...</Invoice>',\n      destinationXml: '<Order>...</Order>',\n      mappingJson: { 'Invoice/InvoiceNumber': 'Order/OrderID' },\n      removeEmptyTags: true\n    })\n  });\n  const transformedXml = await response.text();\n  return transformedXml;\n};`, 'exampleJs')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'exampleJs' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className={apiStyles.exampleSection}>
-                                    <h3>Python</h3>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`import requests
-import json
-
-def transform_xml(jwt_token, source_xml, destination_xml, mapping):
-    url = '${baseUrl}/api/transform'
-    headers = {
-        'Authorization': f'Bearer {jwt_token}',
-        'Content-Type': 'application/json'
-    }
-    
-    payload = {
-        'sourceXml': source_xml,
-        'destinationXml': destination_xml,
-        'mappingJson': mapping,
-        'removeEmptyTags': True
-    }
-    
-    response = requests.post(url, headers=headers, json=payload)
-    
-    # Check for rate limiting
-    if response.status_code == 429:
-        error_data = response.json()
-        print(f"Rate limit exceeded: {error_data['details']}")
-        return None
-    
-    # Check response status
-    response.raise_for_status()
-    
-    # Get usage information from headers
-    usage_limit = response.headers.get('X-Usage-Limit')
-    usage_count = response.headers.get('X-Usage-Count')
-    usage_remaining = response.headers.get('X-Usage-Remaining')
-    
-    print(f"Usage: {usage_count}/{usage_limit} (Remaining: {usage_remaining})")
-    
-    return response.text
-
-# Example usage
-source = '<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>'
-destination = '<Order><OrderID></OrderID></Order>'
-mapping = {'Invoice/InvoiceNumber': 'Order/OrderID'}
-
-transformed = transform_xml('YOUR_JWT_TOKEN', source, destination, mapping)
-print(transformed)`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`import requests\n\ndef transform_xml(jwt_token, source_xml, destination_xml, mapping):\n    url = '${baseUrl}/api/transform'\n    headers = {'Authorization': f'Bearer {jwt_token}', 'Content-Type': 'application/json'}\n    payload = {'sourceXml': source_xml, 'destinationXml': destination_xml, 'mappingJson': mapping}\n    response = requests.post(url, headers=headers, json=payload)\n    response.raise_for_status()\n    return response.text`, 'examplePy')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'examplePy' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className={apiStyles.exampleSection}>
-                                    <h3>cURL</h3>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`# REST API with JWT
-curl -X POST ${baseUrl}/api/transform \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "sourceXml": "<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>",
-    "destinationXml": "<Order><OrderID></OrderID></Order>",
-    "mappingJson": {
-      "Invoice/InvoiceNumber": "Order/OrderID"
-    },
-    "removeEmptyTags": true
-  }' \\
-  -v
-
-# Webhook with API Key (raw XML)
-curl -X POST ${baseUrl}/api/webhook/transform \\
-  -H "x-api-key: rxml_your_api_key_here" \\
-  -H "Content-Type: application/xml" \\
-  -d '<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>' \\
-  -v`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`curl -X POST ${baseUrl}/api/transform \\\n  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"sourceXml": "<Invoice>...</Invoice>", "destinationXml": "<Order>...</Order>", "mappingJson": {"Invoice/InvoiceNumber": "Order/OrderID"}}' \\\n  -v`, 'exampleCurl')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'exampleCurl' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className={apiStyles.exampleSection}>
-                                    <h3>PHP</h3>
-                                    <div className={apiStyles.codeBlock}>
-                                        <pre>{`<?php
-function transformXml($jwtToken, $sourceXml, $destinationXml, $mapping) {
-    $url = '${baseUrl}/api/transform';
-    
-    $data = [
-        'sourceXml' => $sourceXml,
-        'destinationXml' => $destinationXml,
-        'mappingJson' => $mapping,
-        'removeEmptyTags' => true
-    ];
-    
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $jwtToken,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_HEADER, true);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    
-    $headers = substr($response, 0, $headerSize);
-    $body = substr($response, $headerSize);
-    
-    curl_close($ch);
-    
-    // Check for rate limiting
-    if ($httpCode === 429) {
-        $errorData = json_decode($body, true);
-        echo "Rate limit exceeded: " . json_encode($errorData['details']) . "\\n";
-        return null;
-    }
-    
-    if ($httpCode !== 200) {
-        throw new Exception("HTTP error: $httpCode");
-    }
-    
-    // Extract usage headers
-    preg_match('/X-Usage-Count: (\\d+)/', $headers, $usageCount);
-    preg_match('/X-Usage-Limit: (\\d+)/', $headers, $usageLimit);
-    preg_match('/X-Usage-Remaining: (\\d+)/', $headers, $usageRemaining);
-    
-    echo "Usage: {$usageCount[1]}/{$usageLimit[1]} (Remaining: {$usageRemaining[1]})\\n";
-    
-    return $body;
-}
-
-// Example usage
-$source = '<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>';
-$destination = '<Order><OrderID></OrderID></Order>';
-$mapping = ['Invoice/InvoiceNumber' => 'Order/OrderID'];
-
-$transformed = transformXml('YOUR_JWT_TOKEN', $source, $destination, $mapping);
-echo $transformed;
-?>`}</pre>
-                                        <button 
-                                            onClick={() => copyToClipboard(`<?php\nfunction transformXml($jwtToken, $sourceXml, $destinationXml, $mapping) {\n    $url = '${baseUrl}/api/transform';\n    $data = ['sourceXml' => $sourceXml, 'destinationXml' => $destinationXml, 'mappingJson' => $mapping];\n    $ch = curl_init($url);\n    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n    curl_setopt($ch, CURLOPT_POST, true);\n    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));\n    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $jwtToken, 'Content-Type: application/json']);\n    $response = curl_exec($ch);\n    curl_close($ch);\n    return $response;\n}`, 'examplePhp')}
-                                            className={apiStyles.copyButton}
-                                        >
-                                            {copiedEndpoint === 'examplePhp' ? '✓ Copied' : '📋 Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className={apiStyles.exampleSection}>
-                                    <h3>Postman Collection</h3>
-                                    <div className={apiStyles.infoBox}>
-                                        <p>Import this collection into Postman to test all endpoints:</p>
-                                        <div className={apiStyles.codeBlock}>
-                                            <pre>{`{
-  "info": {
-    "name": "RossumXML API",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "Authentication",
-      "item": [
-        {
-          "name": "Register",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "url": "${baseUrl}/auth/register",
-            "body": {
-              "mode": "raw",
-              "raw": "{\\"email\\": \\"test@example.com\\", \\"password\\": \\"password123\\", \\"username\\": \\"testuser\\"}"
-            }
-          }
-        },
-        {
-          "name": "Login",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "url": "${baseUrl}/auth/login",
-            "body": {
-              "mode": "raw",
-              "raw": "{\\"email\\": \\"test@example.com\\", \\"password\\": \\"password123\\"}"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Transform XML (JWT)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {"key": "Authorization", "value": "Bearer {{jwt_token}}"},
-          {"key": "Content-Type", "value": "application/json"}
-        ],
-        "url": "${baseUrl}/api/transform",
-        "body": {
-          "mode": "raw",
-          "raw": "{\\"sourceXml\\": \\"<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>\\", \\"destinationXml\\": \\"<Order><OrderID></OrderID></Order>\\", \\"mappingJson\\": {\\"Invoice/InvoiceNumber\\": \\"Order/OrderID\\"}, \\"removeEmptyTags\\": true}"
-        }
-      }
-    },
-    {
-      "name": "Webhook Transform (API Key)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {"key": "x-api-key", "value": "{{api_key}}"},
-          {"key": "Content-Type", "value": "application/xml"}
-        ],
-        "url": "${baseUrl}/api/webhook/transform",
-        "body": {
-          "mode": "raw",
-          "raw": "<Invoice><InvoiceNumber>INV-001</InvoiceNumber></Invoice>"
-        }
-      }
-    }
-  ]
 }`}</pre>
-                                            <button 
-                                                onClick={() => copyToClipboard(`{"info": {"name": "RossumXML API"}, "item": [{"name": "Transform XML", "request": {"method": "POST", "url": "${baseUrl}/api/transform"}}]}`, 'postman')}
-                                                className={apiStyles.copyButton}
-                                            >
-                                                {copiedEndpoint === 'postman' ? '✓ Copied' : '📋 Copy'}
-                                            </button>
-                                        </div>
                                     </div>
                                 </div>
-                            </section>
+                            </>
                         )}
+                    </aside>
+                </main>
 
-                    </main>
-
-                    {/* Footer Navigation */}
-                    <footer className={apiStyles.docsFooter}>
-                        <div className={apiStyles.footerLinks}>
-                            <a href="/contact" className={apiStyles.footerLink}>Need Help?</a>
-                            <a href="/request-demo" className={apiStyles.footerLink}>Request Demo</a>
-                            <a href="/register" className={apiStyles.footerLink}>Create Account</a>
-                        </div>
-                        <p className={apiStyles.footerText}>
-                            Have questions? Contact our support team at <a href="mailto:support@rossumxml.com">support@rossumxml.com</a>
-                        </p>
-                    </footer>
-
-                </div>
             </div>
             <Footer />
         </>

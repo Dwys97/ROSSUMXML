@@ -21,7 +21,6 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <div className="app-container">
           <Routes>
             {/* Публичные маршруты */}
             <Route path="/" element={<LandingPage />} />
@@ -68,7 +67,6 @@ function App() {
               } 
             />
           </Routes>
-        </div>
       </AuthProvider>
     </BrowserRouter>
   );

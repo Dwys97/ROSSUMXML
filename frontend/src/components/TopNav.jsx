@@ -79,7 +79,7 @@ const TopNav = memo(function TopNav() {
                             <>
                                 <NavLink to="/solutions" className={styles.navLink}>Solutions</NavLink>
                                 <NavLink to="/enterprise" className={styles.navLink}>Enterprise</NavLink>
-                                <NavLink to="/api-documentation" className={styles.navLink}>API Docs</NavLink>
+                                <NavLink to="/api-docs" className={styles.navLink}>API Docs</NavLink>
                                 <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
                                 <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
                                 {user ? (
