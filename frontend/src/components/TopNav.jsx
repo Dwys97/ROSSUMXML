@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import UserProfile from './profile/UserProfile';
 import ApiSettingsModal from './common/ApiSettingsModal';
+import AnalyticsDashboardModal from './analytics/AnalyticsDashboardModal';
 import styles from './TopNav.module.css';
 import logo from '../assets/logo-light.svg';
 
@@ -13,6 +14,7 @@ const TopNav = memo(function TopNav() {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showApiSettings, setShowApiSettings] = useState(false);
+    const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
     // Check authentication state when entering the page
     useEffect(() => {
@@ -99,7 +101,16 @@ const TopNav = memo(function TopNav() {
                             </>
                         ) : user ? (
                             <>
-                                <NavLink to="/analytics" className={styles.navLink}>📊 Analytics</NavLink>
+                                <button 
+                                    onClick={() => {
+                                        setIsAnalyticsOpen(true);
+                                        setIsMobileMenuOpen(false);
+                                    }} 
+                                    className={styles.navLink}
+                                    aria-label="Analytics Dashboard"
+                                >
+                                    📊 Analytics
+                                </button>
                                 <button 
                                     onClick={() => setShowApiSettings(true)} 
                                     className={styles.apiSettingsButton}
@@ -181,9 +192,15 @@ const TopNav = memo(function TopNav() {
                             </>
                         ) : user ? (
                             <>
-                                <NavLink to="/analytics" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                <button 
+                                    onClick={() => {
+                                        setIsAnalyticsOpen(true);
+                                        setIsMobileMenuOpen(false);
+                                    }} 
+                                    className={styles.mobileNavLink}
+                                >
                                     📊 Analytics
-                                </NavLink>
+                                </button>
                                 <button 
                                     onClick={() => {
                                         setShowApiSettings(true);
@@ -222,6 +239,12 @@ const TopNav = memo(function TopNav() {
                 <ApiSettingsModal 
                     isOpen={showApiSettings} 
                     onClose={() => setShowApiSettings(false)}
+                />
+            )}
+            {isAnalyticsOpen && user && (
+                <AnalyticsDashboardModal
+                    isOpen={isAnalyticsOpen}
+                    onClose={() => setIsAnalyticsOpen(false)}
                 />
             )}
         </>

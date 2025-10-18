@@ -518,10 +518,214 @@ async function getDashboardSummary(pool, userId) {
     }
 }
 
+/**
+ * Get transformation logs (detailed event log for transformations tab)
+ * @route GET /api/analytics/transformations/logs
+ * @query {number} page - Page number
+ * @query {number} limit - Results per page
+ * @query {string} startDate - Start date filter
+ * @query {string} endDate - End date filter
+ */
+async function getTransformationLogs(pool, userId, queryParams = {}) {
+    const client = await pool.connect();
+    try {
+        // Get user's organization
+        const orgResult = await client.query(
+            'SELECT organization_id FROM users WHERE id = $1',
+            [userId]
+        );
+        const organizationId = orgResult.rows[0]?.organization_id;
+
+        const page = parseInt(queryParams.page) || 1;
+        const limit = Math.min(parseInt(queryParams.limit) || 50, 100);
+        const offset = (page - 1) * limit;
+
+        // Date filtering
+        let dateCondition = '';
+        const params = [organizationId || userId];
+        let paramIndex = 2;
+
+        if (queryParams.startDate && queryParams.endDate) {
+            dateCondition = `AND we.created_at BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+            params.push(queryParams.startDate, queryParams.endDate);
+            paramIndex += 2;
+        } else {
+            // Default to last 30 days
+            dateCondition = `AND we.created_at >= NOW() - INTERVAL '30 days'`;
+        }
+
+        const userCondition = organizationId 
+            ? 'u.organization_id = $1'
+            : 'we.user_id = $1';
+
+        // Get transformation logs with full details
+        const logsQuery = `
+            SELECT 
+                we.id,
+                we.event_type,
+                we.source_system,
+                we.rossum_annotation_id,
+                we.status,
+                we.source_xml_size,
+                we.transformed_xml_size,
+                we.processing_time_ms,
+                we.error_message,
+                we.created_at,
+                u.email as user_email,
+                u.full_name as user_name,
+                tm.mapping_name,
+                tm.destination_schema_type,
+                mul.mapping_id
+            FROM webhook_events we
+            LEFT JOIN users u ON we.user_id = u.id
+            LEFT JOIN mapping_usage_log mul ON we.id = mul.webhook_event_id
+            LEFT JOIN transformation_mappings tm ON mul.mapping_id = tm.id
+            WHERE ${userCondition}
+              ${dateCondition}
+            ORDER BY we.created_at DESC
+            LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+        `;
+
+        params.push(limit, offset);
+        const logsResult = await client.query(logsQuery, params);
+
+        // Get total count
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM webhook_events we
+            LEFT JOIN users u ON we.user_id = u.id
+            WHERE ${userCondition}
+              ${dateCondition}
+        `;
+        const countParams = [organizationId || userId];
+        if (queryParams.startDate && queryParams.endDate) {
+            countParams.push(queryParams.startDate, queryParams.endDate);
+        }
+        const countResult = await client.query(countQuery, countParams);
+        const total = parseInt(countResult.rows[0].total);
+
+        return {
+            logs: logsResult.rows,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
+
+    } finally {
+        client.release();
+    }
+}
+
+/**
+ * Get mapping change activity log
+ * @route GET /api/analytics/mappings/:id/activity
+ * @param {string} mappingId - Mapping ID
+ * @query {number} limit - Results limit
+ */
+async function getMappingChangeActivity(pool, userId, mappingId, limit = 50) {
+    const client = await pool.connect();
+    try {
+        // Verify user has access to this mapping
+        const orgResult = await client.query(
+            'SELECT organization_id FROM users WHERE id = $1',
+            [userId]
+        );
+        const organizationId = orgResult.rows[0]?.organization_id;
+
+        // Check mapping access
+        const accessQuery = `
+            SELECT tm.id, tm.mapping_name, tm.user_id
+            FROM transformation_mappings tm
+            LEFT JOIN users u ON tm.user_id = u.id
+            WHERE tm.id = $1
+              AND (tm.user_id = $2 OR u.organization_id = $3)
+        `;
+        const accessResult = await client.query(accessQuery, [mappingId, userId, organizationId]);
+
+        if (accessResult.rows.length === 0) {
+            throw new Error('Mapping not found or access denied');
+        }
+
+        // Get activity log using helper function
+        const activityResult = await client.query(
+            'SELECT * FROM get_mapping_activity($1, $2)',
+            [mappingId, limit]
+        );
+
+        return {
+            mapping_id: mappingId,
+            mapping_name: accessResult.rows[0].mapping_name,
+            activity: activityResult.rows
+        };
+
+    } finally {
+        client.release();
+    }
+}
+
+/**
+ * Get all mapping activity for user's organization
+ * @route GET /api/analytics/mappings/activity/all
+ * @query {number} limit - Results limit
+ */
+async function getAllMappingActivity(pool, userId, limit = 100) {
+    const client = await pool.connect();
+    try {
+        // Get user's organization
+        const orgResult = await client.query(
+            'SELECT organization_id FROM users WHERE id = $1',
+            [userId]
+        );
+        const organizationId = orgResult.rows[0]?.organization_id;
+
+        if (!organizationId) {
+            // For users without organization, get their own mapping activity
+            const activityQuery = `
+                SELECT 
+                    mcl.id,
+                    mcl.mapping_id,
+                    tm.mapping_name,
+                    u.email as user_email,
+                    u.full_name as user_name,
+                    mcl.change_type,
+                    mcl.changes_summary,
+                    mcl.created_at
+                FROM mapping_change_log mcl
+                LEFT JOIN transformation_mappings tm ON mcl.mapping_id = tm.id
+                LEFT JOIN users u ON mcl.user_id = u.id
+                WHERE mcl.user_id = $1
+                ORDER BY mcl.created_at DESC
+                LIMIT $2
+            `;
+            const activityResult = await client.query(activityQuery, [userId, limit]);
+            return { activity: activityResult.rows };
+        }
+
+        // Get organization activity using helper function
+        const activityResult = await client.query(
+            'SELECT * FROM get_organization_mapping_activity($1, $2)',
+            [organizationId, limit]
+        );
+
+        return {
+            activity: activityResult.rows
+        };
+
+    } finally {
+        client.release();
+    }
+}
+
 module.exports = {
     getTransformationStats,
     getMappingActivity,
     getCustomReport,
     getTransformationHistory,
-    getDashboardSummary
+    getDashboardSummary,
+    getTransformationLogs,
+    getMappingChangeActivity,
+    getAllMappingActivity
 };

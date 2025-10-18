@@ -4,12 +4,10 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const fs = require('fs');
 
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 const { parseXmlToTree } = require('./services/xmlParser.service');
 const { generateMappingSuggestion, generateBatchMappingSuggestions, checkAIFeatureAccess } = require('./services/aiMapping.service');
-const analyticsRoutes = require('./routes/analytics.routes');
 const db = require('./db');
 const userService = require('./services/user.service');
 
@@ -1205,7 +1203,7 @@ exports.handler = async (event) => {
 
         // Frontend Transformer Page endpoint - JWT REQUIRED
         // For registered users on FREE subscription tier (10 transforms/day)
-        // Rate limiting implemented: 10 requests/day for free tier, unlimited for paid tiers
+        // TODO: Add rate limiting in Phase 5 (10 requests/day for free tier)
         if (path === '/api/transform' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
                 // Verify JWT token - all users must be registered
@@ -1216,123 +1214,24 @@ exports.handler = async (event) => {
                     return createResponse(400, JSON.stringify({ error: 'Missing required fields' }), 'application/json');
                 }
                 
-                // Get user's subscription level
-                const client = await pool.connect();
-                try {
-                    const subResult = await client.query(
-                        'SELECT level FROM subscriptions WHERE user_id = $1',
-                        [user.id]
-                    );
-                    
-                    const subscriptionLevel = subResult.rows[0]?.level || 'free';
-                    
-                    // Rate limiting for free tier users
-                    if (subscriptionLevel === 'free') {
-                        // Count transformations in the last 24 hours
-                        const countResult = await client.query(`
-                            SELECT COUNT(*) as count
-                            FROM security_audit_log
-                            WHERE user_id = $1
-                              AND event_type = 'transformation'
-                              AND resource_type IN ('USER_UPLOAD', 'ROSSUM_EXPORT')
-                              AND created_at >= NOW() - INTERVAL '24 hours'
-                        `, [user.id]);
-                        
-                        const transformCount = parseInt(countResult.rows[0].count);
-                        const freeLimit = 10;
-                        
-                        console.log(`[RATE LIMIT] User ${user.email} - ${transformCount}/${freeLimit} transformations used today`);
-                        
-                        if (transformCount >= freeLimit) {
-                            // Log rate limit exceeded
-                            await logSecurityEvent(
-                                pool,
-                                user.id,
-                                'rate_limit_exceeded',
-                                'transformation',
-                                null,
-                                'free_tier_limit',
-                                false,
-                                {
-                                    limit: freeLimit,
-                                    current_count: transformCount,
-                                    subscription_level: subscriptionLevel
-                                }
-                            );
-                            
-                            return createResponse(429, JSON.stringify({
-                                error: 'Rate limit exceeded',
-                                message: 'You have reached your free tier limit of 10 transformations per day.',
-                                details: {
-                                    limit: freeLimit,
-                                    used: transformCount,
-                                    remaining: 0,
-                                    subscription_level: subscriptionLevel,
-                                    reset_time: 'Limit resets every 24 hours'
-                                },
-                                upgrade_url: '/pricing'
-                            }));
-                        }
-                    }
-                    
-                    // Log transformation
-                    await logTransformationRequest(
-                        pool,
-                        user.id,
-                        'USER_UPLOAD',
-                        'USER_UPLOAD',
-                        sourceXml.length,
-                        event
-                    );
-                    
-                    console.log(`[TRANSFORM] User ${user.id} (${user.email}) - ${subscriptionLevel} tier transformation`);
-                    
-                    const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
-                    
-                    // Count again to get updated usage
-                    const updatedCountResult = await client.query(`
-                        SELECT COUNT(*) as count
-                        FROM security_audit_log
-                        WHERE user_id = $1
-                          AND event_type = 'transformation'
-                          AND resource_type IN ('USER_UPLOAD', 'ROSSUM_EXPORT')
-                          AND created_at >= NOW() - INTERVAL '24 hours'
-                    `, [user.id]);
-                    
-                    const updatedCount = parseInt(updatedCountResult.rows[0].count);
-                    const limit = subscriptionLevel === 'free' ? 10 : 999999;
-                    
-                    // Return transformed XML with usage info in custom header
-                    return {
-                        statusCode: 200,
-                        body: transformed,
-                        headers: {
-                            "Content-Type": "application/xml",
-                            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                            "Access-Control-Allow-Origin": "*",
-                            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-                            "Access-Control-Expose-Headers": "X-Usage-Limit,X-Usage-Count,X-Usage-Remaining,X-Subscription-Level",
-                            "X-Usage-Limit": String(limit),
-                            "X-Usage-Count": String(updatedCount),
-                            "X-Usage-Remaining": String(Math.max(0, limit - updatedCount)),
-                            "X-Subscription-Level": subscriptionLevel,
-                            // Security Headers
-                            "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-                            "X-Content-Type-Options": "nosniff",
-                            "X-Frame-Options": "DENY",
-                            "X-XSS-Protection": "1; mode=block",
-                            "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:3000 http://localhost:5173; font-src 'self' data:; object-src 'none'; frame-src 'none'",
-                            "Referrer-Policy": "strict-origin-when-cross-origin",
-                            "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
-                        }
-                    };
-                    
-                } finally {
-                    client.release();
-                }
+                // Log transformation for free tier users
+                await logTransformationRequest(
+                    pool,
+                    user.id,
+                    'USER_UPLOAD',
+                    'USER_UPLOAD',
+                    sourceXml.length,
+                    event
+                );
+                
+                console.log(`[FREE TIER TRANSFORM] User ${user.id} (${user.email}) - Free tier transformation`);
+                
+                const transformed = transformSingleFile(sourceXml, destinationXml, mappingJson, removeEmptyTags);
+                
+                return createResponse(200, transformed, 'application/xml');
                 
             } catch (err) {
-                console.error('Transformation error:', err);
+                console.error('Free tier transformation error:', err);
                 if (err.message.includes('token')) {
                     return createResponse(401, JSON.stringify({ 
                         error: 'Authentication required',
@@ -1834,14 +1733,6 @@ exports.handler = async (event) => {
                     
                     const mappingId = result.rows[0].id;
                     
-                    // If this is set as default, update all user's API keys to use this mapping
-                    if (is_default) {
-                        await client.query(
-                            'UPDATE api_keys SET default_mapping_id = $1 WHERE user_id = $2',
-                            [mappingId, user.id]
-                        );
-                    }
-                    
                     await client.query('COMMIT');
                     
                     // Log mapping creation
@@ -1899,14 +1790,6 @@ exports.handler = async (event) => {
                     if (result.rows.length === 0) {
                         await client.query('ROLLBACK');
                         return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
-                    }
-                    
-                    // If this is set as default, update all user's API keys to use this mapping
-                    if (is_default) {
-                        await client.query(
-                            'UPDATE api_keys SET default_mapping_id = $1 WHERE user_id = $2',
-                            [mappingId, user.id]
-                        );
                     }
                     
                     await client.query('COMMIT');
@@ -2300,35 +2183,6 @@ exports.handler = async (event) => {
                         // Convert Rossum JSON content to XML
                         sourceXml = convertRossumJsonToXml(rossumPayload.annotation);
                         console.log(`[Rossum Webhook] Converted to XML: ${sourceXml.length} bytes`);
-                        console.log(`\n========== SOURCE XML (from Rossum JSON) ==========`);
-                        console.log(sourceXml);
-                        console.log(`========== END SOURCE XML ==========\n`);
-                        
-                        // Save source XML to file
-                        try {
-                            // In Lambda, use /tmp; in local dev, use workspace directory
-                            // SAM Local mounts the backend directory, so we can use __dirname
-                            const baseDir = process.env.LAMBDA_TASK_ROOT 
-                                ? '/tmp/webhook-xmls' 
-                                : '/workspaces/ROSSUMXML/webhook-xmls';
-                            const sourceDir = `${baseDir}/source`;
-                            const transformedDir = `${baseDir}/transformed`;
-                            
-                            // Create directories if they don't exist
-                            if (!fs.existsSync(sourceDir)) {
-                                fs.mkdirSync(sourceDir, { recursive: true });
-                            }
-                            if (!fs.existsSync(transformedDir)) {
-                                fs.mkdirSync(transformedDir, { recursive: true });
-                            }
-                            
-                            const sourceXmlPath = `${sourceDir}/source-${annotationId}.xml`;
-                            fs.writeFileSync(sourceXmlPath, sourceXml, 'utf8');
-                            console.log(`[Rossum Webhook] Saved source XML to: ${sourceXmlPath}`);
-                        } catch (fileErr) {
-                            console.warn(`[Rossum Webhook] Could not save source XML file: ${fileErr.message}`);
-                            // Continue processing even if file save fails
-                        }
                         
                     } catch (conversionErr) {
                         console.error('[Rossum Webhook] Error converting Rossum data to XML:', conversionErr);
@@ -2373,29 +2227,7 @@ exports.handler = async (event) => {
                         );
                         
                         console.log(`[Rossum Webhook] Transformation successful: ${transformedXml.length} bytes`);
-                        console.log(`\n========== TRANSFORMED XML (output) ==========`);
-                        console.log(transformedXml);
-                        console.log(`========== END TRANSFORMED XML ==========\n`);
-                        
-                        // Save transformed XML to file
-                        try {
-                            const baseDir = process.env.LAMBDA_TASK_ROOT 
-                                ? '/tmp/webhook-xmls' 
-                                : '/workspaces/ROSSUMXML/webhook-xmls';
-                            const transformedDir = `${baseDir}/transformed`;
-                            
-                            // Create directory if it doesn't exist
-                            if (!fs.existsSync(transformedDir)) {
-                                fs.mkdirSync(transformedDir, { recursive: true });
-                            }
-                            
-                            const transformedXmlPath = `${transformedDir}/transformed-${annotationId}.xml`;
-                            fs.writeFileSync(transformedXmlPath, transformedXml, 'utf8');
-                            console.log(`[Rossum Webhook] Saved transformed XML to: ${transformedXmlPath}`);
-                        } catch (fileErr) {
-                            console.warn(`[Rossum Webhook] Could not save transformed XML file: ${fileErr.message}`);
-                            // Continue processing even if file save fails
-                        }
+                        console.log(`[Rossum Webhook] Transformed XML Output:\n${transformedXml}`);
                         
                     } catch (transformErr) {
                         console.error('[Rossum Webhook] Transformation error:', transformErr);
@@ -2503,22 +2335,19 @@ exports.handler = async (event) => {
                             }));
                         }
                     } else {
-                        // No destination webhook - store both source and transformed XML
+                        // No destination webhook - just log success
                         await client.query(
                             `UPDATE webhook_events 
                              SET status = $1, event_type = $2, source_xml_size = $3, 
                                  transformed_xml_size = $4, processing_time_ms = $5,
-                                 source_xml_payload = $6, response_payload = $7,
                                  updated_at = CURRENT_TIMESTAMP 
-                             WHERE id = $8`,
+                             WHERE id = $6`,
                             [
                                 'success',
                                 'transformation_success',
                                 sourceXml.length,
                                 transformedXml.length,
                                 Date.now() - startTime,
-                                sourceXml, // Store the source XML (converted from Rossum JSON)
-                                transformedXml, // Store the transformed XML
                                 webhookEventId
                             ]
                         );
@@ -4254,425 +4083,7 @@ exports.handler = async (event) => {
             }
         }
 
-        // ============================================================
-        // TRANSFORMATION MONITORING ENDPOINTS
-        // ============================================================
-
-        // ENDPOINT 11: GET /api/admin/transformations/stats - Transformation statistics
-        // (Must be checked BEFORE general /transformations route)
-        if (path === '/api/admin/transformations/stats' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
-            if (!permissionCheck.authorized) {
-                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
-            }
-
-            try {
-                const queryParams = event.queryStringParameters || {};
-                const dateFrom = queryParams.dateFrom || null;
-                const dateTo = queryParams.dateTo || null;
-
-                // Build WHERE clause for date filtering
-                let whereClauses = [];
-                let queryParamsArray = [];
-                let paramCount = 1;
-
-                if (dateFrom) {
-                    whereClauses.push(`created_at >= $${paramCount}`);
-                    queryParamsArray.push(dateFrom);
-                    paramCount++;
-                }
-
-                if (dateTo) {
-                    whereClauses.push(`created_at <= $${paramCount}`);
-                    queryParamsArray.push(dateTo);
-                    paramCount++;
-                }
-
-                const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-                // Get comprehensive statistics
-                const statsResult = await pool.query(`
-                    SELECT 
-                        COUNT(*) as total_transformations,
-                        COUNT(*) FILTER (WHERE status = 'success') as successful,
-                        COUNT(*) FILTER (WHERE status != 'success') as failed,
-                        ROUND(AVG(processing_time_ms)::numeric, 2) as avg_processing_time_ms,
-                        SUM(source_xml_size) as total_source_volume_bytes,
-                        SUM(transformed_xml_size) as total_transformed_volume_bytes,
-                        MAX(COALESCE(source_xml_size, 0) + COALESCE(transformed_xml_size, 0)) as largest_transformation_bytes,
-                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as transformations_today,
-                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE AND status != 'success') as failed_today
-                    FROM webhook_events
-                    ${whereClause}
-                `, queryParamsArray);
-
-                const stats = statsResult.rows[0];
-
-                // Calculate success rate
-                const successRate = stats.total_transformations > 0
-                    ? ((stats.successful / stats.total_transformations) * 100).toFixed(2)
-                    : 0;
-
-                // Calculate average lines per document (estimation)
-                const avgSourceSize = stats.total_transformations > 0
-                    ? stats.total_source_volume_bytes / stats.total_transformations
-                    : 0;
-                const avgLinesPerDocument = Math.round(avgSourceSize / 60);
-
-                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_stats', null, 'view_stats', true);
-
-                return createResponse(200, JSON.stringify({
-                    total_transformations: parseInt(stats.total_transformations),
-                    successful: parseInt(stats.successful),
-                    failed: parseInt(stats.failed),
-                    success_rate: parseFloat(successRate),
-                    avg_processing_time_ms: parseFloat(stats.avg_processing_time_ms) || 0,
-                    total_source_volume_bytes: parseInt(stats.total_source_volume_bytes) || 0,
-                    total_transformed_volume_bytes: parseInt(stats.total_transformed_volume_bytes) || 0,
-                    avg_lines_per_document: avgLinesPerDocument,
-                    transformations_today: parseInt(stats.transformations_today),
-                    failed_today: parseInt(stats.failed_today),
-                    largest_transformation_bytes: parseInt(stats.largest_transformation_bytes) || 0
-                }));
-
-            } catch (err) {
-                console.error('[Admin] Error fetching transformation stats:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch transformation statistics',
-                    details: err.message
-                }));
-            }
-        }
-
-        // ENDPOINT 10.5: GET /api/admin/transformations/users - Get unique users from transformations
-        if (path === '/api/admin/transformations/users' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
-            if (!permissionCheck.authorized) {
-                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
-            }
-
-            try {
-                // Get distinct users who have webhook events
-                const result = await pool.query(`
-                    SELECT DISTINCT
-                        u.id,
-                        u.email,
-                        u.username
-                    FROM webhook_events w
-                    INNER JOIN users u ON w.user_id = u.id
-                    ORDER BY u.email
-                `);
-
-                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_users', null, 'list_users', true);
-
-                return createResponse(200, JSON.stringify({
-                    users: result.rows
-                }));
-
-            } catch (err) {
-                console.error('[Admin] Error fetching transformation users:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch users',
-                    details: err.message
-                }));
-            }
-        }
-
-        // ENDPOINT 10: GET /api/admin/transformations - List all transformations with filtering
-        if (path === '/api/admin/transformations' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
-            if (!permissionCheck.authorized) {
-                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
-            }
-
-            try {
-                const queryParams = event.queryStringParameters || {};
-                const page = parseInt(queryParams.page) || 1;
-                const limit = Math.min(parseInt(queryParams.limit) || 20, 100); // Max 100 per page
-                const offset = (page - 1) * limit;
-
-                // Filters
-                const dateFrom = queryParams.dateFrom || null;
-                const dateTo = queryParams.dateTo || null;
-                const status = queryParams.status || null; // 'success', 'failed', or null for all
-                const userId = queryParams.userId || null;
-                const annotationId = queryParams.annotationId || null;
-                const sortBy = queryParams.sortBy || 'created_at';
-                const sortOrder = (queryParams.sortOrder || 'DESC').toUpperCase();
-
-                // Build WHERE clause
-                let whereClauses = [];
-                let queryParamsArray = [];
-                let paramCount = 1;
-
-                if (dateFrom) {
-                    whereClauses.push(`w.created_at >= $${paramCount}`);
-                    queryParamsArray.push(dateFrom);
-                    paramCount++;
-                }
-
-                if (dateTo) {
-                    whereClauses.push(`w.created_at <= $${paramCount}`);
-                    queryParamsArray.push(dateTo);
-                    paramCount++;
-                }
-
-                if (status) {
-                    whereClauses.push(`w.status = $${paramCount}`);
-                    queryParamsArray.push(status);
-                    paramCount++;
-                }
-
-                if (userId) {
-                    whereClauses.push(`w.user_id = $${paramCount}`);
-                    queryParamsArray.push(userId);
-                    paramCount++;
-                }
-
-                if (annotationId) {
-                    whereClauses.push(`w.rossum_annotation_id ILIKE $${paramCount}`);
-                    queryParamsArray.push(`%${annotationId}%`);
-                    paramCount++;
-                }
-
-                const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-                // Allowed sort columns
-                const allowedSortColumns = ['created_at', 'processing_time_ms', 'source_xml_size', 'transformed_xml_size'];
-                const sortColumn = allowedSortColumns.includes(sortBy) ? sortBy : 'created_at';
-                const sortDirection = sortOrder === 'ASC' ? 'ASC' : 'DESC';
-
-                // Count total records
-                const countResult = await pool.query(`
-                    SELECT COUNT(*) as total
-                    FROM webhook_events w
-                    ${whereClause}
-                `, queryParamsArray);
-
-                const total = parseInt(countResult.rows[0].total);
-
-                // Fetch transformations with user details
-                const result = await pool.query(`
-                    SELECT 
-                        w.id,
-                        w.rossum_annotation_id as annotation_id,
-                        w.created_at,
-                        w.processing_time_ms,
-                        w.status,
-                        w.error_message,
-                        w.source_xml_size,
-                        w.transformed_xml_size,
-                        w.event_type,
-                        w.rossum_document_id,
-                        w.rossum_queue_id,
-                        u.email as user_email,
-                        u.username as user_name,
-                        ak.key_name as api_key_name,
-                        SUBSTRING(ak.api_secret, 1, 12) || '...' as api_key_prefix
-                    FROM webhook_events w
-                    LEFT JOIN users u ON w.user_id = u.id
-                    LEFT JOIN api_keys ak ON w.api_key_id = ak.id
-                    ${whereClause}
-                    ORDER BY w.${sortColumn} ${sortDirection}
-                    LIMIT $${paramCount} OFFSET $${paramCount + 1}
-                `, [...queryParamsArray, limit, offset]);
-
-                // Calculate line counts for each transformation
-                const transformations = result.rows.map(row => {
-                    // Estimate lines from XML size (rough approximation: ~60 bytes per line)
-                    const estimatedSourceLines = row.source_xml_size ? Math.round(row.source_xml_size / 60) : 0;
-                    const estimatedTransformedLines = row.transformed_xml_size ? Math.round(row.transformed_xml_size / 60) : 0;
-
-                    return {
-                        ...row,
-                        source_lines: estimatedSourceLines,
-                        transformed_lines: estimatedTransformedLines,
-                        created_at: row.created_at?.toISOString(),
-                    };
-                });
-
-                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_logs', null, 'list_transformations', true);
-
-                return createResponse(200, JSON.stringify({
-                    transformations,
-                    pagination: {
-                        total,
-                        page,
-                        limit,
-                        pages: Math.ceil(total / limit)
-                    }
-                }));
-
-            } catch (err) {
-                console.error('[Admin] Error fetching transformations:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch transformations',
-                    details: err.message
-                }));
-            }
-        }
-
-        // ENDPOINT 12: GET /api/admin/transformations/:id - Get single transformation details
-        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
-            if (!permissionCheck.authorized) {
-                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
-            }
-
-            try {
-                const transformationId = path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)$/)[1];
-
-                const result = await pool.query(`
-                    SELECT 
-                        w.id,
-                        w.rossum_annotation_id as annotation_id,
-                        w.created_at,
-                        w.updated_at,
-                        w.processing_time_ms,
-                        w.status,
-                        w.error_message,
-                        w.event_type,
-                        w.source_xml_size,
-                        w.transformed_xml_size,
-                        w.source_xml_payload,
-                        w.response_payload,
-                        w.rossum_document_id,
-                        w.rossum_queue_id,
-                        w.http_status_code,
-                        u.id as user_id,
-                        u.email as user_email,
-                        u.username as user_name,
-                        ak.id as api_key_id,
-                        ak.key_name as api_key_name,
-                        SUBSTRING(ak.api_secret, 1, 12) || '...' as api_key_prefix
-                    FROM webhook_events w
-                    LEFT JOIN users u ON w.user_id = u.id
-                    LEFT JOIN api_keys ak ON w.api_key_id = ak.id
-                    WHERE w.id = $1
-                `, [transformationId]);
-
-                if (result.rows.length === 0) {
-                    return createResponse(404, JSON.stringify({ error: 'Transformation not found' }));
-                }
-
-                const transformation = result.rows[0];
-
-                // Estimate line counts
-                const estimatedSourceLines = transformation.source_xml_size ? Math.round(transformation.source_xml_size / 60) : 0;
-                const estimatedTransformedLines = transformation.transformed_xml_size ? Math.round(transformation.transformed_xml_size / 60) : 0;
-
-                await logSecurityEvent(pool, user.id, 'data_access', 'transformation_detail', transformationId, 'view_details', true);
-
-                return createResponse(200, JSON.stringify({
-                    ...transformation,
-                    source_lines: estimatedSourceLines,
-                    transformed_lines: estimatedTransformedLines,
-                    created_at: transformation.created_at?.toISOString(),
-                    updated_at: transformation.updated_at?.toISOString(),
-                    user: {
-                        id: transformation.user_id,
-                        email: transformation.user_email,
-                        name: transformation.user_name
-                    },
-                    api_key: {
-                        id: transformation.api_key_id,
-                        key_name: transformation.api_key_name,
-                        key_prefix: transformation.api_key_prefix
-                    }
-                }));
-
-            } catch (err) {
-                console.error('[Admin] Error fetching transformation details:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch transformation details',
-                    details: err.message
-                }));
-            }
-        }
-
-        // ENDPOINT 13: GET /api/admin/transformations/:id/download - Download XML files
-        if (path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)\/download$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
-            if (!permissionCheck.authorized) {
-                return createResponse(403, JSON.stringify({ error: permissionCheck.error || 'Forbidden: user:read permission required' }));
-            }
-
-            try {
-                const transformationId = path.match(/^\/api\/admin\/transformations\/([a-f0-9-]+)\/download$/)[1];
-                const queryParams = event.queryStringParameters || {};
-                const type = queryParams.type || 'transformed'; // 'source' or 'transformed'
-
-                const column = type === 'source' ? 'source_xml_payload' : 'response_payload';
-
-                const result = await pool.query(`
-                    SELECT 
-                        ${column} as xml_payload,
-                        rossum_annotation_id
-                    FROM webhook_events
-                    WHERE id = $1 AND ${column} IS NOT NULL
-                `, [transformationId]);
-
-                if (result.rows.length === 0) {
-                    return createResponse(404, JSON.stringify({ error: 'XML not found' }));
-                }
-
-                const xmlPayload = result.rows[0].xml_payload;
-                const annotationId = result.rows[0].rossum_annotation_id;
-                const filename = `${type}-${annotationId}.xml`;
-
-                await logSecurityEvent(pool, user.id, 'data_access', 'xml_download', transformationId, `download_${type}_xml`, true);
-
-                return {
-                    statusCode: 200,
-                    headers: {
-                        'Content-Type': 'application/xml',
-                        'Content-Disposition': `attachment; filename="${filename}"`,
-                        'Access-Control-Allow-Origin': '*',
-                        'Access-Control-Allow-Headers': '*',
-                        ...SECURITY_HEADERS
-                    },
-                    body: xmlPayload
-                };
-
-            } catch (err) {
-                console.error('[Admin] Error downloading XML:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to download XML',
-                    details: err.message
-                }));
-            }
-        }
-
-        // ============================================================
-        // END TRANSFORMATION MONITORING ENDPOINTS
-        // ============================================================
-
-        // ENDPOINT 14: GET /api/admin/subscriptions - List all subscriptions
+        // ENDPOINT 10: GET /api/admin/subscriptions - List all subscriptions
         if (path === '/api/admin/subscriptions' && method === 'GET') {
             const user = await verifyJWT(event);
             if (!user) {
@@ -4825,141 +4236,6 @@ exports.handler = async (event) => {
         }
 
         // ============================================================================
-        // USER ANALYTICS ENDPOINTS - Dashboard & Reporting
-        // ============================================================================
-
-        // GET /api/analytics/dashboard/summary - Get dashboard summary
-        if (path === '/api/analytics/dashboard/summary' && method === 'GET') {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            try {
-                const summary = await analyticsRoutes.getDashboardSummary(pool, user.id);
-                return createResponse(200, JSON.stringify(summary));
-            } catch (err) {
-                console.error('[Analytics] Error fetching dashboard summary:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch dashboard summary',
-                    details: err.message
-                }));
-            }
-        }
-
-        // GET /api/analytics/transformations/stats - Get transformation statistics
-        if (path === '/api/analytics/transformations/stats' && method === 'GET') {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            try {
-                const queryParams = event.queryStringParameters || {};
-                const period = queryParams.period || 'daily';
-                const startDate = queryParams.startDate || null;
-                const endDate = queryParams.endDate || null;
-
-                const stats = await analyticsRoutes.getTransformationStats(
-                    pool, 
-                    user.id, 
-                    period, 
-                    startDate, 
-                    endDate
-                );
-                return createResponse(200, JSON.stringify(stats));
-            } catch (err) {
-                console.error('[Analytics] Error fetching transformation stats:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch transformation statistics',
-                    details: err.message
-                }));
-            }
-        }
-
-        // GET /api/analytics/mappings/activity - Get mapping activity statistics
-        if (path === '/api/analytics/mappings/activity' && method === 'GET') {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            try {
-                const queryParams = event.queryStringParameters || {};
-                const period = queryParams.period || 'daily';
-
-                const activity = await analyticsRoutes.getMappingActivity(pool, user.id, period);
-                return createResponse(200, JSON.stringify(activity));
-            } catch (err) {
-                console.error('[Analytics] Error fetching mapping activity:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch mapping activity',
-                    details: err.message
-                }));
-            }
-        }
-
-        // POST /api/analytics/reports/custom - Generate custom report
-        if (path === '/api/analytics/reports/custom' && method === 'POST') {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            try {
-                const { tags, period, startDate, endDate } = body;
-                
-                const report = await analyticsRoutes.getCustomReport(
-                    pool, 
-                    user.id, 
-                    tags, 
-                    period, 
-                    startDate, 
-                    endDate
-                );
-                return createResponse(200, JSON.stringify(report));
-            } catch (err) {
-                console.error('[Analytics] Error generating custom report:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to generate custom report',
-                    details: err.message
-                }));
-            }
-        }
-
-        // GET /api/analytics/transformations/history - Get transformation history
-        if (path === '/api/analytics/transformations/history' && method === 'GET') {
-            const user = await verifyJWT(event);
-            if (!user) {
-                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
-            }
-
-            try {
-                const queryParams = event.queryStringParameters || {};
-                const page = parseInt(queryParams.page) || 1;
-                const limit = parseInt(queryParams.limit) || 50;
-                const status = queryParams.status || null;
-                const resourceType = queryParams.resourceType || null;
-
-                const history = await analyticsRoutes.getTransformationHistory(
-                    pool, 
-                    user.id, 
-                    page, 
-                    limit, 
-                    status, 
-                    resourceType
-                );
-                return createResponse(200, JSON.stringify(history));
-            } catch (err) {
-                console.error('[Analytics] Error fetching transformation history:', err);
-                return createResponse(500, JSON.stringify({
-                    error: 'Failed to fetch transformation history',
-                    details: err.message
-                }));
-            }
-        }
-
-        // ============================================================================
         // SECURITY ENDPOINTS - Audit Logs & Security Settings
         // ============================================================================
 
@@ -5039,6 +4315,230 @@ exports.handler = async (event) => {
 
         // ============================================================================
         // END OF ADMIN PANEL ENDPOINTS
+        // ============================================================================
+
+        // ============================================================================
+        // USER ANALYTICS DASHBOARD ENDPOINTS
+        // ============================================================================
+        // Organization-specific analytics for transformation stats, mapping usage, and custom reports
+        // Available to all authenticated users (shows organization-level data)
+        // ============================================================================
+
+        // GET /api/analytics/dashboard/summary - Main dashboard overview
+        if (path === '/api/analytics/dashboard/summary' && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getDashboardSummary(pool, user.id);
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('Analytics dashboard error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch analytics dashboard',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/transformations/stats - Transformation statistics
+        if (path === '/api/analytics/transformations/stats' && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const queryParams = event.queryStringParameters || {};
+                const period = queryParams.period || 'daily';
+                const startDate = queryParams.startDate || null;
+                const endDate = queryParams.endDate || null;
+
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getTransformationStats(
+                    pool, 
+                    user.id, 
+                    period, 
+                    startDate, 
+                    endDate
+                );
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('Transformation stats error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation statistics',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/transformations/history - Transformation history with filters
+        if (path === '/api/analytics/transformations/history' && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const queryParams = event.queryStringParameters || {};
+                const page = parseInt(queryParams.page) || 1;
+                const limit = parseInt(queryParams.limit) || 50;
+                const status = queryParams.status || null;
+                const resourceType = queryParams.resourceType || null;
+
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getTransformationHistory(
+                    pool, 
+                    user.id, 
+                    page, 
+                    limit, 
+                    status, 
+                    resourceType
+                );
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('Transformation history error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation history',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/mappings/activity - Mapping usage analytics
+        if (path === '/api/analytics/mappings/activity' && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const queryParams = event.queryStringParameters || {};
+                const period = queryParams.period || 'daily';
+
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getMappingActivity(pool, user.id, period);
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('Mapping activity error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch mapping activity',
+                    details: err.message
+                }));
+            }
+        }
+
+        // POST /api/analytics/reports/custom - Generate custom report by XML tags
+        if (path === '/api/analytics/reports/custom' && method === 'POST') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const { tags, period, startDate, endDate } = body;
+
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getCustomReport(
+                    pool, 
+                    user.id, 
+                    tags || [], 
+                    period || 'monthly', 
+                    startDate, 
+                    endDate
+                );
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('Custom report error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to generate custom report',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/transformations/logs - Detailed transformation event logs
+        if (path === '/api/analytics/transformations/logs' && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const queryParams = event.queryStringParameters || {};
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getTransformationLogs(pool, user.id, queryParams);
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('Transformation logs error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation logs',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/mappings/:id/activity - Mapping change activity log
+        if (path.match(/^\/api\/analytics\/mappings\/[^\/]+\/activity$/) && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const pathParts = path.split('/');
+                const mappingId = pathParts[pathParts.length - 2];
+                const queryParams = event.queryStringParameters || {};
+                const limit = parseInt(queryParams.limit) || 50;
+
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getMappingChangeActivity(pool, user.id, mappingId, limit);
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('Mapping activity error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch mapping activity',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/mappings/activity/all - All mapping activity for organization
+        if (path === '/api/analytics/mappings/activity/all' && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const queryParams = event.queryStringParameters || {};
+                const limit = parseInt(queryParams.limit) || 100;
+
+                const analyticsRoutes = require('./routes/analytics.routes');
+                const result = await analyticsRoutes.getAllMappingActivity(pool, user.id, limit);
+                
+                return createResponse(200, JSON.stringify(result));
+            } catch (err) {
+                console.error('All mapping activity error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch mapping activity',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ============================================================================
+        // END OF USER ANALYTICS DASHBOARD ENDPOINTS
         // ============================================================================
 
         // Log unauthorized API access attempt (404 on API endpoints)

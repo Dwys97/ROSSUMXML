@@ -1,0 +1,228 @@
+/* frontend/src/components/analytics/MappingActivityChart.module.css - Dark Theme */
+
+.container {
+    width: 100%;
+}
+
+.container h2 {
+    font-size: 2rem;
+    color: #ffffff;
+    margin: 0 0 30px 0;
+}
+
+.statsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.statCard {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 4px solid;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.statIcon {
+    font-size: 2.5rem;
+}
+
+.statValue {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.statLabel {
+    font-size: 1rem;
+    color: #a5a9b5;
+}
+
+.topMappingsSection {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.topMappingsSection h3 {
+    font-size: 1.3rem;
+    color: #ffffff;
+    margin: 0 0 20px 0;
+}
+
+.mappingsList {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.mappingItem {
+    display: flex;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.mappingItem:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(5px);
+}
+
+.mappingRank {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1d72f3;
+    min-width: 50px;
+}
+
+.mappingInfo {
+    flex: 1;
+}
+
+.mappingName {
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 8px;
+}
+
+.mappingStats {
+    display: flex;
+    gap: 15px;
+    font-size: 0.9rem;
+    color: #a5a9b5;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #a5a9b5;
+}
+
+/* Mapping Activity Log Section */
+.activitySection {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 25px;
+    margin-top: 30px;
+}
+
+.activitySection h3 {
+    font-size: 1.3rem;
+    color: #ffffff;
+    margin: 0 0 20px 0;
+}
+
+.activityLoading {
+    text-align: center;
+    padding: 40px;
+    color: #a5a9b5;
+}
+
+.activityTimeline {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.activityItem {
+    display: grid;
+    grid-template-columns: 50px 200px 100px 150px 140px 1fr;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.02);
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.activityItem:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.activityIcon {
+    font-size: 1.8rem;
+    text-align: center;
+}
+
+.activityMappingName {
+    font-weight: 600;
+    color: #ffffff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.activityChange {
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.activityChange.created {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.activityChange.updated {
+    background: rgba(255, 152, 0, 0.2);
+    color: #FF9800;
+    border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.activityChange.deleted {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.activityUser {
+    font-size: 0.9rem;
+    color: #a5a9b5;
+}
+
+.activityTime {
+    font-size: 0.85rem;
+    color: #a5a9b5;
+}
+
+.activityChanges {
+    font-size: 0.85rem;
+    color: #ffffff;
+}
+
+.changeItem {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 2px 8px;
+    background: rgba(29, 114, 243, 0.15);
+    border-radius: 4px;
+    color: #1d72f3;
+}
+
+.noActivity {
+    text-align: center;
+    padding: 40px;
+    color: #a5a9b5;
+    font-size: 1rem;
+}

@@ -1,0 +1,363 @@
+/* Analytics Dashboard Modal Styles - Dark Theme */
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(8px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal {
+    background: linear-gradient(135deg, #1a1d29 0%, #252936 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    width: 95%;
+    max-width: 1400px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.closeButton {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 32px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    color: #ffffff;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.closeButton:hover {
+    background: #ff4444;
+    color: white;
+    transform: rotate(90deg);
+    box-shadow: 0 4px 12px rgba(255, 68, 68, 0.5);
+}
+
+.modalHeader {
+    padding: 30px 30px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modalHeader h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+.orgBadge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    backdrop-filter: blur(10px);
+}
+
+.orgIcon {
+    font-size: 18px;
+}
+
+.tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px;
+    border-radius: 0;
+}
+
+.tab {
+    flex: 1;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    color: #a5a9b5;
+    transition: all 0.3s ease;
+    position: relative;
+    border-radius: 12px;
+}
+
+.tab:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.tab.active {
+    background: rgba(29, 114, 243, 0.2);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    box-shadow: 0 4px 20px rgba(29, 114, 243, 0.3);
+    border: 1px solid rgba(29, 114, 243, 0.3);
+    font-weight: 600;
+}
+
+.tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 0;
+}
+
+.periodSelector {
+    padding: 16px 30px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.periodSelector label {
+    font-weight: 500;
+    color: #ffffff;
+    font-size: 14px;
+}
+
+.periodSelect {
+    padding: 8px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.periodSelect option {
+    background: #1a1d29;
+    color: #ffffff;
+}
+
+.periodSelect:hover {
+    border-color: #1d72f3;
+    background: rgba(29, 114, 243, 0.1);
+}
+
+.periodSelect:focus {
+    border-color: #1d72f3;
+    box-shadow: 0 0 0 3px rgba(29, 114, 243, 0.2);
+}
+
+.content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 30px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.loadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    gap: 20px;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loadingContainer p {
+    color: #a5a9b5;
+    font-size: 16px;
+    margin: 0;
+}
+
+.errorContainer {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.errorContainer h3 {
+    color: #ff6b6b;
+    font-size: 24px;
+    margin-bottom: 12px;
+}
+
+.errorContainer p {
+    color: #a5a9b5;
+    margin-bottom: 24px;
+}
+
+.retryButton {
+    padding: 12px 32px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.retryButton:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.retryButton:active {
+    transform: translateY(0);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .modal {
+        width: 100%;
+        max-width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+
+    .modalHeader {
+        padding: 20px 20px 15px;
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .modalHeader h1 {
+        font-size: 22px;
+    }
+
+    .tabs {
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tab {
+        padding: 12px 16px;
+        font-size: 13px;
+        white-space: nowrap;
+        flex: none;
+        min-width: fit-content;
+    }
+
+    .periodSelector {
+        padding: 12px 20px;
+        flex-wrap: wrap;
+    }
+
+    .content {
+        padding: 20px;
+    }
+
+    .closeButton {
+        top: 15px;
+        right: 15px;
+        width: 36px;
+        height: 36px;
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 480px) {
+    .modalHeader h1 {
+        font-size: 20px;
+    }
+
+    .orgBadge {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .tab {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    .content {
+        padding: 15px;
+    }
+}
