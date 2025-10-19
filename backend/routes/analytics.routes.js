@@ -554,6 +554,30 @@ async function getTransformationLogs(pool, userId, queryParams = {}) {
             dateCondition = `AND we.created_at >= NOW() - INTERVAL '30 days'`;
         }
 
+        // Additional filters
+        let additionalFilters = '';
+
+        // Status filter
+        if (queryParams.status) {
+            additionalFilters += ` AND we.status = $${paramIndex}`;
+            params.push(queryParams.status);
+            paramIndex++;
+        }
+
+        // Annotation ID filter
+        if (queryParams.annotationId) {
+            additionalFilters += ` AND we.rossum_annotation_id::text LIKE $${paramIndex}`;
+            params.push(`%${queryParams.annotationId}%`);
+            paramIndex++;
+        }
+
+        // Mapping name filter
+        if (queryParams.mappingName) {
+            additionalFilters += ` AND tm.mapping_name ILIKE $${paramIndex}`;
+            params.push(`%${queryParams.mappingName}%`);
+            paramIndex++;
+        }
+
         const userCondition = organizationId 
             ? 'u.organization_id = $1'
             : 'we.user_id = $1';
@@ -582,6 +606,7 @@ async function getTransformationLogs(pool, userId, queryParams = {}) {
             LEFT JOIN transformation_mappings tm ON mul.mapping_id = tm.id
             WHERE ${userCondition}
               ${dateCondition}
+              ${additionalFilters}
             ORDER BY we.created_at DESC
             LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
         `;
@@ -589,18 +614,42 @@ async function getTransformationLogs(pool, userId, queryParams = {}) {
         params.push(limit, offset);
         const logsResult = await client.query(logsQuery, params);
 
-        // Get total count
+        // Get total count with same filters
         const countQuery = `
             SELECT COUNT(*) as total
             FROM webhook_events we
             LEFT JOIN users u ON we.user_id = u.id
+            LEFT JOIN mapping_usage_log mul ON we.id = mul.webhook_event_id
+            LEFT JOIN transformation_mappings tm ON mul.mapping_id = tm.id
             WHERE ${userCondition}
               ${dateCondition}
+              ${additionalFilters}
         `;
+        
+        // Build count params with same filters
         const countParams = [organizationId || userId];
+        let countParamIndex = 2;
+        
         if (queryParams.startDate && queryParams.endDate) {
             countParams.push(queryParams.startDate, queryParams.endDate);
+            countParamIndex += 2;
         }
+        
+        if (queryParams.status) {
+            countParams.push(queryParams.status);
+            countParamIndex++;
+        }
+        
+        if (queryParams.annotationId) {
+            countParams.push(`%${queryParams.annotationId}%`);
+            countParamIndex++;
+        }
+        
+        if (queryParams.mappingName) {
+            countParams.push(`%${queryParams.mappingName}%`);
+            countParamIndex++;
+        }
+        
         const countResult = await client.query(countQuery, countParams);
         const total = parseInt(countResult.rows[0].total);
 

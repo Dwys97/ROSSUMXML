@@ -18,7 +18,7 @@
 }
 
 .modalContent {
-    background: rgba(26, 26, 46, 0.95);
+    background: linear-gradient(135deg, #1a1d29 0%, #252936 100%);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
@@ -27,7 +27,7 @@
     max-height: 90vh;
     overflow-y: auto;
     position: relative;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
 .closeButton {
@@ -293,13 +293,13 @@
 }
 
 .mappingBadge {
-    background: rgba(99, 102, 241, 0.2);
-    color: #a5b4fc;
+    background: rgba(29, 114, 243, 0.2);
+    color: #60a5fa;
     font-size: 12px;
     font-weight: 600;
     padding: 4px 10px;
     border-radius: 6px;
-    border: 1px solid rgba(99, 102, 241, 0.3);
+    border: 1px solid rgba(29, 114, 243, 0.3);
 }
 
 .autoTransformBadge {
@@ -369,7 +369,7 @@
 }
 
 .select option {
-    background: #1a1a2e;
+    background: #1a1d29;
     color: #ffffff;
 }
 

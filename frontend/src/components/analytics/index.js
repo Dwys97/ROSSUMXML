@@ -5,3 +5,4 @@ export { default as MappingActivityChart } from './MappingActivityChart';
 export { default as CustomReportGenerator } from './CustomReportGenerator';
 export { default as TransformationHistoryTable } from './TransformationHistoryTable';
 export { default as AnalyticsDashboardModal } from './AnalyticsDashboardModal';
+export { default as TransformationDetailsModal } from './TransformationDetailsModal';

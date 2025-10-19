@@ -52,9 +52,10 @@
     justify-content: space-between;
     padding: 20px 24px;
     border-bottom: 1px solid #e5e7eb;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, rgba(29, 114, 243, 0.8) 0%, rgba(29, 114, 243, 0.6) 100%);
     color: white;
     border-radius: 12px 12px 0 0;
+    backdrop-filter: blur(10px);
 }
 
 .headerContent {
@@ -146,7 +147,7 @@
 
 .arrow {
     flex-shrink: 0;
-    color: #667eea;
+    color: #1d72f3;
     margin-top: 20px;
 }
 
@@ -223,7 +224,7 @@
 
 .reasoningText {
     background: #f9fafb;
-    border-left: 3px solid #667eea;
+    border-left: 3px solid #1d72f3;
     padding: 14px 16px;
     border-radius: 6px;
     font-size: 14px;
@@ -285,13 +286,14 @@
 }
 
 .acceptButton {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: rgba(29, 114, 243, 0.9);
     color: white;
+    border: 1px solid rgba(29, 114, 243, 0.3);
 }
 
 .acceptButton:hover:not(:disabled) {
-    background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
-    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    background: #1d72f3;
+    box-shadow: 0 4px 12px rgba(29, 114, 243, 0.4);
 }
 
 .spinner {

@@ -50,8 +50,9 @@
     justify-content: space-between;
     padding: 20px 24px;
     border-bottom: 1px solid #e5e7eb;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, rgba(29, 114, 243, 0.8) 0%, rgba(29, 114, 243, 0.6) 100%);
     color: white;
+    backdrop-filter: blur(10px);
 }
 
 .headerContent {
@@ -140,7 +141,7 @@
 .selectAllWrapper input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: #667eea;
+    accent-color: #1d72f3;
 }
 
 .actionButtons {
@@ -340,7 +341,7 @@
 
 .arrow {
     flex-shrink: 0;
-    color: #667eea;
+    color: #1d72f3;
 }
 
 .arrow svg {
@@ -371,7 +372,7 @@
     background: #f9fafb;
     padding: 10px;
     border-radius: 4px;
-    border-left: 3px solid #667eea;
+    border-left: 3px solid #1d72f3;
 }
 
 /* Individual Actions */
@@ -401,7 +402,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    background: #6366f1;
+    background: #1d72f3;
     color: white;
     border: none;
     padding: 6px 12px;
@@ -413,7 +414,7 @@
 }
 
 .regenerateIndividualButton:hover:not(:disabled) {
-    background: #4f46e5;
+    background: #1557b0;
 }
 
 .regenerateIndividualButton svg {
@@ -493,11 +494,11 @@ button:disabled {
     justify-content: center;
     gap: 12px;
     padding: 24px;
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+    background: linear-gradient(135deg, rgba(29, 114, 243, 0.1) 0%, rgba(29, 114, 243, 0.05) 100%);
     border-radius: 8px;
     margin-top: 16px;
     font-size: 14px;
-    color: #667eea;
+    color: #1d72f3;
     font-weight: 500;
     animation: pulseLoad 2s ease-in-out infinite;
 }
@@ -556,6 +557,6 @@ button:disabled {
 
 /* Remaining Count Indicator */
 .remainingIndicator {
-    color: #667eea;
+    color: #1d72f3;
     font-weight: 600;
 }

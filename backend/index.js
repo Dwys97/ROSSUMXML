@@ -4537,6 +4537,136 @@ exports.handler = async (event) => {
             }
         }
 
+        // GET /api/analytics/transformations/:id - Get transformation details by ID
+        if (path.match(/^\/api\/analytics\/transformations\/[^\/]+$/) && method === 'GET' && !path.endsWith('/download')) {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const pathParts = path.split('/');
+                const transformationId = pathParts[pathParts.length - 1];
+
+                // Get user's organization
+                const orgResult = await pool.query(
+                    'SELECT organization_id FROM users WHERE id = $1',
+                    [user.id]
+                );
+                const organizationId = orgResult.rows[0]?.organization_id;
+
+                const userCondition = organizationId 
+                    ? 'u.organization_id = $2'
+                    : 'we.user_id = $2';
+
+                // Get transformation details from webhook_events (ID passed is webhook_event ID)
+                const result = await pool.query(`
+                    SELECT 
+                        we.id,
+                        we.event_type,
+                        we.source_system,
+                        we.rossum_annotation_id,
+                        we.status,
+                        we.source_xml_size,
+                        we.transformed_xml_size,
+                        we.processing_time_ms,
+                        we.error_message,
+                        we.created_at,
+                        we.source_xml_payload as source_xml_preview,
+                        we.response_payload as transformed_xml_preview,
+                        u.email as user_email,
+                        u.full_name as user_name,
+                        tm.mapping_name,
+                        tm.destination_schema_type,
+                        mul.id as mapping_usage_id,
+                        CASE WHEN we.status = 'success' THEN true ELSE false END as success
+                    FROM webhook_events we
+                    LEFT JOIN users u ON we.user_id = u.id
+                    LEFT JOIN mapping_usage_log mul ON we.id = mul.webhook_event_id
+                    LEFT JOIN transformation_mappings tm ON mul.mapping_id = tm.id
+                    WHERE we.id = $1 AND ${userCondition}
+                `, [transformationId, organizationId || user.id]);
+
+                if (result.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({ error: 'Transformation not found' }));
+                }
+
+                return createResponse(200, JSON.stringify(result.rows[0]));
+            } catch (err) {
+                console.error('Transformation details error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation details',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/analytics/transformations/:id/download - Download transformation XML
+        if (path.match(/^\/api\/analytics\/transformations\/[^\/]+\/download$/) && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const pathParts = path.split('/');
+                const webhookEventId = pathParts[pathParts.length - 2]; // ID is webhook_event ID
+                const queryParams = event.queryStringParameters || {};
+                const type = queryParams.type || 'transformed'; // 'source' or 'transformed'
+
+                // Get user's organization
+                const orgResult = await pool.query(
+                    'SELECT organization_id FROM users WHERE id = $1',
+                    [user.id]
+                );
+                const organizationId = orgResult.rows[0]?.organization_id;
+
+                const userCondition = organizationId 
+                    ? 'u.organization_id = $3'
+                    : 'we.user_id = $3';
+
+                // Get XML from webhook_events table - verify user has access
+                const xmlResult = await pool.query(`
+                    SELECT 
+                        we.source_xml_payload,
+                        we.response_payload,
+                        we.rossum_annotation_id
+                    FROM webhook_events we
+                    LEFT JOIN users u ON we.user_id = u.id
+                    WHERE we.id = $1 AND ${userCondition}
+                `, [webhookEventId, organizationId || user.id, organizationId || user.id]);
+
+                if (xmlResult.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({ error: 'Transformation not found or access denied' }));
+                }
+
+                const xmlData = xmlResult.rows[0];
+                const xml = type === 'source' ? xmlData.source_xml_payload : xmlData.response_payload;
+
+                if (!xml) {
+                    return createResponse(404, JSON.stringify({ error: `${type} XML not available` }));
+                }
+
+                const filename = `${type}_${xmlData.rossum_annotation_id || webhookEventId}.xml`;
+
+                return {
+                    statusCode: 200,
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'Content-Disposition': `attachment; filename="${filename}"`,
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    body: xml
+                };
+            } catch (err) {
+                console.error('Download XML error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to download XML',
+                    details: err.message
+                }));
+            }
+        }
+
         // ============================================================================
         // END OF USER ANALYTICS DASHBOARD ENDPOINTS
         // ============================================================================

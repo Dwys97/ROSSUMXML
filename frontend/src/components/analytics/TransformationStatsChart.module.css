@@ -250,6 +250,87 @@
     margin: 0 0 20px 0;
 }
 
+/* Filters Bar */
+.filtersBar {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.filterGroup {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filterGroup label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #a5a9b5;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.filterSelect,
+.filterInput {
+    padding: 10px 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    transition: all 0.3s ease;
+}
+
+.filterSelect option {
+    background: #1a1d29;
+    color: #ffffff;
+}
+
+.filterInput::placeholder {
+    color: #a5a9b5;
+}
+
+.filterSelect:hover,
+.filterInput:hover {
+    border-color: #1d72f3;
+    background: rgba(29, 114, 243, 0.1);
+}
+
+.filterSelect:focus,
+.filterInput:focus {
+    outline: none;
+    border-color: #1d72f3;
+    box-shadow: 0 0 0 3px rgba(29, 114, 243, 0.2);
+}
+
+.clearFiltersButton {
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.clearFiltersButton:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
 .logsLoading {
     text-align: center;
     padding: 40px;
@@ -287,15 +368,19 @@
 .tableRow {
     display: grid;
     grid-template-columns: 140px 180px 180px 140px 140px 100px 120px;
-    gap: 12px;
-    padding: 12px;
+    gap: 15px;
+    padding: 15px;
     background: rgba(255, 255, 255, 0.02);
-    transition: all 0.2s ease;
     align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
 
 .tableRow:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(29, 114, 243, 0.15);
+    transform: translateX(2px);
+    box-shadow: 0 2px 8px rgba(29, 114, 243, 0.2);
 }
 
 .failedRow {

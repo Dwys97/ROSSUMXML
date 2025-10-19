@@ -1,5 +1,6 @@
 // frontend/src/components/analytics/TransformationStatsChart.jsx
 import React, { useState, useEffect } from 'react';
+import TransformationDetailsModal from './TransformationDetailsModal';
 import styles from './TransformationStatsChart.module.css';
 
 // eslint-disable-next-line no-unused-vars
@@ -8,17 +9,36 @@ function TransformationStatsChart({ stats, period, onRefresh }) {
     const [logsLoading, setLogsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [selectedTransformation, setSelectedTransformation] = useState(null);
+    
+    // Filters
+    const [filters, setFilters] = useState({
+        status: '',
+        annotationId: '',
+        mappingName: ''
+    });
 
     useEffect(() => {
         loadTransformationLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage]);
+    }, [currentPage, filters]);
 
     const loadTransformationLogs = async () => {
         setLogsLoading(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const response = await fetch(`/api/analytics/transformations/logs?page=${currentPage}&limit=20`, {
+            
+            // Build query parameters with filters
+            const queryParams = new URLSearchParams({
+                page: currentPage.toString(),
+                limit: '20'
+            });
+            
+            if (filters.status) queryParams.append('status', filters.status);
+            if (filters.annotationId) queryParams.append('annotationId', filters.annotationId);
+            if (filters.mappingName) queryParams.append('mappingName', filters.mappingName);
+            
+            const response = await fetch(`/api/analytics/transformations/logs?${queryParams}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -35,6 +55,71 @@ function TransformationStatsChart({ stats, period, onRefresh }) {
         } finally {
             setLogsLoading(false);
         }
+    };
+
+    // Fetch transformation details
+    const fetchTransformationDetails = async (id) => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const response = await fetch(`/api/analytics/transformations/${id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch transformation details');
+            }
+
+            const data = await response.json();
+            setSelectedTransformation(data);
+        } catch (err) {
+            console.error('Error fetching transformation details:', err);
+            alert('Failed to load transformation details: ' + err.message);
+        }
+    };
+
+    // Download XML file
+    const downloadXML = async (id, type) => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const response = await fetch(`/api/analytics/transformations/${id}/download?type=${type}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to download XML');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || `${type}.xml`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Error downloading XML:', err);
+            alert('Failed to download XML: ' + err.message);
+        }
+    };
+
+    const handleRowClick = (log) => {
+        fetchTransformationDetails(log.id);
+    };
+
+    const handleCloseModal = () => {
+        setSelectedTransformation(null);
+    };
+
+    const handleFilterChange = (filterName, value) => {
+        setFilters(prev => ({ ...prev, [filterName]: value }));
+        setCurrentPage(1); // Reset to first page when filters change
     };
 
     if (!stats || !stats.stats) {
@@ -160,6 +245,55 @@ function TransformationStatsChart({ stats, period, onRefresh }) {
             {/* Transformation Logs Section */}
             <div className={styles.logsSection}>
                 <h3>📋 Recent Transformation Logs</h3>
+                
+                {/* Filters */}
+                <div className={styles.filtersBar}>
+                    <div className={styles.filterGroup}>
+                        <label>Status</label>
+                        <select 
+                            value={filters.status} 
+                            onChange={(e) => handleFilterChange('status', e.target.value)}
+                            className={styles.filterSelect}
+                        >
+                            <option value="">All</option>
+                            <option value="success">Success Only</option>
+                            <option value="failed">Failed Only</option>
+                        </select>
+                    </div>
+                    
+                    <div className={styles.filterGroup}>
+                        <label>Annotation ID</label>
+                        <input
+                            type="text"
+                            value={filters.annotationId}
+                            onChange={(e) => handleFilterChange('annotationId', e.target.value)}
+                            placeholder="Filter by annotation ID"
+                            className={styles.filterInput}
+                        />
+                    </div>
+                    
+                    <div className={styles.filterGroup}>
+                        <label>Mapping Name</label>
+                        <input
+                            type="text"
+                            value={filters.mappingName}
+                            onChange={(e) => handleFilterChange('mappingName', e.target.value)}
+                            placeholder="Filter by mapping"
+                            className={styles.filterInput}
+                        />
+                    </div>
+                    
+                    <button 
+                        onClick={() => {
+                            setFilters({ status: '', annotationId: '', mappingName: '' });
+                            setCurrentPage(1);
+                        }}
+                        className={styles.clearFiltersButton}
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+                
                 {logsLoading ? (
                     <div className={styles.logsLoading}>Loading logs...</div>
                 ) : (
@@ -179,7 +313,12 @@ function TransformationStatsChart({ stats, period, onRefresh }) {
                                     <div className={styles.noLogs}>No transformation logs found</div>
                                 ) : (
                                     logs.map((log) => (
-                                        <div key={log.id} className={`${styles.tableRow} ${log.status === 'failed' ? styles.failedRow : ''}`}>
+                                        <div 
+                                            key={log.id} 
+                                            className={`${styles.tableRow} ${log.status === 'failed' ? styles.failedRow : ''}`}
+                                            onClick={() => handleRowClick(log)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
                                             <div className={styles.colTime}>
                                                 {formatDate(log.created_at)}
                                             </div>
@@ -248,6 +387,15 @@ function TransformationStatsChart({ stats, period, onRefresh }) {
                     </>
                 )}
             </div>
+
+            {/* Details Modal */}
+            {selectedTransformation && (
+                <TransformationDetailsModal
+                    transformation={selectedTransformation}
+                    onClose={handleCloseModal}
+                    onDownload={downloadXML}
+                />
+            )}
         </div>
     );
 }
