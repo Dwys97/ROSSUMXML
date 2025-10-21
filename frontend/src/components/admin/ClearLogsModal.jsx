@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import BaseModal from '../common/BaseModal';
 import styles from './ClearLogsModal.module.css';
 
 function ClearLogsModal({ isOpen, onClose, onConfirm }) {
@@ -129,18 +130,42 @@ function ClearLogsModal({ isOpen, onClose, onConfirm }) {
         }
     };
 
-    const modalContent = (
-        <div className={styles.modalOverlay} onClick={handleClose}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                {step === 1 ? (
-                    <>
-                        <div className={styles.modalHeader}>
-                            <h2>Clear Audit Logs</h2>
-                            <button className={styles.closeButton} onClick={handleClose}>✕</button>
-                        </div>
+    const footerButtons = step === 1 ? (
+        <>
+            <button className={styles.cancelButton} onClick={handleClose}>
+                Cancel
+            </button>
+            <button className={styles.nextButton} onClick={handleNext}>
+                Next →
+            </button>
+        </>
+    ) : (
+        <>
+            <button className={styles.backButton} onClick={handleBack} disabled={clearing}>
+                ← Back
+            </button>
+            <button 
+                className={styles.confirmButton} 
+                onClick={handleConfirm}
+                disabled={clearing || !password}
+            >
+                {clearing ? 'Clearing...' : '🗑️ Confirm Deletion'}
+            </button>
+        </>
+    );
 
-                        <div className={styles.modalBody}>
-                            <div className={styles.warningBox}>
+    const modalContent = (
+        <BaseModal
+            isOpen={isOpen}
+            onClose={handleClose}
+            title={step === 1 ? 'Clear Audit Logs' : 'Confirm Log Deletion'}
+            footer={footerButtons}
+            size="medium"
+            closeOnOverlayClick={false}
+        >
+            {step === 1 ? (
+                <>
+                    <div className={styles.warningBox}>
                                 <span className={styles.warningIcon}>⚠️</span>
                                 <p>Select the time range of logs to delete. This action cannot be undone.</p>
                             </div>
@@ -191,25 +216,10 @@ function ClearLogsModal({ isOpen, onClose, onConfirm }) {
                             </div>
 
                             {error && <div className={styles.error}>{error}</div>}
-                        </div>
-
-                        <div className={styles.modalFooter}>
-                            <button className={styles.cancelButton} onClick={handleClose}>
-                                Cancel
-                            </button>
-                            <button className={styles.nextButton} onClick={handleNext}>
-                                Next →
-                            </button>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <div className={styles.modalHeader}>
-                            <h2>Confirm Log Deletion</h2>
-                            <button className={styles.closeButton} onClick={handleClose}>✕</button>
-                        </div>
-
-                        <div className={styles.modalBody}>
+                </>
+            ) : (
+                <>
+                    <div className={styles.modalBody}>
                             <div className={styles.dangerBox}>
                                 <span className={styles.dangerIcon}>🚨</span>
                                 <div>
@@ -245,24 +255,9 @@ function ClearLogsModal({ isOpen, onClose, onConfirm }) {
                             </div>
 
                             {error && <div className={styles.error}>{error}</div>}
-                        </div>
-
-                        <div className={styles.modalFooter}>
-                            <button className={styles.backButton} onClick={handleBack} disabled={clearing}>
-                                ← Back
-                            </button>
-                            <button 
-                                className={styles.confirmButton} 
-                                onClick={handleConfirm}
-                                disabled={clearing || !password}
-                            >
-                                {clearing ? 'Clearing...' : '🗑️ Confirm Deletion'}
-                            </button>
-                        </div>
-                    </>
-                )}
-            </div>
-        </div>
+                </>
+            )}
+        </BaseModal>
     );
 
     return createPortal(modalContent, document.body);

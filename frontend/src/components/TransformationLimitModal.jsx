@@ -1,4 +1,5 @@
 import React from 'react';
+import BaseModal from './common/BaseModal';
 import styles from './TransformationLimitModal.module.css';
 
 /**
@@ -14,22 +15,24 @@ function TransformationLimitModal({
     onClose, 
     onUpgrade 
 }) {
-    if (!show) return null;
 
     const percentage = Math.min(100, (used / limit) * 100);
     const isLimitExceeded = remaining === 0;
 
-    return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-                <div className={styles.header}>
-                    <h2>
-                        {isLimitExceeded ? '🚫 Daily Limit Reached' : '📊 Transformation Usage'}
-                    </h2>
-                    <button className={styles.closeButton} onClick={onClose}>×</button>
-                </div>
+    const footerButtons = (
+        <button className={styles.closeBtn} onClick={onClose}>
+            {isLimitExceeded ? 'Got it' : 'Close'}
+        </button>
+    );
 
-                <div className={styles.content}>
+    return (
+        <BaseModal
+            isOpen={show}
+            onClose={onClose}
+            title={isLimitExceeded ? '🚫 Daily Limit Reached' : '📊 Transformation Usage'}
+            footer={footerButtons}
+            size="small"
+        >
                     <div className={styles.tierBadge}>
                         <span className={styles[`tier-${subscriptionLevel}`]}>
                             {subscriptionLevel.toUpperCase()} PLAN
@@ -86,15 +89,7 @@ function TransformationLimitModal({
                             </button>
                         </div>
                     )}
-                </div>
-
-                <div className={styles.footer}>
-                    <button className={styles.closeBtn} onClick={onClose}>
-                        {isLimitExceeded ? 'Got it' : 'Close'}
-                    </button>
-                </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 }
 

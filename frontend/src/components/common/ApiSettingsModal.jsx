@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { tokenStorage } from '../../utils/tokenStorage';
 import { useDataPreload } from '../../contexts/DataPreloadContext';
+import BaseModal from './BaseModal';
 import styles from './ApiSettingsModal.module.css';
 
 const ApiSettingsModal = ({ isOpen, onClose }) => {
@@ -453,24 +454,15 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         return new Date(dateString).toLocaleDateString();
     };
 
-    // Don't render if modal is not open
-    if (!isOpen) return null;
-
     return (
-        <div className={styles.modalOverlay} onClick={onClose}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                <button className={styles.closeButton} onClick={onClose} aria-label="Close">
-                    ✕
-                </button>
-                
-                <div className={styles.apiSettingsContainer}>
-                    <div className={styles.pageHeader}>
-                        <h1 className={styles.pageTitle}>API Settings</h1>
-                        <p className={styles.pageSubtitle}>
-                            Manage your API keys, webhooks, and output delivery preferences
-                        </p>
-                    </div>
-
+        <BaseModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="API Settings"
+            subtitle="Manage your API keys, webhooks, and output delivery preferences"
+            size="xl"
+            contentClassName={styles.modalContent}
+        >
             {message && (
                 <div className={message.type === 'success' ? styles.successMessage : styles.errorMessage}>
                     {message.type === 'success' ? '✓' : '⚠'} {message.text}
@@ -1193,9 +1185,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                     </div>
                 </div>
             )}
-                </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 };
 

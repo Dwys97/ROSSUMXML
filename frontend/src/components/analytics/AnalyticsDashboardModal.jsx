@@ -1,6 +1,7 @@
 // frontend/src/components/analytics/AnalyticsDashboardModal.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/useAuth';
+import BaseModal from '../common/BaseModal';
 import DashboardSummary from './DashboardSummary';
 import TransformationStatsChart from './TransformationStatsChart';
 import MappingActivityChart from './MappingActivityChart';
@@ -86,26 +87,22 @@ function AnalyticsDashboardModal({ isOpen, onClose }) {
         }
     };
 
-    if (!isOpen) return null;
-
-    return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modal} onClick={e => e.stopPropagation()}>
-                <button className={styles.closeButton} onClick={onClose} aria-label="Close analytics dashboard">
-                    ×
-                </button>
-
-                <div className={styles.modalHeader}>
-                    <h1>📊 Analytics Dashboard</h1>
-                    {summary?.isOrganizationView && (
-                        <div className={styles.orgBadge}>
-                            <span className={styles.orgIcon}>🏢</span>
-                            Organization View
-                        </div>
-                    )}
+    // Custom header with org badge
+    const customHeader = (
+        <div className={styles.modalHeader}>
+            <h1 className={styles.title}>📊 Analytics Dashboard</h1>
+            {summary?.isOrganizationView && (
+                <div className={styles.orgBadge}>
+                    <span className={styles.orgIcon}>🏢</span>
+                    Organization View
                 </div>
+            )}
+        </div>
+    );
 
-                <div className={styles.tabs}>
+    // Tab navigation in header slot
+    const tabNavigation = (
+        <div className={styles.tabs}>
                     <button
                         className={`${styles.tab} ${activeTab === 'transformations' ? styles.active : ''}`}
                         onClick={() => setActiveTab('transformations')}
@@ -125,25 +122,35 @@ function AnalyticsDashboardModal({ isOpen, onClose }) {
                         📄 Reports
                     </button>
                 </div>
+    );
 
-                {/* Period Selector (for stats tabs) */}
-                {(activeTab === 'transformations' || activeTab === 'mappings') && (
-                    <div className={styles.periodSelector}>
-                        <label>Time Period:</label>
-                        <select 
-                            value={period} 
-                            onChange={(e) => setPeriod(e.target.value)}
-                            className={styles.periodSelect}
-                        >
-                            <option value="daily">Daily (Last 30 days)</option>
-                            <option value="weekly">Weekly (Last 12 weeks)</option>
-                            <option value="monthly">Monthly (Last 12 months)</option>
-                            <option value="yearly">Yearly (Last 5 years)</option>
-                        </select>
-                    </div>
-                )}
+    return (
+        <BaseModal
+            isOpen={isOpen}
+            onClose={onClose}
+            header={customHeader}
+            headerSlot={tabNavigation}
+            size="xl"
+            contentClassName={styles.modalContent}
+        >
+            {/* Period Selector (for stats tabs) */}
+            {(activeTab === 'transformations' || activeTab === 'mappings') && (
+                <div className={styles.periodSelector}>
+                    <label>Time Period:</label>
+                    <select 
+                        value={period} 
+                        onChange={(e) => setPeriod(e.target.value)}
+                        className={styles.periodSelect}
+                    >
+                        <option value="daily">Daily (Last 30 days)</option>
+                        <option value="weekly">Weekly (Last 12 weeks)</option>
+                        <option value="monthly">Monthly (Last 12 months)</option>
+                        <option value="yearly">Yearly (Last 5 years)</option>
+                    </select>
+                </div>
+            )}
 
-                <div className={styles.content}>
+            <div className={styles.content}>
                     {loading && !summary ? (
                         <div className={styles.loadingContainer}>
                             <div className={styles.spinner}></div>
@@ -185,9 +192,8 @@ function AnalyticsDashboardModal({ isOpen, onClose }) {
                             )}
                         </>
                     )}
-                </div>
             </div>
-        </div>
+        </BaseModal>
     );
 }
 

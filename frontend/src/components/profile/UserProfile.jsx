@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import { useDataPreload } from '../../contexts/DataPreloadContext';
 import { tokenStorage } from '../../utils/tokenStorage';
+import BaseModal from '../common/BaseModal';
 import styles from './UserProfile.module.css';
 
 const COUNTRIES = [
@@ -522,15 +523,9 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         }
     };
 
-    if (!isOpen) return null;
-
-    return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modal} onClick={e => e.stopPropagation()}>
-                <button className={styles.closeButton} onClick={onClose}>&times;</button>
-                
-                <div className={styles.content}>
-                    <div className={styles.tabs}>
+    // Tab navigation
+    const tabNavigation = (
+        <div className={styles.tabs}>
                         <button 
                             className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
                             onClick={() => { setActiveTab('profile'); clearMessages(); }}
@@ -562,13 +557,23 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                             </button>
                         )}
                     </div>
+    );
 
-                    <div className={styles.messageContainer}>
-                        {error && <div className={styles.error}>{error}</div>}
-                        {success && <div className={styles.success}>{success}</div>}
-                    </div>
+    return (
+        <BaseModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="User Profile"
+            headerSlot={tabNavigation}
+            size="large"
+            contentClassName={styles.modalContent}
+        >
+            <div className={styles.messageContainer}>
+                {error && <div className={styles.error}>{error}</div>}
+                {success && <div className={styles.success}>{success}</div>}
+            </div>
 
-                    {activeTab === 'profile' && (
+            {activeTab === 'profile' && (
                         <div className={styles.tabContent}>
                             <div className={styles.sectionHeader}>
                                 <h2>Profile Information</h2>
@@ -940,9 +945,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                             </form>
                         </div>
                     )}
-                </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 }
 

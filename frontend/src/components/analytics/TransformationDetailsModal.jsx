@@ -1,9 +1,9 @@
 // frontend/src/components/analytics/TransformationDetailsModal.jsx
 import React from 'react';
+import BaseModal from '../common/BaseModal';
 import styles from './TransformationDetailsModal.module.css';
 
 function TransformationDetailsModal({ transformation, onClose, onDownload }) {
-    if (!transformation) return null;
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
@@ -31,15 +31,22 @@ function TransformationDetailsModal({ transformation, onClose, onDownload }) {
         return `${(ms / 1000).toFixed(2)}s`;
     };
 
-    return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-                <div className={styles.header}>
-                    <h2>Transformation Details</h2>
-                    <button onClick={onClose} className={styles.closeButton}>×</button>
-                </div>
+    // Footer with download button
+    const footerButtons = onDownload && (
+        <button onClick={onDownload} className={styles.downloadButton}>
+            📥 Download XML
+        </button>
+    );
 
-                <div className={styles.content}>
+    return (
+        <BaseModal
+            isOpen={!!transformation}
+            onClose={onClose}
+            title="Transformation Details"
+            subtitle="View complete transformation information"
+            footer={footerButtons}
+            size="large"
+        >
                     {/* Main Info */}
                     <div className={styles.section}>
                         <h3>Overview</h3>
@@ -177,15 +184,7 @@ function TransformationDetailsModal({ transformation, onClose, onDownload }) {
                             </div>
                         </div>
                     )}
-                </div>
-
-                <div className={styles.footer}>
-                    <button onClick={onClose} className={styles.closeBtn}>
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 }
 
