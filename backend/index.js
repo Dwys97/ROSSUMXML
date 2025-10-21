@@ -2390,29 +2390,32 @@ exports.handler = async (event) => {
                     // ============================================
                     // STEP 8.5: LOG MAPPING USAGE
                     // ============================================
+                    console.log('[Rossum Webhook] Checking mapping_id:', config.mapping_id);
                     if (config.mapping_id) {
+                        console.log('[Rossum Webhook] Logging mapping usage for:', config.mapping_name);
                         try {
                             await client.query(
                                 `INSERT INTO mapping_usage_log (
                                     user_id, mapping_id, webhook_event_id, 
-                                    source_system, destination_system, 
-                                    transformation_successful, processing_time_ms
-                                ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                                    source_system, success, processing_time_ms
+                                ) VALUES ($1, $2, $3, $4, $5, $6)`,
                                 [
                                     config.user_id,
                                     config.mapping_id,
                                     webhookEventId,
                                     'rossum',
-                                    config.destination_schema_type || 'unknown',
                                     true,
                                     Date.now() - startTime
                                 ]
                             );
-                            console.log(`[Rossum Webhook] Logged mapping usage: ${config.mapping_name}`);
+                            console.log(`[Rossum Webhook] Successfully logged mapping usage: ${config.mapping_name}`);
                         } catch (mappingLogError) {
-                            console.error('[Rossum Webhook] Error logging mapping usage:', mappingLogError);
+                            console.error('[Rossum Webhook] Error logging mapping usage:', mappingLogError.message);
+                            console.error('[Rossum Webhook] Full error:', mappingLogError);
                             // Don't fail the transformation if logging fails
                         }
+                    } else {
+                        console.log('[Rossum Webhook] No mapping_id found - skipping mapping usage log');
                     }
                     
                     // ============================================
@@ -2662,15 +2665,13 @@ exports.handler = async (event) => {
                             await client.query(
                                 `INSERT INTO mapping_usage_log (
                                     user_id, mapping_id, webhook_event_id,
-                                    source_system, destination_system,
-                                    transformation_successful, processing_time_ms
-                                ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                                    source_system, success, processing_time_ms
+                                ) VALUES ($1, $2, $3, $4, $5, $6)`,
                                 [
                                     apiKeyData.user_id,
                                     apiKeyData.mapping_id,
                                     webhookEventId,
                                     apiKeyData.source_schema_type || 'unknown',
-                                    apiKeyData.destination_schema_type || 'unknown',
                                     true,
                                     processingTime
                                 ]
