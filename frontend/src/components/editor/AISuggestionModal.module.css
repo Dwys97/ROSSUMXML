@@ -1,73 +1,13 @@
 /* frontend/src/components/editor/AISuggestionModal.module.css */
+/* NOW USING BaseModal - Only content-specific styles remain */
 
-.overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-.modal {
-    background: white;
-    border-radius: 12px;
-    max-width: 600px;
-    width: 90%;
-    max-height: 85vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-    from {
-        transform: translateY(20px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-/* Header */
+/* Custom Header with AI Icon */
 .header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 20px 24px;
-    border-bottom: 1px solid #e5e7eb;
-    background: linear-gradient(135deg, rgba(29, 114, 243, 0.8) 0%, rgba(29, 114, 243, 0.6) 100%);
-    color: white;
-    border-radius: 12px 12px 0 0;
-    backdrop-filter: blur(10px);
-}
-
-.headerContent {
-    display: flex;
-    align-items: center;
     gap: 12px;
-}
-
-.headerContent h2 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 600;
+    width: 100%;
+    padding: 30px 30px 20px;
 }
 
 .aiIcon {
@@ -76,26 +16,16 @@
     stroke-width: 2;
 }
 
-.closeButton {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    border-radius: 6px;
-    padding: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
+.title {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: #ffffff;
 }
 
-.closeButton:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.closeButton svg {
-    width: 20px;
-    height: 20px;
-    stroke: white;
+/* Modal Content Container */
+.modalContent {
+    padding: 0 !important;
 }
 
 /* Mapping Display */
@@ -104,7 +34,8 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    background: #f9fafb;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .mappingItem {
@@ -115,39 +46,39 @@
     display: block;
     font-size: 12px;
     font-weight: 600;
-    color: #6b7280;
+    color: var(--text-muted, #a5a9b5);
     margin-bottom: 8px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .elementPath {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
     padding: 12px;
     font-family: 'Courier New', monospace;
     font-size: 13px;
-    color: #1f2937;
+    color: var(--text, #ffffff);
     word-break: break-all;
     line-height: 1.5;
 }
 
 .elementName {
     font-weight: 600;
-    color: #1f2937;
+    color: var(--accent-blue, #1d72f3);
     margin-bottom: 4px;
 }
 
 .elementPathText {
     font-size: 11px;
-    color: #6b7280;
+    color: var(--text-muted, #a5a9b5);
     font-style: italic;
 }
 
 .arrow {
     flex-shrink: 0;
-    color: #1d72f3;
+    color: var(--accent-blue, #1d72f3);
     margin-top: 20px;
 }
 
@@ -160,20 +91,20 @@
 /* Confidence Section */
 .confidenceSection {
     padding: 20px 24px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .confidenceSection label {
     display: block;
     font-size: 13px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text, #ffffff);
     margin-bottom: 10px;
 }
 
 .confidenceBar {
     height: 32px;
-    background: #e5e7eb;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 16px;
     overflow: hidden;
     position: relative;
@@ -211,31 +142,29 @@
 /* Reasoning Section */
 .reasoningSection {
     padding: 20px 24px;
-    border-bottom: 1px solid #e5e7eb;
 }
 
 .reasoningSection label {
     display: block;
     font-size: 13px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text, #ffffff);
     margin-bottom: 10px;
 }
 
 .reasoningText {
-    background: #f9fafb;
-    border-left: 3px solid #1d72f3;
+    background: rgba(29, 114, 243, 0.1);
+    border-left: 3px solid var(--accent-blue, #1d72f3);
     padding: 14px 16px;
     border-radius: 6px;
     font-size: 14px;
     line-height: 1.6;
-    color: #4b5563;
+    color: var(--text-muted, #a5a9b5);
     font-style: italic;
 }
 
-/* Actions */
+/* Actions (Footer Buttons) */
 .actions {
-    padding: 20px 24px;
     display: flex;
     gap: 12px;
     justify-content: flex-end;
@@ -244,7 +173,7 @@
 .actions button {
     padding: 10px 20px;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -266,13 +195,14 @@
 }
 
 .rejectButton {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted, #a5a9b5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .rejectButton:hover:not(:disabled) {
-    background: #e5e7eb;
-    color: #4b5563;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text, #ffffff);
 }
 
 .regenerateButton {
@@ -282,17 +212,16 @@
 
 .regenerateButton:hover:not(:disabled) {
     background: #d97706;
-    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 }
 
 .acceptButton {
-    background: rgba(29, 114, 243, 0.9);
+    background: var(--accent-blue, #1d72f3);
     color: white;
-    border: 1px solid rgba(29, 114, 243, 0.3);
 }
 
 .acceptButton:hover:not(:disabled) {
-    background: #1d72f3;
+    background: #1557c0;
     box-shadow: 0 4px 12px rgba(29, 114, 243, 0.4);
 }
 

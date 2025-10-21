@@ -1,5 +1,6 @@
 // frontend/src/components/editor/AIBatchSuggestionModal.jsx
 import React, { useState, useEffect } from 'react';
+import BaseModal from '../common/BaseModal';
 import styles from './AIBatchSuggestionModal.module.css';
 
 /**
@@ -163,42 +164,43 @@ export function AIBatchSuggestionModal({
     );
     const averageConfidence = visibleSuggestions.reduce((sum, s) => sum + (s.confidence || 0), 0) / (visibleSuggestions.length || 1);
 
+    // Custom header with AI icon and subtitle
+    const customHeader = (
+        <div className={styles.header}>
+            <svg className={styles.aiIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" strokeWidth="2" />
+                <path d="M2 17l10 5 10-5M2 12l10 5 10-5" strokeWidth="2" />
+            </svg>
+            <div>
+                <h2 className={styles.title}>AI Mapping Suggestions</h2>
+                <p className={styles.subtitle}>
+                    {visibleSuggestions.length} suggestions • Avg confidence: {Math.round(averageConfidence)}%
+                    {remainingCount > 0 && (
+                        <span className={styles.remainingIndicator}>
+                            {' • '}
+                            {remainingCount} unmapped leaf elements
+                        </span>
+                    )}
+                    {isLoadingMore && (
+                        <span className={styles.loadingMoreIndicator}>
+                            {' • '}
+                            <span className={styles.smallSpinner}></span>
+                            {' Loading more...'}
+                        </span>
+                    )}
+                </p>
+            </div>
+        </div>
+    );
+
     return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
-                <div className={styles.header}>
-                    <div className={styles.headerContent}>
-                        <svg className={styles.aiIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z" strokeWidth="2" />
-                            <path d="M2 17l10 5 10-5M2 12l10 5 10-5" strokeWidth="2" />
-                        </svg>
-                        <div>
-                            <h2>AI Mapping Suggestions</h2>
-                            <p className={styles.subtitle}>
-                                {visibleSuggestions.length} suggestions • Avg confidence: {Math.round(averageConfidence)}%
-                                {remainingCount > 0 && (
-                                    <span className={styles.remainingIndicator}>
-                                        {' • '}
-                                        {remainingCount} unmapped leaf elements
-                                    </span>
-                                )}
-                                {isLoadingMore && (
-                                    <span className={styles.loadingMoreIndicator}>
-                                        {' • '}
-                                        <span className={styles.smallSpinner}></span>
-                                        {' Loading more...'}
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                    </div>
-                    <button className={styles.closeButton} onClick={onClose}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M18 6L6 18M6 6l12 12" strokeWidth="2" />
-                        </svg>
-                    </button>
-                </div>
+        <BaseModal
+            isOpen={suggestions && suggestions.length > 0}
+            onClose={onClose}
+            header={customHeader}
+            size="xl"
+            contentClassName={styles.modalContent}
+        >
 
                 {/* Batch Actions */}
                 <div className={styles.batchActions}>
@@ -384,7 +386,6 @@ export function AIBatchSuggestionModal({
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 }

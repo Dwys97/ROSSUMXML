@@ -1,0 +1,409 @@
+/* ==========================================================================
+   BaseModal - Unified Modal Styling System
+   Implements consistent design tokens and structure for all modals
+   ========================================================================== */
+
+/* Design Tokens - Aligned with App.css :root variables */
+:root {
+  /* Overlay */
+  --modal-overlay-bg: rgba(0, 0, 0, 0.85);
+  --modal-overlay-blur: blur(8px);
+  --modal-overlay-z: 10000;
+  
+  /* Container */
+  --modal-bg: linear-gradient(135deg, #1a1d29 0%, #252936 100%);
+  --modal-border: 1px solid rgba(255, 255, 255, 0.1);
+  --modal-radius: 16px;
+  --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --modal-backdrop-blur: blur(20px);
+  --modal-max-width: 1200px;
+  --modal-width: 95%;
+  --modal-max-height: 90vh;
+  
+  /* Header */
+  --modal-header-bg: linear-gradient(135deg, rgba(29, 114, 243, 0.8) 0%, rgba(29, 114, 243, 0.6) 100%);
+  --modal-header-padding: 30px 30px 20px;
+  --modal-title-size: 28px;
+  --modal-title-weight: 600;
+  --modal-subtitle-size: 14px;
+  
+  /* Close Button */
+  --modal-close-size: 42px;
+  --modal-close-bg: rgba(255, 255, 255, 0.1);
+  --modal-close-border: 1px solid rgba(255, 255, 255, 0.2);
+  --modal-close-hover-bg: #ff4444;
+  --modal-close-position: 20px;
+  
+  /* Content */
+  --modal-content-padding: 30px;
+  
+  /* Footer */
+  --modal-footer-padding: 20px 30px;
+  
+  /* Animation */
+  --modal-fade-duration: 0.2s;
+  --modal-slide-duration: 0.3s;
+  --modal-slide-distance: 30px;
+  --modal-easing: ease-out;
+  
+  /* Scrollbar */
+  --modal-scrollbar-width: 8px;
+  --modal-scrollbar-track: rgba(255, 255, 255, 0.05);
+  --modal-scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --modal-scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+}
+
+/* ==========================================================================
+   Overlay - Full Screen Background
+   ========================================================================== */
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--modal-overlay-bg);
+    backdrop-filter: var(--modal-overlay-blur);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: var(--modal-overlay-z);
+    padding: 20px;
+    animation: fadeIn var(--modal-fade-duration) var(--modal-easing);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ==========================================================================
+   Modal Container - Main Content Box
+   ========================================================================== */
+
+.modal {
+    background: var(--modal-bg);
+    backdrop-filter: var(--modal-backdrop-blur);
+    border: var(--modal-border);
+    border-radius: var(--modal-radius);
+    width: var(--modal-width);
+    max-width: var(--modal-max-width);
+    max-height: var(--modal-max-height);
+    overflow: hidden;
+    box-shadow: var(--modal-shadow);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp var(--modal-slide-duration) var(--modal-easing);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(var(--modal-slide-distance));
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Size Variants */
+.modalSmall {
+    max-width: 500px;
+}
+
+.modalMedium {
+    max-width: 900px;
+}
+
+.modalLarge {
+    max-width: 1200px;
+}
+
+.modalXl {
+    max-width: 1400px;
+}
+
+/* ==========================================================================
+   Close Button - Consistent Placement & Behavior
+   ========================================================================== */
+
+.closeButton {
+    position: absolute;
+    top: var(--modal-close-position);
+    right: var(--modal-close-position);
+    background: var(--modal-close-bg);
+    border: var(--modal-close-border);
+    font-size: 32px;
+    width: var(--modal-close-size);
+    height: var(--modal-close-size);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    color: #ffffff;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    padding: 0;
+    line-height: 1;
+}
+
+.closeButton:hover {
+    background: var(--modal-close-hover-bg);
+    color: white;
+    transform: rotate(90deg);
+    box-shadow: 0 4px 12px rgba(255, 68, 68, 0.5);
+}
+
+.closeButton:focus-visible {
+    outline: 2px solid var(--accent-blue, #1d72f3);
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Header - Title & Subtitle Area
+   ========================================================================== */
+
+.header {
+    padding: var(--modal-header-padding);
+    background: var(--modal-header-bg);
+    backdrop-filter: blur(10px);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.headerContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.title {
+    margin: 0;
+    font-size: var(--modal-title-size);
+    font-weight: var(--modal-title-weight);
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.subtitle {
+    margin: 0;
+    font-size: var(--modal-subtitle-size);
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.4;
+}
+
+/* Header Slot - For tabs, badges, etc. */
+.headerSlot {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================================================
+   Content - Scrollable Main Area
+   ========================================================================== */
+
+.content {
+    padding: var(--modal-content-padding);
+    overflow-y: auto;
+    flex: 1;
+    background: transparent;
+}
+
+/* Custom Scrollbar */
+.content::-webkit-scrollbar {
+    width: var(--modal-scrollbar-width);
+}
+
+.content::-webkit-scrollbar-track {
+    background: var(--modal-scrollbar-track);
+}
+
+.content::-webkit-scrollbar-thumb {
+    background: var(--modal-scrollbar-thumb);
+    border-radius: 4px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+    background: var(--modal-scrollbar-thumb-hover);
+}
+
+/* Firefox Scrollbar */
+.content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--modal-scrollbar-thumb) var(--modal-scrollbar-track);
+}
+
+/* ==========================================================================
+   Footer - Optional Action Bar
+   ========================================================================== */
+
+.footer {
+    padding: var(--modal-footer-padding);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    position: sticky;
+    bottom: 0;
+    background: var(--modal-bg);
+    backdrop-filter: blur(10px);
+}
+
+/* ==========================================================================
+   Responsive Design - Mobile Optimizations
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .overlay {
+        padding: 0;
+    }
+
+    .modal {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+
+    .modalSmall,
+    .modalMedium,
+    .modalLarge,
+    .modalXl {
+        max-width: 100%;
+    }
+
+    .header {
+        padding: 20px 20px 15px;
+    }
+
+    .title {
+        font-size: 24px;
+    }
+
+    .content {
+        padding: 20px;
+    }
+
+    .footer {
+        padding: 15px 20px;
+        flex-wrap: wrap;
+    }
+
+    .closeButton {
+        width: 36px;
+        height: 36px;
+        top: 15px;
+        right: 15px;
+        font-size: 28px;
+    }
+}
+
+/* ==========================================================================
+   Accessibility Enhancements
+   ========================================================================== */
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .modal {
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .closeButton {
+        border: 2px solid rgba(255, 255, 255, 0.4);
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .overlay {
+        animation: none;
+    }
+
+    .modal {
+        animation: none;
+    }
+
+    .closeButton {
+        transition: none;
+    }
+
+    .closeButton:hover {
+        transform: none;
+    }
+}
+
+/* Focus Indicators */
+.content *:focus-visible {
+    outline: 2px solid var(--accent-blue, #1d72f3);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ==========================================================================
+   Utility Classes - Optional Modifiers
+   ========================================================================== */
+
+/* No Header Padding - For full-width header content */
+.modal.noHeaderPadding .header {
+    padding: 0;
+}
+
+/* No Content Padding - For edge-to-edge content */
+.modal.noContentPadding .content {
+    padding: 0;
+}
+
+/* Compact Variant - Reduced spacing */
+.modal.compact .header {
+    padding: 20px 20px 15px;
+}
+
+.modal.compact .content {
+    padding: 20px;
+}
+
+.modal.compact .footer {
+    padding: 15px 20px;
+}
+
+/* Light Theme Variant - For specific modals */
+.modal.light {
+    background: white;
+    color: #1f2937;
+}
+
+.modal.light .header {
+    background: linear-gradient(135deg, rgba(29, 114, 243, 0.8) 0%, rgba(29, 114, 243, 0.6) 100%);
+    color: white;
+}
+
+.modal.light .title {
+    color: white;
+}
+
+.modal.light .content {
+    color: #1f2937;
+}
+
+.modal.light .closeButton {
+    background: rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    color: #1f2937;
+}
+
+.modal.light .closeButton:hover {
+    background: #ff4444;
+    color: white;
+}

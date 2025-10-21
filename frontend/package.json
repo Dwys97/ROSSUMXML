@@ -10,16 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.3",
-    "chart.js": "^4.4.0",
-    "react-chartjs-2": "^5.2.0",
     "@tanstack/react-table": "^8.10.0",
-    "papaparse": "^5.4.1",
+    "chart.js": "^4.4.0",
+    "date-fns": "^2.30.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.0",
-    "date-fns": "^2.30.0"
+    "papaparse": "^5.4.1",
+    "prop-types": "^15.8.1",
+    "react": "^19.1.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.9.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
