@@ -2279,14 +2279,15 @@ exports.handler = async (event) => {
                             
                             console.log(`[Rossum Webhook] Delivery to destination: ${deliverySuccess ? 'SUCCESS' : 'FAILED'} (${deliveryStatus})`);
                             
-                            // Update webhook event with delivery results
+                            // Update webhook event with delivery results AND save XML payloads
                             await client.query(
                                 `UPDATE webhook_events 
                                  SET status = $1, event_type = $2, source_xml_size = $3, 
                                      transformed_xml_size = $4, processing_time_ms = $5,
                                      http_status_code = $6, response_payload = $7,
+                                     source_xml_payload = $8,
                                      updated_at = CURRENT_TIMESTAMP 
-                                 WHERE id = $8`,
+                                 WHERE id = $9`,
                                 [
                                     deliverySuccess ? 'success' : 'failed',
                                     deliverySuccess ? 'delivery_success' : 'delivery_failed',
@@ -2294,7 +2295,8 @@ exports.handler = async (event) => {
                                     transformedXml.length,
                                     Date.now() - startTime,
                                     deliveryStatus,
-                                    deliveryText.substring(0, 5000), // Limit response size
+                                    transformedXml, // Save the transformed XML (not delivery response)
+                                    sourceXml, // Save the source XML
                                     webhookEventId
                                 ]
                             );
@@ -2315,8 +2317,9 @@ exports.handler = async (event) => {
                                 `UPDATE webhook_events 
                                  SET status = $1, event_type = $2, error_message = $3,
                                      source_xml_size = $4, transformed_xml_size = $5,
-                                     processing_time_ms = $6, updated_at = CURRENT_TIMESTAMP 
-                                 WHERE id = $7`,
+                                     processing_time_ms = $6, source_xml_payload = $7, 
+                                     response_payload = $8, updated_at = CURRENT_TIMESTAMP 
+                                 WHERE id = $9`,
                                 [
                                     'failed',
                                     'delivery_failed',
@@ -2324,6 +2327,8 @@ exports.handler = async (event) => {
                                     sourceXml.length,
                                     transformedXml.length,
                                     Date.now() - startTime,
+                                    sourceXml,
+                                    transformedXml,
                                     webhookEventId
                                 ]
                             );
@@ -2335,19 +2340,22 @@ exports.handler = async (event) => {
                             }));
                         }
                     } else {
-                        // No destination webhook - just log success
+                        // No destination webhook - just log success and save XML payloads
                         await client.query(
                             `UPDATE webhook_events 
                              SET status = $1, event_type = $2, source_xml_size = $3, 
                                  transformed_xml_size = $4, processing_time_ms = $5,
+                                 source_xml_payload = $6, response_payload = $7,
                                  updated_at = CURRENT_TIMESTAMP 
-                             WHERE id = $6`,
+                             WHERE id = $8`,
                             [
                                 'success',
                                 'transformation_success',
                                 sourceXml.length,
                                 transformedXml.length,
                                 Date.now() - startTime,
+                                sourceXml,
+                                transformedXml,
                                 webhookEventId
                             ]
                         );
