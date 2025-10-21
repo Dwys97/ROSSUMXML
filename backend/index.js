@@ -4854,7 +4854,7 @@ exports.handler = async (event) => {
             }
         }
 
-        // POST /api/analytics/reports/custom - Generate custom report by XML tags
+        // POST /api/analytics/reports/custom - Generate custom report with flexible filtering
         if (path === '/api/analytics/reports/custom' && method === 'POST') {
             try {
                 const user = await verifyJWT(event);
@@ -4862,19 +4862,215 @@ exports.handler = async (event) => {
                     return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
                 }
 
-                const { tags, period, startDate, endDate } = body;
+                const { filters, startDate, endDate } = body;
 
-                const analyticsRoutes = require('./routes/analytics.routes');
-                const result = await analyticsRoutes.getCustomReport(
-                    pool, 
-                    user.id, 
-                    tags || [], 
-                    period || 'monthly', 
-                    startDate, 
-                    endDate
-                );
-                
-                return createResponse(200, JSON.stringify(result));
+                // Build dynamic WHERE clauses from filters
+                const whereConditions = ['we.user_id = $1'];
+                const queryParams = [user.id];
+                let paramIndex = 2;
+
+                // Add date range filters
+                if (startDate) {
+                    whereConditions.push(`we.created_at >= $${paramIndex}`);
+                    queryParams.push(startDate);
+                    paramIndex++;
+                }
+                if (endDate) {
+                    whereConditions.push(`we.created_at <= $${paramIndex}`);
+                    queryParams.push(endDate + ' 23:59:59');
+                    paramIndex++;
+                }
+
+                // Process dynamic filters
+                if (filters && Array.isArray(filters)) {
+                    for (const filter of filters) {
+                        const { field, operator, value } = filter;
+                        if (!field || !operator || value === undefined || value === '') continue;
+
+                        switch (field) {
+                            case 'status':
+                                if (operator === 'equals') {
+                                    whereConditions.push(`we.status = $${paramIndex}`);
+                                    queryParams.push(value);
+                                    paramIndex++;
+                                } else if (operator === 'not_equals') {
+                                    whereConditions.push(`we.status != $${paramIndex}`);
+                                    queryParams.push(value);
+                                    paramIndex++;
+                                }
+                                break;
+
+                            case 'annotation_id':
+                                if (operator === 'equals') {
+                                    whereConditions.push(`we.rossum_annotation_id = $${paramIndex}`);
+                                    queryParams.push(value);
+                                    paramIndex++;
+                                } else if (operator === 'contains') {
+                                    whereConditions.push(`we.rossum_annotation_id::text ILIKE $${paramIndex}`);
+                                    queryParams.push(`%${value}%`);
+                                    paramIndex++;
+                                }
+                                break;
+
+                            case 'processing_time':
+                                const timeValue = parseInt(value);
+                                if (!isNaN(timeValue)) {
+                                    if (operator === 'greater_than') {
+                                        whereConditions.push(`we.processing_time_ms > $${paramIndex}`);
+                                        queryParams.push(timeValue);
+                                        paramIndex++;
+                                    } else if (operator === 'less_than') {
+                                        whereConditions.push(`we.processing_time_ms < $${paramIndex}`);
+                                        queryParams.push(timeValue);
+                                        paramIndex++;
+                                    } else if (operator === 'equals') {
+                                        whereConditions.push(`we.processing_time_ms = $${paramIndex}`);
+                                        queryParams.push(timeValue);
+                                        paramIndex++;
+                                    }
+                                }
+                                break;
+
+                            case 'xml_size':
+                                const sizeValue = parseInt(value);
+                                if (!isNaN(sizeValue)) {
+                                    if (operator === 'greater_than') {
+                                        whereConditions.push(`we.source_xml_size > $${paramIndex}`);
+                                        queryParams.push(sizeValue);
+                                        paramIndex++;
+                                    } else if (operator === 'less_than') {
+                                        whereConditions.push(`we.source_xml_size < $${paramIndex}`);
+                                        queryParams.push(sizeValue);
+                                        paramIndex++;
+                                    } else if (operator === 'equals') {
+                                        whereConditions.push(`we.source_xml_size = $${paramIndex}`);
+                                        queryParams.push(sizeValue);
+                                        paramIndex++;
+                                    }
+                                }
+                                break;
+
+                            case 'http_status':
+                                const statusValue = parseInt(value);
+                                if (!isNaN(statusValue)) {
+                                    if (operator === 'equals') {
+                                        whereConditions.push(`we.http_status_code = $${paramIndex}`);
+                                        queryParams.push(statusValue);
+                                        paramIndex++;
+                                    } else if (operator === 'not_equals') {
+                                        whereConditions.push(`we.http_status_code != $${paramIndex}`);
+                                        queryParams.push(statusValue);
+                                        paramIndex++;
+                                    } else if (operator === 'greater_than') {
+                                        whereConditions.push(`we.http_status_code > $${paramIndex}`);
+                                        queryParams.push(statusValue);
+                                        paramIndex++;
+                                    }
+                                }
+                                break;
+
+                            case 'line_count':
+                                // Count number of <Item> tags in line_items_section
+                                const lineCountValue = parseInt(value);
+                                if (!isNaN(lineCountValue)) {
+                                    const itemCountCalc = `(LENGTH(we.source_xml_payload) - LENGTH(REPLACE(we.source_xml_payload, '<Item>', ''))) / LENGTH('<Item>')`;
+                                    if (operator === 'equals') {
+                                        whereConditions.push(`${itemCountCalc} = $${paramIndex}`);
+                                        queryParams.push(lineCountValue);
+                                        paramIndex++;
+                                    } else if (operator === 'greater_than') {
+                                        whereConditions.push(`${itemCountCalc} > $${paramIndex}`);
+                                        queryParams.push(lineCountValue);
+                                        paramIndex++;
+                                    } else if (operator === 'less_than') {
+                                        whereConditions.push(`${itemCountCalc} < $${paramIndex}`);
+                                        queryParams.push(lineCountValue);
+                                        paramIndex++;
+                                    }
+                                }
+                                break;
+
+                            case 'mapping_name':
+                                if (operator === 'equals') {
+                                    whereConditions.push(`tm.mapping_name = $${paramIndex}`);
+                                    queryParams.push(value);
+                                    paramIndex++;
+                                } else if (operator === 'contains') {
+                                    whereConditions.push(`tm.mapping_name ILIKE $${paramIndex}`);
+                                    queryParams.push(`%${value}%`);
+                                    paramIndex++;
+                                }
+                                break;
+
+                            // XML content filters - search anywhere in XML payload
+                            case 'consignee':
+                            case 'consignor':
+                            case 'invoice_number':
+                                // For Rossum XML, map common terms to actual tag names
+                                const tagMappings = {
+                                    'consignee': ['recipient_name', 'recipient_address'],
+                                    'consignor': ['sender_name', 'sender_address'],
+                                    'invoice_number': ['document_id', 'order_id']
+                                };
+                                
+                                const possibleTags = tagMappings[field] || [field];
+                                const tagConditions = [];
+                                
+                                if (operator === 'contains') {
+                                    // Search across all possible tag names
+                                    for (const tag of possibleTags) {
+                                        tagConditions.push(`we.source_xml_payload ILIKE $${paramIndex}`);
+                                        queryParams.push(`%<${tag}>%${value}%</${tag}>%`);
+                                        paramIndex++;
+                                    }
+                                    whereConditions.push(`(${tagConditions.join(' OR ')})`);
+                                } else if (operator === 'equals') {
+                                    // Search across all possible tag names
+                                    for (const tag of possibleTags) {
+                                        tagConditions.push(`we.source_xml_payload ILIKE $${paramIndex}`);
+                                        queryParams.push(`%<${tag}>${value}</${tag}>%`);
+                                        paramIndex++;
+                                    }
+                                    whereConditions.push(`(${tagConditions.join(' OR ')})`);
+                                }
+                                break;
+                        }
+                    }
+                }
+
+                const whereClause = whereConditions.join(' AND ');
+
+                // Execute query with dynamic filters
+                const query = `
+                    SELECT 
+                        we.id,
+                        we.rossum_annotation_id as annotation_id,
+                        we.status,
+                        we.created_at,
+                        we.processing_time_ms,
+                        we.source_xml_size,
+                        we.http_status_code,
+                        we.rossum_queue_id,
+                        u.email as user_email,
+                        u.full_name as user_name,
+                        tm.mapping_name
+                    FROM webhook_events we
+                    LEFT JOIN users u ON we.user_id = u.id
+                    LEFT JOIN mapping_usage_log mul ON we.id = mul.webhook_event_id
+                    LEFT JOIN transformation_mappings tm ON mul.mapping_id = tm.id
+                    WHERE ${whereClause}
+                    ORDER BY we.created_at DESC
+                    LIMIT 1000
+                `;
+
+                const result = await pool.query(query, queryParams);
+
+                return createResponse(200, JSON.stringify({
+                    success: true,
+                    total: result.rows.length,
+                    transformations: result.rows
+                }));
+
             } catch (err) {
                 console.error('Custom report error:', err);
                 return createResponse(500, JSON.stringify({

@@ -3,13 +3,49 @@ import React, { useState } from 'react';
 import styles from './CustomReportGenerator.module.css';
 
 function CustomReportGenerator() {
-    const [tags, setTags] = useState('');
-    const [period, setPeriod] = useState('monthly');
+    const [filters, setFilters] = useState([
+        { field: 'status', operator: 'equals', value: '' }
+    ]);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [report, setReport] = useState(null);
+    const [reportData, setReportData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    const filterFields = [
+        { value: 'status', label: 'Status' },
+        { value: 'consignee', label: 'Consignee (XML Tag)' },
+        { value: 'consignor', label: 'Consignor (XML Tag)' },
+        { value: 'invoice_number', label: 'Invoice Number (XML Tag)' },
+        { value: 'line_count', label: 'Number of Lines' },
+        { value: 'xml_size', label: 'XML Size (bytes)' },
+        { value: 'processing_time', label: 'Processing Time (ms)' },
+        { value: 'user_email', label: 'User Email' },
+        { value: 'api_key_name', label: 'API Key Name' },
+        { value: 'mapping_name', label: 'Mapping Name' }
+    ];
+
+    const operators = {
+        'equals': 'Equals',
+        'contains': 'Contains',
+        'greater_than': 'Greater Than',
+        'less_than': 'Less Than',
+        'not_equals': 'Not Equals'
+    };
+
+    const addFilter = () => {
+        setFilters([...filters, { field: 'status', operator: 'equals', value: '' }]);
+    };
+
+    const removeFilter = (index) => {
+        setFilters(filters.filter((_, i) => i !== index));
+    };
+
+    const updateFilter = (index, key, value) => {
+        const newFilters = [...filters];
+        newFilters[index][key] = value;
+        setFilters(newFilters);
+    };
 
     const handleGenerateReport = async () => {
         setLoading(true);
@@ -17,8 +53,7 @@ function CustomReportGenerator() {
 
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const tagArray = tags.split(',').map(t => t.trim()).filter(t => t);
-
+            
             const response = await fetch('/api/analytics/reports/custom', {
                 method: 'POST',
                 headers: {
@@ -26,8 +61,7 @@ function CustomReportGenerator() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    tags: tagArray,
-                    period,
+                    filters: filters.filter(f => f.value !== ''),
                     startDate: startDate || null,
                     endDate: endDate || null
                 })
@@ -38,7 +72,7 @@ function CustomReportGenerator() {
             }
 
             const data = await response.json();
-            setReport(data);
+            setReportData(data);
 
         } catch (err) {
             console.error('[Custom Report] Error:', err);
@@ -48,69 +82,177 @@ function CustomReportGenerator() {
         }
     };
 
+    const handleExportExcel = () => {
+        if (!reportData || !reportData.transformations) return;
+
+        // Create CSV content
+        const headers = [
+            'Date',
+            'Annotation ID',
+            'Status',
+            'User',
+            'API Key',
+            'Mapping',
+            'Processing Time (ms)',
+            'Source Size (KB)',
+            'Transformed Size (KB)',
+            'Consignee',
+            'Consignor',
+            'Invoice Number',
+            'Error Message'
+        ];
+
+        const rows = reportData.transformations.map(t => [
+            new Date(t.created_at).toLocaleString(),
+            t.annotation_id || '',
+            t.status || '',
+            t.user_email || '',
+            t.api_key_name || '',
+            t.mapping_name || '',
+            t.processing_time_ms || '',
+            t.source_xml_size ? (t.source_xml_size / 1024).toFixed(2) : '',
+            t.transformed_xml_size ? (t.transformed_xml_size / 1024).toFixed(2) : '',
+            t.consignee || '',
+            t.consignor || '',
+            t.invoice_number || '',
+            t.error_message || ''
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `transformation_report_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className={styles.container}>
             <h2>📄 Custom Report Generator</h2>
             <p className={styles.subtitle}>
-                Generate custom reports by filtering transformations based on XML tags
+                Create custom Excel reports by filtering transformations with flexible criteria
             </p>
 
             <div className={styles.form}>
-                <div className={styles.formGroup}>
-                    <label>XML Tags (comma-separated)</label>
-                    <input
-                        type="text"
-                        value={tags}
-                        onChange={(e) => setTags(e.target.value)}
-                        placeholder="e.g., invoice, customer, order"
-                        className={styles.input}
-                    />
-                    <small>Enter XML tag names to filter transformations containing these tags</small>
+                {/* Date Range */}
+                <div className={styles.dateRange}>
+                    <h3>Date Range</h3>
+                    <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
+                            <label>Start Date</label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className={styles.input}
+                            />
+                        </div>
+
+                        <div className={styles.formGroup}>
+                            <label>End Date</label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className={styles.input}
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                <div className={styles.formRow}>
-                    <div className={styles.formGroup}>
-                        <label>Period</label>
-                        <select 
-                            value={period}
-                            onChange={(e) => setPeriod(e.target.value)}
-                            className={styles.select}
+                {/* Dynamic Filters */}
+                <div className={styles.filtersSection}>
+                    <div className={styles.filterHeader}>
+                        <h3>Filters</h3>
+                        <button onClick={addFilter} className={styles.addFilterButton}>
+                            ➕ Add Filter
+                        </button>
+                    </div>
+
+                    {filters.map((filter, index) => (
+                        <div key={index} className={styles.filterRow}>
+                            <select
+                                value={filter.field}
+                                onChange={(e) => updateFilter(index, 'field', e.target.value)}
+                                className={styles.select}
+                            >
+                                {filterFields.map(field => (
+                                    <option key={field.value} value={field.value}>
+                                        {field.label}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={filter.operator}
+                                onChange={(e) => updateFilter(index, 'operator', e.target.value)}
+                                className={styles.select}
+                            >
+                                {Object.entries(operators).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <input
+                                type="text"
+                                value={filter.value}
+                                onChange={(e) => updateFilter(index, 'value', e.target.value)}
+                                placeholder="Value"
+                                className={styles.input}
+                            />
+
+                            {filters.length > 1 && (
+                                <button
+                                    onClick={() => removeFilter(index)}
+                                    className={styles.removeButton}
+                                    title="Remove filter"
+                                >
+                                    ❌
+                                </button>
+                            )}
+                        </div>
+                    ))}
+
+                    <div className={styles.filterExamples}>
+                        <strong>Examples:</strong>
+                        <ul>
+                            <li>Consignee contains "ACME Corp"</li>
+                            <li>Number of Lines greater than 5</li>
+                            <li>XML Size (bytes) less than 50000</li>
+                            <li>Status equals success</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div className={styles.actions}>
+                    <button
+                        onClick={handleGenerateReport}
+                        disabled={loading}
+                        className={styles.generateButton}
+                    >
+                        {loading ? '🔄 Generating...' : '📊 Generate Report'}
+                    </button>
+
+                    {reportData && reportData.transformations && reportData.transformations.length > 0 && (
+                        <button
+                            onClick={handleExportExcel}
+                            className={styles.exportButton}
                         >
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="yearly">Yearly</option>
-                        </select>
-                    </div>
-
-                    <div className={styles.formGroup}>
-                        <label>Start Date (Optional)</label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className={styles.input}
-                        />
-                    </div>
-
-                    <div className={styles.formGroup}>
-                        <label>End Date (Optional)</label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className={styles.input}
-                        />
-                    </div>
+                            📥 Export to Excel (CSV)
+                        </button>
+                    )}
                 </div>
-
-                <button
-                    onClick={handleGenerateReport}
-                    disabled={loading}
-                    className={styles.generateButton}
-                >
-                    {loading ? '🔄 Generating...' : '📊 Generate Report'}
-                </button>
             </div>
 
             {error && (
@@ -119,52 +261,68 @@ function CustomReportGenerator() {
                 </div>
             )}
 
-            {report && (
+            {reportData && (
                 <div className={styles.reportResults}>
                     <h3>Report Results</h3>
                     <div className={styles.reportSummary}>
                         <div className={styles.summaryItem}>
-                            <span className={styles.summaryLabel}>Tags Analyzed:</span>
-                            <span className={styles.summaryValue}>{report.tags.join(', ')}</span>
+                            <span className={styles.summaryLabel}>Total Transformations:</span>
+                            <span className={styles.summaryValue}>{reportData.transformations?.length || 0}</span>
                         </div>
                         <div className={styles.summaryItem}>
-                            <span className={styles.summaryLabel}>Period:</span>
-                            <span className={styles.summaryValue}>{report.period}</span>
+                            <span className={styles.summaryLabel}>Successful:</span>
+                            <span className={styles.summaryValue}>
+                                {reportData.transformations?.filter(t => t.status === 'success').length || 0}
+                            </span>
                         </div>
                         <div className={styles.summaryItem}>
-                            <span className={styles.summaryLabel}>Total Results:</span>
-                            <span className={styles.summaryValue}>{report.results.length}</span>
+                            <span className={styles.summaryLabel}>Failed:</span>
+                            <span className={styles.summaryValue}>
+                                {reportData.transformations?.filter(t => t.status === 'failed').length || 0}
+                            </span>
                         </div>
                     </div>
 
-                    {report.results.length > 0 ? (
-                        <table className={styles.table}>
-                            <thead>
-                                <tr>
-                                    <th>Period</th>
-                                    <th>Source Type</th>
-                                    <th>Total</th>
-                                    <th>Successful</th>
-                                    <th>Failed</th>
-                                    <th>Unique Users</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {report.results.map((row, index) => (
-                                    <tr key={index}>
-                                        <td>{new Date(row.period).toLocaleDateString()}</td>
-                                        <td>{row.resource_type}</td>
-                                        <td>{row.transformation_count}</td>
-                                        <td className={styles.successCell}>{row.successful}</td>
-                                        <td className={styles.failCell}>{row.failed}</td>
-                                        <td>{row.unique_users}</td>
+                    {reportData.transformations && reportData.transformations.length > 0 ? (
+                        <div className={styles.tableContainer}>
+                            <table className={styles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Annotation ID</th>
+                                        <th>Status</th>
+                                        <th>User</th>
+                                        <th>Processing Time</th>
+                                        <th>Size (KB)</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {reportData.transformations.slice(0, 50).map((t, index) => (
+                                        <tr key={index}>
+                                            <td>{new Date(t.created_at).toLocaleDateString()}</td>
+                                            <td className={styles.annotationCell}>{t.annotation_id}</td>
+                                            <td>
+                                                <span className={t.status === 'success' ? styles.successBadge : styles.failBadge}>
+                                                    {t.status}
+                                                </span>
+                                            </td>
+                                            <td>{t.user_email || 'Unknown'}</td>
+                                            <td>{t.processing_time_ms}ms</td>
+                                            <td>{t.source_xml_size ? (t.source_xml_size / 1024).toFixed(2) : '0'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {reportData.transformations.length > 50 && (
+                                <p className={styles.tableNote}>
+                                    Showing first 50 of {reportData.transformations.length} results. 
+                                    Export to Excel to see all data.
+                                </p>
+                            )}
+                        </div>
                     ) : (
                         <div className={styles.noResults}>
-                            No transformations found matching the specified tags
+                            No transformations found matching the specified filters
                         </div>
                     )}
                 </div>
