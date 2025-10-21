@@ -719,4 +719,320 @@ router.put('/subscriptions/:id', requirePermission('user:write'), async (req, re
     }
 });
 
+// ============================================================================
+// TRANSFORMATION LOG ENDPOINTS (Admin-wide view)
+// ============================================================================
+
+/**
+ * GET /api/admin/transformations/stats
+ * Get transformation statistics across all users
+ * Required permission: user:read
+ */
+router.get('/transformations/stats', requirePermission('user:read'), async (req, res) => {
+    try {
+        // Get overall stats from webhook_events table
+        const statsQuery = `
+            SELECT 
+                COUNT(*) as total_transformations,
+                COUNT(DISTINCT user_id) as unique_users,
+                COUNT(*) FILTER (WHERE status = 'success') as successful,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today,
+                COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as this_month,
+                ROUND(COUNT(*) FILTER (WHERE status = 'success') * 100.0 / NULLIF(COUNT(*), 0), 2) as success_rate,
+                SUM(source_xml_size) as total_bytes_processed,
+                AVG(processing_time_ms) as avg_processing_time
+            FROM webhook_events
+        `;
+        
+        const statsResult = await db.query(statsQuery);
+        
+        res.json(statsResult.rows[0]);
+
+    } catch (error) {
+        console.error('[Admin] Error fetching transformation stats:', error);
+        res.status(500).json({
+            error: 'Failed to fetch transformation stats',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/transformations/users
+ * Get list of unique users who have performed transformations
+ * Required permission: user:read
+ */
+router.get('/transformations/users', requirePermission('user:read'), async (req, res) => {
+    try {
+        const usersQuery = `
+            SELECT DISTINCT
+                u.id,
+                u.username,
+                u.email,
+                u.full_name,
+                COUNT(we.id) as transformation_count,
+                MAX(we.created_at) as last_transformation
+            FROM users u
+            INNER JOIN webhook_events we ON we.user_id = u.id
+            GROUP BY u.id, u.username, u.email, u.full_name
+            ORDER BY transformation_count DESC
+        `;
+        
+        const usersResult = await db.query(usersQuery);
+        
+        res.json({
+            users: usersResult.rows
+        });
+
+    } catch (error) {
+        console.error('[Admin] Error fetching transformation users:', error);
+        res.status(500).json({
+            error: 'Failed to fetch transformation users',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/transformations
+ * Get all transformations with filtering and pagination
+ * Required permission: user:read
+ */
+router.get('/transformations', requirePermission('user:read'), async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 50,
+            status = '',
+            userId = '',
+            annotationId = '',
+            sortBy = 'created_at',
+            sortOrder = 'DESC',
+            dateFrom = '',
+            dateTo = ''
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+
+        let query = `
+            SELECT 
+                we.id,
+                we.user_id,
+                u.username,
+                u.email,
+                we.event_type,
+                we.source_system,
+                we.rossum_annotation_id as annotation_id,
+                we.status,
+                we.created_at,
+                we.source_xml_size,
+                we.transformed_xml_size,
+                we.processing_time_ms,
+                we.error_message
+            FROM webhook_events we
+            LEFT JOIN users u ON u.id = we.user_id
+            WHERE 1=1
+        `;
+
+        const params = [];
+        let paramIndex = 1;
+
+        // Add filters
+        if (status) {
+            query += ` AND we.status = $${paramIndex}`;
+            params.push(status);
+            paramIndex++;
+        }
+
+        if (userId) {
+            query += ` AND we.user_id = $${paramIndex}`;
+            params.push(userId);
+            paramIndex++;
+        }
+
+        if (annotationId) {
+            query += ` AND we.rossum_annotation_id ILIKE $${paramIndex}`;
+            params.push(`%${annotationId}%`);
+            paramIndex++;
+        }
+
+        if (dateFrom) {
+            query += ` AND we.created_at >= $${paramIndex}`;
+            params.push(dateFrom);
+            paramIndex++;
+        }
+
+        if (dateTo) {
+            query += ` AND we.created_at <= $${paramIndex}`;
+            params.push(dateTo);
+            paramIndex++;
+        }
+
+        // Add sorting
+        const allowedSortFields = ['created_at', 'status', 'user_id', 'processing_time_ms', 'source_xml_size'];
+        const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
+        const sortDirection = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        
+        query += ` ORDER BY we.${sortField} ${sortDirection}`;
+        query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        params.push(limit, offset);
+
+        const result = await db.query(query, params);
+
+        // Get total count for pagination
+        let countQuery = `SELECT COUNT(*) FROM webhook_events we WHERE 1=1`;
+        const countParams = [];
+        let countIndex = 1;
+
+        if (status) {
+            countQuery += ` AND we.status = $${countIndex}`;
+            countParams.push(status);
+            countIndex++;
+        }
+
+        if (userId) {
+            countQuery += ` AND we.user_id = $${countIndex}`;
+            countParams.push(userId);
+            countIndex++;
+        }
+
+        if (annotationId) {
+            countQuery += ` AND we.rossum_annotation_id ILIKE $${countIndex}`;
+            countParams.push(`%${annotationId}%`);
+            countIndex++;
+        }
+
+        if (dateFrom) {
+            countQuery += ` AND we.created_at >= $${countIndex}`;
+            countParams.push(dateFrom);
+            countIndex++;
+        }
+
+        if (dateTo) {
+            countQuery += ` AND we.created_at <= $${countIndex}`;
+            countParams.push(dateTo);
+            countIndex++;
+        }
+
+        const countResult = await db.query(countQuery, countParams);
+        const total = parseInt(countResult.rows[0].count);
+
+        res.json({
+            transformations: result.rows,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+
+    } catch (error) {
+        console.error('[Admin] Error fetching transformations:', error);
+        res.status(500).json({
+            error: 'Failed to fetch transformations',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/transformations/:id
+ * Get detailed information about a specific transformation
+ * Required permission: user:read
+ */
+router.get('/transformations/:id', requirePermission('user:read'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await db.query(`
+            SELECT 
+                we.id,
+                we.user_id,
+                u.username,
+                u.email,
+                we.event_type,
+                we.source_system,
+                we.rossum_annotation_id as annotation_id,
+                we.status,
+                we.created_at,
+                we.source_xml_size,
+                we.transformed_xml_size,
+                we.processing_time_ms,
+                we.error_message,
+                we.source_xml,
+                we.transformed_xml,
+                we.request_headers,
+                we.request_body
+            FROM webhook_events we
+            LEFT JOIN users u ON u.id = we.user_id
+            WHERE we.id = $1
+        `, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: 'Transformation not found'
+            });
+        }
+
+        res.json(result.rows[0]);
+
+    } catch (error) {
+        console.error('[Admin] Error fetching transformation details:', error);
+        res.status(500).json({
+            error: 'Failed to fetch transformation details',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/transformations/:id/download
+ * Download XML file for a transformation
+ * Required permission: user:read
+ */
+router.get('/transformations/:id/download', requirePermission('user:read'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { type = 'transformed' } = req.query; // 'source' or 'transformed'
+
+        const result = await db.query(`
+            SELECT 
+                ${type === 'source' ? 'source_xml' : 'transformed_xml'} as xml_content,
+                rossum_annotation_id,
+                created_at
+            FROM webhook_events
+            WHERE id = $1
+        `, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: 'Transformation not found'
+            });
+        }
+
+        const { xml_content, rossum_annotation_id, created_at } = result.rows[0];
+
+        if (!xml_content) {
+            return res.status(404).json({
+                error: `${type} XML not available`
+            });
+        }
+
+        // Set headers for file download
+        const filename = `${type}_${rossum_annotation_id || id}_${new Date(created_at).toISOString().split('T')[0]}.xml`;
+        res.setHeader('Content-Type', 'application/xml');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(xml_content);
+
+    } catch (error) {
+        console.error('[Admin] Error downloading XML:', error);
+        res.status(500).json({
+            error: 'Failed to download XML',
+            details: error.message
+        });
+    }
+});
+
 module.exports = router;
