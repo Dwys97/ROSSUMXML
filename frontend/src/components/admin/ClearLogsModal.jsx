@@ -219,8 +219,7 @@ function ClearLogsModal({ isOpen, onClose, onConfirm }) {
                 </>
             ) : (
                 <>
-                    <div className={styles.modalBody}>
-                            <div className={styles.dangerBox}>
+                    <div className={styles.dangerBox}>
                                 <span className={styles.dangerIcon}>🚨</span>
                                 <div>
                                     <h3>Critical Action - Password Required</h3>
