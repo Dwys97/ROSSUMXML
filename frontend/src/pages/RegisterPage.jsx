@@ -146,7 +146,7 @@ const RegisterPage = () => {
                     <div className={styles.gradientOrb3}></div>
                     <div className={styles.authOverlay}></div>
                 </div>
-                <div className={styles.authBox} role="main" aria-labelledby="register-heading">
+                <div className={`${styles.authBox} ${styles.wideBox}`} role="main" aria-labelledby="register-heading">
                     <div className={styles.authGrid}>
                         <section className={styles.authFormPanel} aria-label="Registration form">
                             <h1 className={styles.formTitle}>Create your account</h1>

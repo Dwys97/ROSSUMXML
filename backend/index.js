@@ -802,6 +802,18 @@ exports.handler = async (event) => {
                     }));
                 }
 
+                // Fetch user roles
+                const rolesResult = await pool.query(`
+                    SELECT r.role_name
+                    FROM user_roles ur
+                    JOIN roles r ON ur.role_id = r.id
+                    WHERE ur.user_id = $1
+                    AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
+                `, [user.id]);
+                
+                const roles = rolesResult.rows.map(row => row.role_name);
+                const isAdmin = roles.includes('admin') || roles.includes('super_admin');
+
                 // Log successful authentication
                 await logAuthenticationAttempt(pool, email, true, event);
 
@@ -816,7 +828,9 @@ exports.handler = async (event) => {
                     user: {
                         id: user.id,
                         email: user.email,
-                        username: user.username
+                        username: user.username,
+                        roles: roles,
+                        isAdmin: isAdmin
                     }
                 }));
 

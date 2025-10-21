@@ -109,13 +109,18 @@ body {
 /* Auth Box */
 .authBox {
     width: 100%;
-    max-width: 1400px;
+    max-width: 480px;
     background: rgba(13, 27, 42, 0.8);
     backdrop-filter: blur(12px);
     padding: 2.5rem;
     border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.4);
+}
+
+/* Wide Auth Box for Registration */
+.authBox.wideBox {
+    max-width: 1400px;
 }
 
 .authHeader {
@@ -485,8 +490,8 @@ body {
 .gradientOrb3 { width: 200px; height: 200px; background: radial-gradient(circle, rgba(236,72,153,0.1) 0%, transparent 70%); bottom: 40%; left: 60%; animation-delay: 4s; }
 @keyframes authFloat { 0%,100%{ transform: translateY(0) scale(1);} 50%{ transform: translateY(-16px) scale(1.03);} }
 
-/* Card overrides */
-.authBox {
+/* Card overrides for registration with grid layout */
+.authBox.wideBox {
     position: relative;
     z-index: 1;
     max-width: 1100px;
