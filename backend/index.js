@@ -4596,18 +4596,17 @@ exports.handler = async (event) => {
                         u.username,
                         u.email,
                         we.event_type,
-                        we.source_system,
                         we.rossum_annotation_id as annotation_id,
                         we.status,
                         we.created_at,
-                        we.source_xml_size,
-                        we.transformed_xml_size,
                         we.processing_time_ms,
                         we.error_message,
-                        we.source_xml,
-                        we.transformed_xml,
-                        we.request_headers,
-                        we.request_body
+                        we.source_xml_size,
+                        we.transformed_xml_size,
+                        we.source_xml_payload,
+                        we.response_payload,
+                        we.rossum_document_id,
+                        we.rossum_queue_id
                     FROM webhook_events we
                     LEFT JOIN users u ON u.id = we.user_id
                     WHERE we.id = $1
@@ -4652,7 +4651,7 @@ exports.handler = async (event) => {
 
                 const result = await db.query(`
                     SELECT 
-                        ${type === 'source' ? 'source_xml' : 'transformed_xml'} as xml_content,
+                        ${type === 'source' ? 'source_xml_payload' : 'response_payload'} as xml_content,
                         rossum_annotation_id,
                         created_at
                     FROM webhook_events

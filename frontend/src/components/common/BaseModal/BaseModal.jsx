@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import styles from './BaseModal.module.css';
 
@@ -144,7 +145,7 @@ const BaseModal = ({
 
   const sizeClass = styles[`modal${size.charAt(0).toUpperCase() + size.slice(1)}`];
 
-  return (
+  const modalContent = (
     <div
       className={styles.overlay}
       onClick={handleOverlayClick}
@@ -195,6 +196,8 @@ const BaseModal = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 BaseModal.propTypes = {

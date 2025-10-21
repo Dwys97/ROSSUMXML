@@ -59,18 +59,14 @@
 
 .overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: var(--modal-overlay-bg);
     backdrop-filter: var(--modal-overlay-blur);
     display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: var(--modal-overlay-z);
-    padding: 20px;
+    z-index: 99999;
     animation: fadeIn var(--modal-fade-duration) var(--modal-easing);
+    overflow-y: auto;
+    padding: 0;
 }
 
 @keyframes fadeIn {
@@ -93,12 +89,12 @@
     border-radius: var(--modal-radius);
     width: var(--modal-width);
     max-width: var(--modal-max-width);
-    max-height: var(--modal-max-height);
+    max-height: 90vh;
     overflow: hidden;
     box-shadow: var(--modal-shadow);
-    position: relative;
     display: flex;
     flex-direction: column;
+    margin: 3vh auto 2vh;
     animation: slideUp var(--modal-slide-duration) var(--modal-easing);
 }
 
