@@ -4336,6 +4336,239 @@ exports.handler = async (event) => {
         }
 
         // ============================================================================
+        // ADMIN TRANSFORMATION LOG ENDPOINTS
+        // ============================================================================
+
+        // GET /api/admin/transformations/stats - Get overall transformation statistics
+        if (path === '/api/admin/transformations/stats' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: 'Forbidden: user:read permission required' 
+                }));
+            }
+
+            try {
+                const db = require('./db');
+                const result = await db.query(`
+                    SELECT 
+                        COUNT(*) as total_transformations,
+                        COUNT(DISTINCT user_id) as unique_users,
+                        COUNT(*) FILTER (WHERE status = 'success') as successful,
+                        COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today,
+                        COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as this_month,
+                        ROUND(COUNT(*) FILTER (WHERE status = 'success') * 100.0 / NULLIF(COUNT(*), 0), 2) as success_rate,
+                        SUM(source_xml_size) as total_bytes_processed,
+                        AVG(processing_time_ms) as avg_processing_time
+                    FROM webhook_events
+                `);
+                
+                return createResponse(200, JSON.stringify(result.rows[0]));
+            } catch (err) {
+                console.error('Error fetching transformation stats:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation stats',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/admin/transformations/users - Get list of users with transformations
+        if (path === '/api/admin/transformations/users' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: 'Forbidden: user:read permission required' 
+                }));
+            }
+
+            try {
+                const db = require('./db');
+                const result = await db.query(`
+                    SELECT DISTINCT
+                        u.id,
+                        u.username,
+                        u.email,
+                        u.full_name,
+                        COUNT(we.id) as transformation_count,
+                        MAX(we.created_at) as last_transformation
+                    FROM users u
+                    INNER JOIN webhook_events we ON we.user_id = u.id
+                    GROUP BY u.id, u.username, u.email, u.full_name
+                    ORDER BY transformation_count DESC
+                `);
+                
+                return createResponse(200, JSON.stringify({ users: result.rows }));
+            } catch (err) {
+                console.error('Error fetching transformation users:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation users',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/admin/transformations - Get all transformations with filtering
+        if (path === '/api/admin/transformations' && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: 'Forbidden: user:read permission required' 
+                }));
+            }
+
+            try {
+                const db = require('./db');
+                const queryParams = event.queryStringParameters || {};
+                const {
+                    page = 1,
+                    limit = 50,
+                    status = '',
+                    userId = '',
+                    annotationId = '',
+                    sortBy = 'created_at',
+                    sortOrder = 'DESC',
+                    dateFrom = '',
+                    dateTo = ''
+                } = queryParams;
+
+                const offset = (page - 1) * limit;
+                let query = `
+                    SELECT 
+                        we.id,
+                        we.user_id,
+                        u.username,
+                        u.email,
+                        we.event_type,
+                        we.source_system,
+                        we.rossum_annotation_id as annotation_id,
+                        we.status,
+                        we.created_at,
+                        we.source_xml_size,
+                        we.transformed_xml_size,
+                        we.processing_time_ms,
+                        we.error_message
+                    FROM webhook_events we
+                    LEFT JOIN users u ON u.id = we.user_id
+                    WHERE 1=1
+                `;
+
+                const params = [];
+                let paramIndex = 1;
+
+                if (status) {
+                    query += ` AND we.status = $${paramIndex}`;
+                    params.push(status);
+                    paramIndex++;
+                }
+
+                if (userId) {
+                    query += ` AND we.user_id = $${paramIndex}`;
+                    params.push(userId);
+                    paramIndex++;
+                }
+
+                if (annotationId) {
+                    query += ` AND we.rossum_annotation_id ILIKE $${paramIndex}`;
+                    params.push(`%${annotationId}%`);
+                    paramIndex++;
+                }
+
+                if (dateFrom) {
+                    query += ` AND we.created_at >= $${paramIndex}`;
+                    params.push(dateFrom);
+                    paramIndex++;
+                }
+
+                if (dateTo) {
+                    query += ` AND we.created_at <= $${paramIndex}`;
+                    params.push(dateTo);
+                    paramIndex++;
+                }
+
+                const allowedSortFields = ['created_at', 'status', 'user_id', 'processing_time_ms', 'source_xml_size'];
+                const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
+                const sortDirection = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+                
+                query += ` ORDER BY we.${sortField} ${sortDirection}`;
+                query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+                params.push(limit, offset);
+
+                const result = await db.query(query, params);
+
+                // Get total count
+                let countQuery = `SELECT COUNT(*) FROM webhook_events we WHERE 1=1`;
+                const countParams = [];
+                let countIndex = 1;
+
+                if (status) {
+                    countQuery += ` AND we.status = $${countIndex}`;
+                    countParams.push(status);
+                    countIndex++;
+                }
+
+                if (userId) {
+                    countQuery += ` AND we.user_id = $${countIndex}`;
+                    countParams.push(userId);
+                    countIndex++;
+                }
+
+                if (annotationId) {
+                    countQuery += ` AND we.rossum_annotation_id ILIKE $${countIndex}`;
+                    countParams.push(`%${annotationId}%`);
+                    countIndex++;
+                }
+
+                if (dateFrom) {
+                    countQuery += ` AND we.created_at >= $${countIndex}`;
+                    countParams.push(dateFrom);
+                    countIndex++;
+                }
+
+                if (dateTo) {
+                    countQuery += ` AND we.created_at <= $${countIndex}`;
+                    countParams.push(dateTo);
+                    countIndex++;
+                }
+
+                const countResult = await db.query(countQuery, countParams);
+                const total = parseInt(countResult.rows[0].count);
+
+                return createResponse(200, JSON.stringify({
+                    transformations: result.rows,
+                    pagination: {
+                        page: parseInt(page),
+                        limit: parseInt(limit),
+                        total,
+                        totalPages: Math.ceil(total / limit)
+                    }
+                }));
+            } catch (err) {
+                console.error('Error fetching transformations:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformations',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ============================================================================
         // END OF ADMIN PANEL ENDPOINTS
         // ============================================================================
 
