@@ -8,6 +8,7 @@ function CustomReportGenerator() {
     ]);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [deduplicateByAnnotation, setDeduplicateByAnnotation] = useState(true);
     const [reportData, setReportData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -63,7 +64,8 @@ function CustomReportGenerator() {
                 body: JSON.stringify({
                     filters: filters.filter(f => f.value !== ''),
                     startDate: startDate || null,
-                    endDate: endDate || null
+                    endDate: endDate || null,
+                    deduplicateByAnnotation: deduplicateByAnnotation
                 })
             });
 
@@ -87,40 +89,48 @@ function CustomReportGenerator() {
 
         // Create CSV content
         const headers = [
-            'Date',
+            'Date/Time',
             'Annotation ID',
             'Status',
-            'User',
-            'API Key',
-            'Mapping',
-            'Processing Time (ms)',
-            'Source Size (KB)',
-            'Transformed Size (KB)',
+            'User Name',
+            'User Email',
+            'Mapping Name',
             'Consignee',
             'Consignor',
             'Invoice Number',
-            'Error Message'
+            'Line Count',
+            'Processing Time (ms)',
+            'Source Size (KB)',
+            'HTTP Status',
+            'Queue ID'
         ];
 
-        const rows = reportData.transformations.map(t => [
-            new Date(t.created_at).toLocaleString(),
-            t.annotation_id || '',
-            t.status || '',
-            t.user_email || '',
-            t.api_key_name || '',
-            t.mapping_name || '',
-            t.processing_time_ms || '',
-            t.source_xml_size ? (t.source_xml_size / 1024).toFixed(2) : '',
-            t.transformed_xml_size ? (t.transformed_xml_size / 1024).toFixed(2) : '',
-            t.consignee || '',
-            t.consignor || '',
-            t.invoice_number || '',
-            t.error_message || ''
-        ]);
+        const rows = reportData.transformations.map(t => {
+            // Format date without commas: YYYY-MM-DD HH:MM:SS
+            const date = new Date(t.created_at);
+            const dateStr = date.toISOString().replace('T', ' ').substring(0, 19);
+            
+            return [
+                dateStr,
+                t.annotation_id || '',
+                t.status || '',
+                t.user_name || '',
+                t.user_email || '',
+                t.mapping_name || '',
+                t.consignee || '',
+                t.consignor || '',
+                t.invoice_number || '',
+                t.line_count || '0',
+                t.processing_time_ms || '',
+                t.source_xml_size ? (t.source_xml_size / 1024).toFixed(2) : '',
+                t.http_status_code || '',
+                t.rossum_queue_id || ''
+            ];
+        });
 
         const csvContent = [
             headers.join(','),
-            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         ].join('\n');
 
         // Create download link
@@ -166,6 +176,18 @@ function CustomReportGenerator() {
                                 className={styles.input}
                             />
                         </div>
+                    </div>
+
+                    <div className={styles.checkboxGroup}>
+                        <label className={styles.checkboxLabel}>
+                            <input
+                                type="checkbox"
+                                checked={deduplicateByAnnotation}
+                                onChange={(e) => setDeduplicateByAnnotation(e.target.checked)}
+                                className={styles.checkbox}
+                            />
+                            <span>Show only latest transformation per document (remove duplicates)</span>
+                        </label>
                     </div>
                 </div>
 

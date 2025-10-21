@@ -2388,6 +2388,34 @@ exports.handler = async (event) => {
                     );
                     
                     // ============================================
+                    // STEP 8.5: LOG MAPPING USAGE
+                    // ============================================
+                    if (config.mapping_id) {
+                        try {
+                            await client.query(
+                                `INSERT INTO mapping_usage_log (
+                                    user_id, mapping_id, webhook_event_id, 
+                                    source_system, destination_system, 
+                                    transformation_successful, processing_time_ms
+                                ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                                [
+                                    config.user_id,
+                                    config.mapping_id,
+                                    webhookEventId,
+                                    'rossum',
+                                    config.destination_schema_type || 'unknown',
+                                    true,
+                                    Date.now() - startTime
+                                ]
+                            );
+                            console.log(`[Rossum Webhook] Logged mapping usage: ${config.mapping_name}`);
+                        } catch (mappingLogError) {
+                            console.error('[Rossum Webhook] Error logging mapping usage:', mappingLogError);
+                            // Don't fail the transformation if logging fails
+                        }
+                    }
+                    
+                    // ============================================
                     // STEP 9: RETURN SUCCESS RESPONSE
                     // ============================================
                     console.log(`[Rossum Webhook] Processing complete for annotation ${annotationId}`);
@@ -2482,7 +2510,7 @@ exports.handler = async (event) => {
                     // Verify API key and get user ID + mapping in one query
                     const keyResult = await client.query(
                         `SELECT ak.user_id, ak.is_active, ak.expires_at, ak.key_name,
-                                tm.mapping_json, tm.destination_schema_xml, tm.mapping_name,
+                                tm.id as mapping_id, tm.mapping_json, tm.destination_schema_xml, tm.mapping_name,
                                 tm.source_schema_type, tm.destination_schema_type
                          FROM api_keys ak
                          JOIN transformation_mappings tm ON tm.id = ak.default_mapping_id
@@ -2568,6 +2596,28 @@ exports.handler = async (event) => {
                         ? JSON.parse(apiKeyData.mapping_json) 
                         : apiKeyData.mapping_json;
                     
+                    // Create webhook event log for tracking
+                    const startTime = Date.now();
+                    const webhookEventResult = await client.query(
+                        `INSERT INTO webhook_events (
+                            api_key_id, user_id, event_type, source_system,
+                            status, request_payload, source_xml_payload
+                         ) VALUES (
+                             (SELECT id FROM api_keys WHERE api_key = $1),
+                             $2, $3, $4, $5, $6, $7
+                         ) RETURNING id`,
+                        [
+                            apiKey,
+                            apiKeyData.user_id,
+                            'transformation_started',
+                            'webhook_generic',
+                            'processing',
+                            null,
+                            sourceXml
+                        ]
+                    );
+                    const webhookEventId = webhookEventResult.rows[0].id;
+                    
                     // Log transformation request to security audit
                     await logTransformationRequest(
                         pool,
@@ -2585,6 +2635,52 @@ exports.handler = async (event) => {
                         mappingObject,
                         true // removeEmptyTags
                     );
+                    
+                    const processingTime = Date.now() - startTime;
+                    
+                    // Update webhook event with success
+                    await client.query(
+                        `UPDATE webhook_events 
+                         SET status = $1, event_type = $2, source_xml_size = $3,
+                             transformed_xml_size = $4, processing_time_ms = $5,
+                             response_payload = $6, updated_at = CURRENT_TIMESTAMP
+                         WHERE id = $7`,
+                        [
+                            'success',
+                            'transformation_success',
+                            sourceXml.length,
+                            transformedXml.length,
+                            processingTime,
+                            transformedXml,
+                            webhookEventId
+                        ]
+                    );
+                    
+                    // Log mapping usage
+                    if (apiKeyData.mapping_id) {
+                        try {
+                            await client.query(
+                                `INSERT INTO mapping_usage_log (
+                                    user_id, mapping_id, webhook_event_id,
+                                    source_system, destination_system,
+                                    transformation_successful, processing_time_ms
+                                ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                                [
+                                    apiKeyData.user_id,
+                                    apiKeyData.mapping_id,
+                                    webhookEventId,
+                                    apiKeyData.source_schema_type || 'unknown',
+                                    apiKeyData.destination_schema_type || 'unknown',
+                                    true,
+                                    processingTime
+                                ]
+                            );
+                            console.log(`[API] Logged mapping usage: ${apiKeyData.mapping_name}`);
+                        } catch (mappingLogError) {
+                            console.error('[API] Error logging mapping usage:', mappingLogError);
+                            // Don't fail the transformation if logging fails
+                        }
+                    }
                     
                     console.log(`[API] Transformation successful for user ${apiKeyData.user_id}, mapping: ${apiKeyData.mapping_name}`);
                     
@@ -4862,7 +4958,7 @@ exports.handler = async (event) => {
                     return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
                 }
 
-                const { filters, startDate, endDate } = body;
+                const { filters, startDate, endDate, deduplicateByAnnotation } = body;
 
                 // Build dynamic WHERE clauses from filters
                 const whereConditions = ['we.user_id = $1'];
@@ -5040,8 +5136,39 @@ exports.handler = async (event) => {
 
                 const whereClause = whereConditions.join(' AND ');
 
-                // Execute query with dynamic filters
-                const query = `
+                // Execute query with dynamic filters - extract XML values using regex
+                // Use DISTINCT ON to get only the latest transformation per annotation if deduplicate is true
+                const query = deduplicateByAnnotation ? `
+                    SELECT DISTINCT ON (we.rossum_annotation_id)
+                        we.id,
+                        we.rossum_annotation_id as annotation_id,
+                        we.status,
+                        we.created_at,
+                        we.processing_time_ms,
+                        we.source_xml_size,
+                        we.http_status_code,
+                        we.rossum_queue_id,
+                        u.email as user_email,
+                        u.full_name as user_name,
+                        tm.mapping_name,
+                        (LENGTH(we.source_xml_payload) - LENGTH(REPLACE(we.source_xml_payload, '<Item>', ''))) / LENGTH('<Item>') as line_count,
+                        COALESCE(
+                            substring(we.source_xml_payload from '<recipient_name>(.*?)</recipient_name>'),
+                            substring(we.source_xml_payload from '<sender_name>(.*?)</sender_name>')
+                        ) as consignee,
+                        substring(we.source_xml_payload from '<sender_name>(.*?)</sender_name>') as consignor,
+                        COALESCE(
+                            substring(we.source_xml_payload from '<document_id>(.*?)</document_id>'),
+                            substring(we.source_xml_payload from '<order_id>(.*?)</order_id>')
+                        ) as invoice_number
+                    FROM webhook_events we
+                    LEFT JOIN users u ON we.user_id = u.id
+                    LEFT JOIN mapping_usage_log mul ON we.id = mul.webhook_event_id
+                    LEFT JOIN transformation_mappings tm ON mul.mapping_id = tm.id
+                    WHERE ${whereClause}
+                    ORDER BY we.rossum_annotation_id, we.created_at DESC
+                    LIMIT 1000
+                ` : `
                     SELECT 
                         we.id,
                         we.rossum_annotation_id as annotation_id,
@@ -5053,7 +5180,17 @@ exports.handler = async (event) => {
                         we.rossum_queue_id,
                         u.email as user_email,
                         u.full_name as user_name,
-                        tm.mapping_name
+                        tm.mapping_name,
+                        (LENGTH(we.source_xml_payload) - LENGTH(REPLACE(we.source_xml_payload, '<Item>', ''))) / LENGTH('<Item>') as line_count,
+                        COALESCE(
+                            substring(we.source_xml_payload from '<recipient_name>(.*?)</recipient_name>'),
+                            substring(we.source_xml_payload from '<sender_name>(.*?)</sender_name>')
+                        ) as consignee,
+                        substring(we.source_xml_payload from '<sender_name>(.*?)</sender_name>') as consignor,
+                        COALESCE(
+                            substring(we.source_xml_payload from '<document_id>(.*?)</document_id>'),
+                            substring(we.source_xml_payload from '<order_id>(.*?)</order_id>')
+                        ) as invoice_number
                     FROM webhook_events we
                     LEFT JOIN users u ON we.user_id = u.id
                     LEFT JOIN mapping_usage_log mul ON we.id = mul.webhook_event_id
