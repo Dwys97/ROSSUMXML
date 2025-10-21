@@ -37,22 +37,41 @@ export_webhook() {
     
     # Clean up old XML files (keep only latest annotation)
     log "$(date '+%H:%M:%S') ${YELLOW}🗑️  Cleaning up old XML files...${NC}"
-    rm -f webhook-xmls/source/source-*.xml
-    rm -f webhook-xmls/transformed/transformed-*.xml
+    
+    # Count and delete old files
+    SOURCE_COUNT=$(find webhook-xmls/source -name "source-*.xml" -type f 2>/dev/null | wc -l)
+    TRANSFORMED_COUNT=$(find webhook-xmls/transformed -name "transformed-*.xml" -type f 2>/dev/null | wc -l)
+    
+    if [ "$SOURCE_COUNT" -gt 0 ]; then
+        rm -f webhook-xmls/source/source-*.xml 2>/dev/null
+        log "$(date '+%H:%M:%S') ${YELLOW}   Deleted ${SOURCE_COUNT} old source XML(s)${NC}"
+    fi
+    
+    if [ "$TRANSFORMED_COUNT" -gt 0 ]; then
+        rm -f webhook-xmls/transformed/transformed-*.xml 2>/dev/null
+        log "$(date '+%H:%M:%S') ${YELLOW}   Deleted ${TRANSFORMED_COUNT} old transformed XML(s)${NC}"
+    fi
+    
+    if [ "$SOURCE_COUNT" -eq 0 ] && [ "$TRANSFORMED_COUNT" -eq 0 ]; then
+        log "$(date '+%H:%M:%S') ${YELLOW}   No old files to clean${NC}"
+    fi
     
     SOURCE_FILE="webhook-xmls/source/source-${ANNOTATION_ID}.xml"
     TRANSFORMED_FILE="webhook-xmls/transformed/transformed-${ANNOTATION_ID}.xml"
     
     # Export source XML
     if [ ! -f "$SOURCE_FILE" ]; then
-        docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
+        timeout 5 docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
         SELECT source_xml_payload 
         FROM webhook_events 
         WHERE id = '${WEBHOOK_ID}'
           AND source_xml_payload IS NOT NULL;
         " > "$SOURCE_FILE" 2>/dev/null
         
-        if [ -s "$SOURCE_FILE" ]; then
+        if [ $? -eq 124 ]; then
+            log "$(date '+%H:%M:%S') ${YELLOW}⚠️  Timeout exporting source XML${NC}"
+            rm -f "$SOURCE_FILE"
+        elif [ -s "$SOURCE_FILE" ]; then
             SIZE=$(stat -f%z "$SOURCE_FILE" 2>/dev/null || stat -c%s "$SOURCE_FILE" 2>/dev/null)
             log "$(date '+%H:%M:%S') ${GREEN}✅ Exported source XML:${NC} ${ANNOTATION_ID} (${SIZE} bytes)"
         else
@@ -62,14 +81,17 @@ export_webhook() {
     
     # Export transformed XML
     if [ ! -f "$TRANSFORMED_FILE" ]; then
-        docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
+        timeout 5 docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
         SELECT response_payload 
         FROM webhook_events 
         WHERE id = '${WEBHOOK_ID}'
           AND response_payload IS NOT NULL;
         " > "$TRANSFORMED_FILE" 2>/dev/null
         
-        if [ -s "$TRANSFORMED_FILE" ]; then
+        if [ $? -eq 124 ]; then
+            log "$(date '+%H:%M:%S') ${YELLOW}⚠️  Timeout exporting transformed XML${NC}"
+            rm -f "$TRANSFORMED_FILE"
+        elif [ -s "$TRANSFORMED_FILE" ]; then
             SIZE=$(stat -f%z "$TRANSFORMED_FILE" 2>/dev/null || stat -c%s "$TRANSFORMED_FILE" 2>/dev/null)
             log "$(date '+%H:%M:%S') ${GREEN}✅ Exported transformed XML:${NC} ${ANNOTATION_ID} (${SIZE} bytes)"
         else
@@ -80,14 +102,20 @@ export_webhook() {
 
 # Main monitoring loop
 while true; do
-    # Get the latest webhook
-    LATEST=$(docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
+    # Get the latest webhook (with timeout to prevent hanging)
+    LATEST=$(timeout 5 docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -A -c "
     SELECT id || '|' || rossum_annotation_id || '|' || status
     FROM webhook_events 
     WHERE rossum_annotation_id IS NOT NULL
     ORDER BY created_at DESC 
     LIMIT 1;
     " 2>/dev/null)
+    
+    if [ $? -eq 124 ]; then
+        log "$(date '+%H:%M:%S') ${YELLOW}⚠️  Database query timeout, retrying...${NC}"
+        sleep 2
+        continue
+    fi
     
     if [ -n "$LATEST" ]; then
         WEBHOOK_ID=$(echo "$LATEST" | cut -d'|' -f1)
