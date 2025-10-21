@@ -4568,6 +4568,133 @@ exports.handler = async (event) => {
             }
         }
 
+        // GET /api/admin/transformations/:id - Get transformation details
+        if (path.startsWith('/api/admin/transformations/') && method === 'GET' && !path.includes('/download')) {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    console.error('[Admin] Unauthorized access to transformation details');
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+
+                const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+                if (!permissionCheck.authorized) {
+                    console.error('[Admin] Permission denied for user:', user.id);
+                    return createResponse(403, JSON.stringify({ 
+                        error: 'Forbidden: user:read permission required' 
+                    }));
+                }
+
+                const db = require('./db');
+                const id = path.split('/').pop();
+                console.log('[Admin] Fetching transformation details for ID:', id);
+
+                const result = await db.query(`
+                    SELECT 
+                        we.id,
+                        we.user_id,
+                        u.username,
+                        u.email,
+                        we.event_type,
+                        we.source_system,
+                        we.rossum_annotation_id as annotation_id,
+                        we.status,
+                        we.created_at,
+                        we.source_xml_size,
+                        we.transformed_xml_size,
+                        we.processing_time_ms,
+                        we.error_message,
+                        we.source_xml,
+                        we.transformed_xml,
+                        we.request_headers,
+                        we.request_body
+                    FROM webhook_events we
+                    LEFT JOIN users u ON u.id = we.user_id
+                    WHERE we.id = $1
+                `, [id]);
+
+                if (result.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({
+                        error: 'Transformation not found'
+                    }));
+                }
+
+                return createResponse(200, JSON.stringify(result.rows[0]));
+            } catch (err) {
+                console.error('Error fetching transformation details:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch transformation details',
+                    details: err.message
+                }));
+            }
+        }
+
+        // GET /api/admin/transformations/:id/download - Download XML file
+        if (path.includes('/api/admin/transformations/') && path.endsWith('/download') && method === 'GET') {
+            const user = await verifyJWT(event);
+            if (!user) {
+                return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+            }
+
+            const permissionCheck = await requirePermission(pool, user.id, 'user:read');
+            if (!permissionCheck.authorized) {
+                return createResponse(403, JSON.stringify({ 
+                    error: 'Forbidden: user:read permission required' 
+                }));
+            }
+
+            try {
+                const db = require('./db');
+                const pathParts = path.split('/');
+                const id = pathParts[pathParts.length - 2];
+                const queryParams = event.queryStringParameters || {};
+                const type = queryParams.type || 'transformed'; // 'source' or 'transformed'
+
+                const result = await db.query(`
+                    SELECT 
+                        ${type === 'source' ? 'source_xml' : 'transformed_xml'} as xml_content,
+                        rossum_annotation_id,
+                        created_at
+                    FROM webhook_events
+                    WHERE id = $1
+                `, [id]);
+
+                if (result.rows.length === 0) {
+                    return createResponse(404, JSON.stringify({
+                        error: 'Transformation not found'
+                    }));
+                }
+
+                const { xml_content, rossum_annotation_id, created_at } = result.rows[0];
+
+                if (!xml_content) {
+                    return createResponse(404, JSON.stringify({
+                        error: `${type} XML not available`
+                    }));
+                }
+
+                // Set headers for file download
+                const filename = `${type}_${rossum_annotation_id || id}_${new Date(created_at).toISOString().split('T')[0]}.xml`;
+                
+                return {
+                    statusCode: 200,
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'Content-Disposition': `attachment; filename="${filename}"`,
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Headers': '*'
+                    },
+                    body: xml_content
+                };
+            } catch (err) {
+                console.error('Error downloading XML:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to download XML',
+                    details: err.message
+                }));
+            }
+        }
+
         // ============================================================================
         // END OF ADMIN PANEL ENDPOINTS
         // ============================================================================
