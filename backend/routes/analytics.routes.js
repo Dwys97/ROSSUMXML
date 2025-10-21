@@ -52,22 +52,21 @@ async function getTransformationStats(pool, userId, period = 'daily', startDate 
             }
         }
 
-        // Query transformation statistics
+        // Query transformation statistics from webhook_events table
         const statsQuery = `
             SELECT 
                 ${groupByFormat || `DATE_TRUNC('day', created_at)`} as period,
                 COUNT(*) as total_transformations,
                 COUNT(DISTINCT user_id) as unique_users,
-                SUM(CAST(metadata->>'source_size' AS INTEGER)) as total_bytes_processed,
-                AVG(CAST(metadata->>'source_size' AS INTEGER)) as avg_file_size,
-                resource_type,
-                COUNT(*) FILTER (WHERE success = true) as successful,
-                COUNT(*) FILTER (WHERE success = false) as failed
-            FROM security_audit_log
-            WHERE event_type IN ('data_access', 'xml_security_threat_detected')
-              ${organizationId ? 'AND user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'AND user_id = $1'}
+                SUM(source_xml_size) as total_bytes_processed,
+                AVG(source_xml_size) as avg_file_size,
+                source_system,
+                COUNT(*) FILTER (WHERE status = 'success') as successful,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed
+            FROM webhook_events
+            WHERE ${organizationId ? 'user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'user_id = $1'}
               ${dateCondition}
-            GROUP BY period, resource_type
+            GROUP BY period, source_system
             ORDER BY period DESC
         `;
 
@@ -86,12 +85,11 @@ async function getTransformationStats(pool, userId, period = 'daily', startDate 
                     u.id,
                     u.username,
                     u.email,
-                    COUNT(sal.id) as transformation_count,
-                    MAX(sal.created_at) as last_transformation
-                FROM security_audit_log sal
-                JOIN users u ON u.id = sal.user_id
-                WHERE sal.event_type = 'transformation'
-                  AND u.organization_id = $1
+                    COUNT(we.id) as transformation_count,
+                    MAX(we.created_at) as last_transformation
+                FROM webhook_events we
+                JOIN users u ON u.id = we.user_id
+                WHERE u.organization_id = $1
                   ${dateCondition}
                 GROUP BY u.id, u.username, u.email
                 ORDER BY transformation_count DESC
@@ -104,14 +102,13 @@ async function getTransformationStats(pool, userId, period = 'daily', startDate 
         // Get transformation by source type
         const sourceTypeQuery = `
             SELECT 
-                resource_type,
+                source_system,
                 COUNT(*) as count,
                 ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentage
-            FROM security_audit_log
-            WHERE event_type = 'transformation'
-              ${organizationId ? 'AND user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'AND user_id = $1'}
+            FROM webhook_events
+            WHERE ${organizationId ? 'user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'user_id = $1'}
               ${dateCondition}
-            GROUP BY resource_type
+            GROUP BY source_system
             ORDER BY count DESC
         `;
         const sourceTypeResult = await client.query(sourceTypeQuery, params);
@@ -169,39 +166,51 @@ async function getMappingActivity(pool, userId, period = 'daily') {
                 groupByFormat = `DATE_TRUNC('day', created_at)`;
         }
 
-        // Get mapping CRUD activity
+        // Get mapping CRUD activity from mapping_change_log and security_audit_log
         const activityQuery = `
+            SELECT 
+                ${groupByFormat} as period,
+                change_type as event_type,
+                COUNT(*) as count,
+                COUNT(DISTINCT user_id) as unique_users
+            FROM mapping_change_log
+            WHERE ${organizationId ? 'organization_id = $1' : 'user_id = $1'}
+              AND created_at >= NOW() - INTERVAL '${dateInterval}'
+            GROUP BY period, change_type
+            
+            UNION ALL
+            
             SELECT 
                 ${groupByFormat} as period,
                 event_type,
                 COUNT(*) as count,
                 COUNT(DISTINCT user_id) as unique_users
             FROM security_audit_log
-            WHERE event_type IN ('mapping_create', 'mapping_update', 'mapping_delete')
+            WHERE event_type IN ('mapping_created', 'mapping_updated', 'mapping_deleted')
               ${organizationId ? 'AND user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'AND user_id = $1'}
               AND created_at >= NOW() - INTERVAL '${dateInterval}'
             GROUP BY period, event_type
+            
             ORDER BY period DESC, event_type
         `;
 
         const params = organizationId ? [organizationId] : [userId];
         const activityResult = await client.query(activityQuery, params);
 
-        // Get most edited mappings
+        // Get most edited mappings from both tables
         const topMappingsQuery = `
             SELECT 
-                resource_id,
-                resource_type as mapping_name,
-                COUNT(*) FILTER (WHERE event_type = 'mapping_update') as edit_count,
-                COUNT(*) FILTER (WHERE event_type = 'mapping_create') as create_count,
-                COUNT(*) FILTER (WHERE event_type = 'mapping_delete') as delete_count,
-                MAX(created_at) as last_modified
-            FROM security_audit_log
-            WHERE event_type IN ('mapping_create', 'mapping_update', 'mapping_delete')
-              ${organizationId ? 'AND user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'AND user_id = $1'}
-              AND created_at >= NOW() - INTERVAL '${dateInterval}'
-              AND resource_id IS NOT NULL
-            GROUP BY resource_id, resource_type
+                tm.id as mapping_id,
+                tm.mapping_name,
+                COUNT(mcl.id) as edit_count,
+                0 as create_count,
+                0 as delete_count,
+                MAX(mcl.created_at) as last_modified
+            FROM mapping_change_log mcl
+            JOIN transformation_mappings tm ON mcl.mapping_id = tm.id
+            WHERE ${organizationId ? 'mcl.organization_id = $1' : 'mcl.user_id = $1'}
+              AND mcl.created_at >= NOW() - INTERVAL '${dateInterval}'
+            GROUP BY tm.id, tm.mapping_name
             ORDER BY edit_count DESC
             LIMIT 10
         `;
@@ -257,15 +266,13 @@ async function getCustomReport(pool, userId, tags = [], period = 'monthly', star
             }
         }
 
-        // If tags are provided, search for transformations with those tags in metadata
+        // If tags are provided, search for transformations with those tags in transformation_xml_tags table
         let tagCondition = '';
+        let tagJoin = '';
         if (tags && tags.length > 0) {
-            // Search in metadata JSONB for XML content references
-            const tagPatterns = tags.map(tag => `%<${tag}>%`).join('|');
-            tagCondition = `AND (
-                metadata->>'source_xml' LIKE ANY(ARRAY[${tags.map((_, i) => `$${i + (organizationId ? 2 : 2) + (startDate && endDate ? 2 : 0)}`).join(',')}])
-                OR metadata->>'destination_xml' LIKE ANY(ARRAY[${tags.map((_, i) => `$${i + (organizationId ? 2 : 2) + (startDate && endDate ? 2 : 0)}`).join(',')}])
-            )`;
+            tagJoin = `JOIN transformation_xml_tags txt ON txt.webhook_event_id = we.id`;
+            const tagPlaceholders = tags.map((_, i) => `$${i + (organizationId ? 2 : 2) + (startDate && endDate ? 2 : 0)}`).join(',');
+            tagCondition = `AND txt.tag_name IN (${tagPlaceholders})`;
         }
 
         const params = organizationId ? [organizationId] : [userId];
@@ -273,25 +280,25 @@ async function getCustomReport(pool, userId, tags = [], period = 'monthly', star
             params.push(startDate, endDate);
         }
         if (tags && tags.length > 0) {
-            params.push(...tags.map(tag => `%<${tag}>%`));
+            params.push(...tags);
         }
 
-        // Get transformation count by tag
+        // Get transformation count by tag from webhook_events
         const reportQuery = `
             SELECT 
-                DATE_TRUNC('${period === 'yearly' ? 'year' : period === 'monthly' ? 'month' : period === 'weekly' ? 'week' : 'day'}', created_at) as period,
-                COUNT(*) as transformation_count,
-                COUNT(DISTINCT user_id) as unique_users,
-                resource_type,
-                COUNT(*) FILTER (WHERE success = true) as successful,
-                COUNT(*) FILTER (WHERE success = false) as failed,
-                AVG(CAST(metadata->>'source_size' AS INTEGER)) as avg_source_size
-            FROM security_audit_log
-            WHERE event_type = 'transformation'
-              ${organizationId ? 'AND user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'AND user_id = $1'}
-              ${dateCondition}
+                DATE_TRUNC('${period === 'yearly' ? 'year' : period === 'monthly' ? 'month' : period === 'weekly' ? 'week' : 'day'}', we.created_at) as period,
+                COUNT(DISTINCT we.id) as transformation_count,
+                COUNT(DISTINCT we.user_id) as unique_users,
+                we.source_system,
+                COUNT(*) FILTER (WHERE we.status = 'success') as successful,
+                COUNT(*) FILTER (WHERE we.status = 'failed') as failed,
+                AVG(we.source_xml_size) as avg_source_size
+            FROM webhook_events we
+            ${tagJoin}
+            WHERE ${organizationId ? 'we.user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'we.user_id = $1'}
+              ${dateCondition.replace('created_at', 'we.created_at')}
               ${tagCondition}
-            GROUP BY period, resource_type
+            GROUP BY period, we.source_system
             ORDER BY period DESC
         `;
 
@@ -336,13 +343,13 @@ async function getTransformationHistory(pool, userId, page = 1, limit = 50, stat
         let paramIndex = 2;
 
         if (status !== null) {
-            filters.push(`success = $${paramIndex}`);
-            params.push(status === 'success' || status === 'true');
+            filters.push(`we.status = $${paramIndex}`);
+            params.push(status === 'success' ? 'success' : 'failed');
             paramIndex++;
         }
 
         if (resourceType) {
-            filters.push(`resource_type = $${paramIndex}`);
+            filters.push(`we.source_system = $${paramIndex}`);
             params.push(resourceType);
             paramIndex++;
         }
@@ -351,24 +358,31 @@ async function getTransformationHistory(pool, userId, page = 1, limit = 50, stat
 
         const historyQuery = `
             SELECT 
-                sal.id,
-                sal.user_id,
+                we.id,
+                we.user_id,
                 u.username,
                 u.email,
-                sal.event_type,
-                sal.resource_type,
-                sal.resource_id,
-                sal.success,
-                sal.created_at,
-                sal.ip_address,
-                sal.user_agent,
-                sal.metadata
-            FROM security_audit_log sal
-            JOIN users u ON u.id = sal.user_id
-            WHERE sal.event_type = 'transformation'
-              ${organizationId ? 'AND sal.user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'AND sal.user_id = $1'}
+                we.event_type,
+                we.source_system as resource_type,
+                we.rossum_annotation_id,
+                CASE WHEN we.status = 'success' THEN true ELSE false END as success,
+                we.status,
+                we.created_at,
+                we.source_xml_size,
+                we.transformed_xml_size,
+                we.processing_time_ms,
+                we.error_message,
+                NULL as ip_address,
+                jsonb_build_object(
+                    'source_size', we.source_xml_size,
+                    'transformed_size', we.transformed_xml_size,
+                    'processing_time_ms', we.processing_time_ms
+                ) as metadata
+            FROM webhook_events we
+            JOIN users u ON u.id = we.user_id
+            WHERE ${organizationId ? 'we.user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'we.user_id = $1'}
               ${filterCondition}
-            ORDER BY sal.created_at DESC
+            ORDER BY we.created_at DESC
             LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
         `;
 
@@ -378,13 +392,12 @@ async function getTransformationHistory(pool, userId, page = 1, limit = 50, stat
         // Get total count for pagination
         const countQuery = `
             SELECT COUNT(*) as total
-            FROM security_audit_log
-            WHERE event_type = 'transformation'
-              ${organizationId ? 'AND user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'AND user_id = $1'}
+            FROM webhook_events
+            WHERE ${organizationId ? 'user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'user_id = $1'}
               ${filterCondition}
         `;
         const countParams = organizationId ? [organizationId] : [userId];
-        if (status !== null) countParams.push(status === 'success' || status === 'true');
+        if (status !== null) countParams.push(status === 'success' ? 'success' : 'failed');
         if (resourceType) countParams.push(resourceType);
         
         const countResult = await client.query(countQuery, countParams);
@@ -428,20 +441,19 @@ async function getDashboardSummary(pool, userId) {
             : 'user_id = $1';
         const params = organizationId ? [organizationId] : [userId];
 
-        // Total transformations (all time) - using data_access as proxy for transformations
+        // Total transformations (all time) from webhook_events
         const totalTransformationsQuery = `
             SELECT COUNT(*) as total
-            FROM security_audit_log
-            WHERE event_type IN ('data_access', 'xml_security_threat_detected') AND ${userCondition}
+            FROM webhook_events
+            WHERE ${userCondition}
         `;
         const totalTransformations = await client.query(totalTransformationsQuery, params);
 
         // Transformations today
         const todayTransformationsQuery = `
             SELECT COUNT(*) as today
-            FROM security_audit_log
-            WHERE event_type IN ('data_access', 'xml_security_threat_detected')
-              AND ${userCondition}
+            FROM webhook_events
+            WHERE ${userCondition}
               AND created_at >= CURRENT_DATE
         `;
         const todayTransformations = await client.query(todayTransformationsQuery, params);
@@ -449,41 +461,37 @@ async function getDashboardSummary(pool, userId) {
         // Transformations this month
         const monthTransformationsQuery = `
             SELECT COUNT(*) as month
-            FROM security_audit_log
-            WHERE event_type IN ('data_access', 'xml_security_threat_detected')
-              AND ${userCondition}
+            FROM webhook_events
+            WHERE ${userCondition}
               AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
         `;
         const monthTransformations = await client.query(monthTransformationsQuery, params);
 
-        // Total mappings
+        // Total mappings from transformation_mappings table
         const totalMappingsQuery = `
-            SELECT COUNT(DISTINCT resource_id) as total
-            FROM security_audit_log
-            WHERE event_type IN ('mapping_created', 'mapping_updated') 
-              AND ${userCondition}
-              AND resource_id IS NOT NULL
+            SELECT COUNT(*) as total
+            FROM transformation_mappings
+            WHERE ${organizationId ? 'user_id IN (SELECT id FROM users WHERE organization_id = $1)' : 'user_id = $1'}
         `;
         const totalMappings = await client.query(totalMappingsQuery, params);
 
         // Active users (last 7 days)
         const activeUsersQuery = organizationId ? `
             SELECT COUNT(DISTINCT user_id) as active
-            FROM security_audit_log
+            FROM webhook_events
             WHERE user_id IN (SELECT id FROM users WHERE organization_id = $1)
               AND created_at >= NOW() - INTERVAL '7 days'
         ` : null;
         const activeUsers = organizationId ? await client.query(activeUsersQuery, params) : null;
 
-        // Success rate (last 30 days)
+        // Success rate (last 30 days) from webhook_events
         const successRateQuery = `
             SELECT 
-                COUNT(*) FILTER (WHERE success = true) as successful,
-                COUNT(*) FILTER (WHERE success = false) as failed,
-                ROUND(COUNT(*) FILTER (WHERE success = true) * 100.0 / NULLIF(COUNT(*), 0), 2) as success_rate
-            FROM security_audit_log
-            WHERE event_type IN ('data_access', 'xml_security_threat_detected')
-              AND ${userCondition}
+                COUNT(*) FILTER (WHERE status = 'success') as successful,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                ROUND(COUNT(*) FILTER (WHERE status = 'success') * 100.0 / NULLIF(COUNT(*), 0), 2) as success_rate
+            FROM webhook_events
+            WHERE ${userCondition}
               AND created_at >= NOW() - INTERVAL '30 days'
         `;
         const successRate = await client.query(successRateQuery, params);
@@ -492,9 +500,8 @@ async function getDashboardSummary(pool, userId) {
         const avgPerDayQuery = `
             SELECT 
                 ROUND(COUNT(*) / 30.0, 2) as avg_per_day
-            FROM security_audit_log
-            WHERE event_type IN ('data_access', 'xml_security_threat_detected')
-              AND ${userCondition}
+            FROM webhook_events
+            WHERE ${userCondition}
               AND created_at >= NOW() - INTERVAL '30 days'
         `;
         const avgPerDay = await client.query(avgPerDayQuery, params);

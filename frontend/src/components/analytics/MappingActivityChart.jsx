@@ -1,38 +1,8 @@
 // frontend/src/components/analytics/MappingActivityChart.jsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import styles from './MappingActivityChart.module.css';
 
-// eslint-disable-next-line no-unused-vars
-function MappingActivityChart({ activity, period, onRefresh }) {
-    const [activityLog, setActivityLog] = useState([]);
-    const [activityLoading, setActivityLoading] = useState(true);
-
-    useEffect(() => {
-        loadMappingActivity();
-    }, []);
-
-    const loadMappingActivity = async () => {
-        setActivityLoading(true);
-        try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const response = await fetch('/api/analytics/mappings/activity/all?limit=50', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setActivityLog(data.activity || []);
-            }
-        } catch (err) {
-            console.error('Error loading mapping activity:', err);
-        } finally {
-            setActivityLoading(false);
-        }
-    };
-
+function MappingActivityChart({ activity, onRefresh }) {
     if (!activity || !activity.activity) {
         return <div className={styles.loading}>Loading mapping activity...</div>;
     }
@@ -50,40 +20,6 @@ function MappingActivityChart({ activity, period, onRefresh }) {
 
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleString();
-    };
-
-    const getChangeIcon = (changeType) => {
-        switch (changeType) {
-            case 'created':
-                return '➕';
-            case 'updated':
-                return '✏️';
-            case 'deleted':
-                return '🗑️';
-            default:
-                return '📝';
-        }
-    };
-
-    const formatChangeSummary = (changesSummary) => {
-        if (!changesSummary) return null;
-        
-        if (Array.isArray(changesSummary)) {
-            return changesSummary.map((change, idx) => (
-                <div key={idx} className={styles.changeDetail}>
-                    <strong>{change.field || 'Field'}:</strong> {change.type || 'modified'}
-                    {change.old_count !== undefined && (
-                        <span> ({change.old_count} → {change.new_count})</span>
-                    )}
-                </div>
-            ));
-        }
-
-        if (changesSummary.action) {
-            return <div className={styles.changeDetail}>{changesSummary.action}</div>;
-        }
-
-        return JSON.stringify(changesSummary);
     };
 
     return (
@@ -146,48 +82,35 @@ function MappingActivityChart({ activity, period, onRefresh }) {
 
             {/* Activity Log Section */}
             <div className={styles.activityLogSection}>
-                <h3>📋 Mapping Change History</h3>
-                {activityLoading ? (
-                    <div className={styles.activityLoading}>Loading activity log...</div>
-                ) : (
-                    <div className={styles.activityLog}>
-                        {activityLog.length === 0 ? (
-                            <div className={styles.noActivity}>No mapping activity found</div>
-                        ) : (
-                            activityLog.map((log) => (
-                                <div key={log.id} className={styles.activityItem}>
+                <h3>📋 Most Edited Mappings</h3>
+                <div className={styles.activityLog}>
+                    {(!topMappings || topMappings.length === 0) ? (
+                        <div className={styles.noActivity}>No mapping activity found</div>
+                    ) : (
+                        topMappings.map((mapping) => (
+                                <div key={mapping.mapping_id} className={styles.activityItem}>
                                     <div className={styles.activityIcon}>
-                                        {getChangeIcon(log.change_type)}
+                                        📝
                                     </div>
                                     <div className={styles.activityContent}>
                                         <div className={styles.activityHeader}>
                                             <span className={styles.activityMapping}>
-                                                {log.mapping_name || 'Unknown Mapping'}
+                                                {mapping.mapping_name || 'Unknown Mapping'}
                                             </span>
-                                            <span className={`${styles.activityType} ${styles[log.change_type]}`}>
-                                                {log.change_type}
+                                            <span className={styles.activityType}>
+                                                {mapping.edit_count} edits
                                             </span>
                                         </div>
                                         <div className={styles.activityMeta}>
-                                            <span className={styles.activityUser}>
-                                                👤 {log.user_name || log.user_email}
-                                            </span>
                                             <span className={styles.activityTime}>
-                                                🕐 {formatDate(log.created_at)}
+                                                � Last modified: {formatDate(mapping.last_modified)}
                                             </span>
                                         </div>
-                                        {log.changes_summary && (
-                                            <div className={styles.activityChanges}>
-                                                <div className={styles.changesLabel}>Changes:</div>
-                                                {formatChangeSummary(log.changes_summary)}
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             ))
                         )}
-                    </div>
-                )}
+                </div>
             </div>
         </div>
     );

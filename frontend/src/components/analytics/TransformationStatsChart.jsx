@@ -38,7 +38,7 @@ function TransformationStatsChart({ stats, period, onRefresh }) {
             if (filters.annotationId) queryParams.append('annotationId', filters.annotationId);
             if (filters.mappingName) queryParams.append('mappingName', filters.mappingName);
             
-            const response = await fetch(`/api/analytics/transformations/logs?${queryParams}`, {
+            const response = await fetch(`/api/analytics/transformations/history?${queryParams}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -47,7 +47,7 @@ function TransformationStatsChart({ stats, period, onRefresh }) {
 
             if (response.ok) {
                 const data = await response.json();
-                setLogs(data.logs || []);
+                setLogs(data.transformations || []);
                 setTotalPages(data.pagination?.totalPages || 1);
             }
         } catch (err) {
