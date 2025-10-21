@@ -4624,10 +4624,14 @@ exports.handler = async (event) => {
                         we.response_payload,
                         we.rossum_document_id,
                         we.rossum_queue_id,
-                        we.http_status_code
+                        we.http_status_code,
+                        tm.mapping_name,
+                        tm.id as mapping_id
                     FROM webhook_events we
                     LEFT JOIN users u ON u.id = we.user_id
                     LEFT JOIN api_keys ak ON ak.id = we.api_key_id
+                    LEFT JOIN mapping_usage_log mul ON mul.webhook_event_id = we.id
+                    LEFT JOIN transformation_mappings tm ON tm.id = mul.mapping_id
                     WHERE we.id = $1
                 `, [id]);
 

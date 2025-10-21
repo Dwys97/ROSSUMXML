@@ -30,20 +30,12 @@ function TransformationDetailsModal({ transformation, onClose, onDownload }) {
         return `${(ms / 1000).toFixed(2)}s`;
     };
 
-    // Footer with download button
-    const footerButtons = onDownload && (
-        <button onClick={onDownload} className={styles.downloadButton}>
-            📥 Download XML
-        </button>
-    );
-
     return (
         <BaseModal
             isOpen={!!transformation}
             onClose={onClose}
             title="Transformation Details"
             subtitle="Admin view - Complete transformation information"
-            footer={footerButtons}
             size="large"
         >
                     {/* Main Info */}
@@ -90,6 +82,10 @@ function TransformationDetailsModal({ transformation, onClose, onDownload }) {
                             <div className={styles.infoItem}>
                                 <label>Key Prefix</label>
                                 <span className={styles.code}>{transformation.api_key?.key_prefix || '-'}</span>
+                            </div>
+                            <div className={styles.infoItem}>
+                                <label>Mapping Used</label>
+                                <span className={styles.badge}>{transformation.mapping_name || 'Default'}</span>
                             </div>
                         </div>
                     </div>
