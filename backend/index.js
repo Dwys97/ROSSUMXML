@@ -4358,14 +4358,18 @@ exports.handler = async (event) => {
                 const result = await db.query(`
                     SELECT 
                         COUNT(*) as total_transformations,
-                        COUNT(DISTINCT user_id) as unique_users,
+                        COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL) as unique_users,
                         COUNT(*) FILTER (WHERE status = 'success') as successful,
                         COUNT(*) FILTER (WHERE status = 'failed') as failed,
-                        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today,
+                        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as transformations_today,
+                        COUNT(*) FILTER (WHERE status = 'failed' AND created_at >= CURRENT_DATE) as failed_today,
                         COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as this_month,
                         ROUND(COUNT(*) FILTER (WHERE status = 'success') * 100.0 / NULLIF(COUNT(*), 0), 2) as success_rate,
-                        SUM(source_xml_size) as total_bytes_processed,
-                        AVG(processing_time_ms) as avg_processing_time
+                        COALESCE(SUM(source_xml_size), 0) as total_source_volume_bytes,
+                        COALESCE(SUM(transformed_xml_size), 0) as total_transformed_volume_bytes,
+                        COALESCE(ROUND(AVG(processing_time_ms)), 0) as avg_processing_time_ms,
+                        COALESCE(MAX(source_xml_size), 0) as largest_transformation_bytes,
+                        0 as avg_lines_per_document
                     FROM webhook_events
                 `);
                 
@@ -4455,6 +4459,9 @@ exports.handler = async (event) => {
                         we.user_id,
                         u.username,
                         u.email,
+                        we.api_key_id,
+                        ak.key_name as api_key_name,
+                        CONCAT(LEFT(ak.api_key, 8), '...') as api_key_prefix,
                         we.event_type,
                         we.source_system,
                         we.rossum_annotation_id as annotation_id,
@@ -4466,6 +4473,7 @@ exports.handler = async (event) => {
                         we.error_message
                     FROM webhook_events we
                     LEFT JOIN users u ON u.id = we.user_id
+                    LEFT JOIN api_keys ak ON ak.id = we.api_key_id
                     WHERE 1=1
                 `;
 
@@ -4550,8 +4558,14 @@ exports.handler = async (event) => {
                 const countResult = await db.query(countQuery, countParams);
                 const total = parseInt(countResult.rows[0].count);
 
+                // Add user_email field for table display
+                const transformations = result.rows.map(row => ({
+                    ...row,
+                    user_email: row.email || 'Unknown'
+                }));
+
                 return createResponse(200, JSON.stringify({
-                    transformations: result.rows,
+                    transformations,
                     pagination: {
                         page: parseInt(page),
                         limit: parseInt(limit),
@@ -4595,6 +4609,9 @@ exports.handler = async (event) => {
                         we.user_id,
                         u.username,
                         u.email,
+                        we.api_key_id,
+                        ak.key_name as api_key_name,
+                        CONCAT(LEFT(ak.api_key, 8), '...') as api_key_prefix,
                         we.event_type,
                         we.rossum_annotation_id as annotation_id,
                         we.status,
@@ -4606,9 +4623,11 @@ exports.handler = async (event) => {
                         we.source_xml_payload,
                         we.response_payload,
                         we.rossum_document_id,
-                        we.rossum_queue_id
+                        we.rossum_queue_id,
+                        we.http_status_code
                     FROM webhook_events we
                     LEFT JOIN users u ON u.id = we.user_id
+                    LEFT JOIN api_keys ak ON ak.id = we.api_key_id
                     WHERE we.id = $1
                 `, [id]);
 
@@ -4618,7 +4637,22 @@ exports.handler = async (event) => {
                     }));
                 }
 
-                return createResponse(200, JSON.stringify(result.rows[0]));
+                // Structure the response to match frontend expectations
+                const row = result.rows[0];
+                const response = {
+                    ...row,
+                    user: row.username || row.email ? {
+                        name: row.username,
+                        email: row.email
+                    } : null,
+                    api_key: row.api_key_name ? {
+                        key_name: row.api_key_name,
+                        key_prefix: row.api_key_prefix
+                    } : null,
+                    user_email: row.email // For table display
+                };
+
+                return createResponse(200, JSON.stringify(response));
             } catch (err) {
                 console.error('Error fetching transformation details:', err);
                 return createResponse(500, JSON.stringify({

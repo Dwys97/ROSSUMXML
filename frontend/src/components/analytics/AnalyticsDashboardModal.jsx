@@ -87,19 +87,6 @@ function AnalyticsDashboardModal({ isOpen, onClose }) {
         }
     };
 
-    // Custom header with org badge
-    const customHeader = (
-        <div className={styles.modalHeader}>
-            <h1 className={styles.title}>📊 Analytics Dashboard</h1>
-            {summary?.isOrganizationView && (
-                <div className={styles.orgBadge}>
-                    <span className={styles.orgIcon}>🏢</span>
-                    Organization View
-                </div>
-            )}
-        </div>
-    );
-
     // Tab navigation in header slot
     const tabNavigation = (
         <div className={styles.tabs}>
@@ -128,7 +115,8 @@ function AnalyticsDashboardModal({ isOpen, onClose }) {
         <BaseModal
             isOpen={isOpen}
             onClose={onClose}
-            header={customHeader}
+            title="📊 Analytics Dashboard"
+            subtitle={summary?.isOrganizationView ? "🏢 Organization View - Your personal analytics and metrics" : "Your personal analytics and metrics"}
             headerSlot={tabNavigation}
             size="xl"
             contentClassName={styles.modalContent}
