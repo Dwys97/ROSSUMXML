@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'rossumxml
+
+  Sample SAM Template for rossumxml
+
+  '
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 128
+  Api:
+    Cors:
+      AllowOrigins:
+      - '''http://localhost:5173'''
+      - '''https://*.app.github.dev'''
+      AllowHeaders:
+      - '''Content-Type'''
+      - '''X-Amz-Date'''
+      - '''Authorization'''
+      - '''X-Api-Key'''
+      - '''X-Amz-Security-Token'''
+      AllowMethods:
+      - '''GET,POST,OPTIONS'''
+      MaxAge: '''600'''
+Resources:
+  TransformFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TransformFunction
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+      - x86_64
+      Environment:
+        Variables:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rossumxml
+          POSTGRES_HOST: 172.18.0.2
+          POSTGRES_PORT: '5432'
+          JWT_SECRET: a_secure_secret_key_for_jwt
+          GEMINI_API_KEY: AIzaSyDGoYZ0PkpEAtW2G7Y6YkobU3jGR8XKo28
+      Events:
+        RegisterApi:
+          Type: Api
+          Properties:
+            Path: /api/auth/register
+            Method: POST
+        LoginApi:
+          Type: Api
+          Properties:
+            Path: /api/auth/login
+            Method: POST
+        ProxyApi:
+          Type: Api
+          Properties:
+            Path: /api/{proxy+}
+            Method: ANY
+    Metadata:
+      SamResourceId: TransformFunction
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL for Prod stage
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/
+  TransformFunction:
+    Description: Transform Function ARN
+    Value:
+      Fn::GetAtt:
+      - TransformFunction
+      - Arn
+  TransformFunctionIamRole:
+    Description: Implicit IAM Role created for Transform function
+    Value:
+      Fn::GetAtt:
+      - TransformFunctionRole
+      - Arn
