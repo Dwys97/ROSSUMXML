@@ -153,17 +153,18 @@ fi
 
 # Test 4: Transformation Mapping Creation Logging
 echo -e "\n${YELLOW}Test 4: Mapping Creation Logging${NC}"
+RANDOM_SUFFIX=$((RANDOM % 10000))
 MAPPING_RESPONSE=$(curl -s -X POST "$API_URL/api-settings/mappings" \
     -H "Authorization: Bearer $JWT_TOKEN" \
     -H "Content-Type: application/json" \
-    -d '{
-        "mapping_name":"Test Security Mapping",
-        "description":"Test mapping for security audit",
-        "source_schema_type":"ROSSUM-EXPORT",
-        "destination_schema_type":"CWEXP",
-        "mapping_json":"{\"test\":\"mapping\"}",
-        "is_default":false
-    }')
+    -d "{
+        \"mapping_name\":\"Test Security Mapping ${RANDOM_SUFFIX}\",
+        \"description\":\"Test mapping for security audit\",
+        \"source_schema_type\":\"ROSSUM-EXPORT\",
+        \"destination_schema_type\":\"CWEXP\",
+        \"mapping_json\":\"{\\\"test\\\":\\\"mapping\\\"}\",
+        \"is_default\":false
+    }")
 
 if check_json_field "$MAPPING_RESPONSE" '.id'; then
     MAPPING_ID=$(echo "$MAPPING_RESPONSE" | jq -r '.id')
@@ -186,13 +187,14 @@ fi
 # Test 5: Mapping Update Logging
 echo -e "\n${YELLOW}Test 5: Mapping Update Logging${NC}"
 if [ ! -z "$MAPPING_ID" ]; then
+    RANDOM_UPDATE_SUFFIX=$((RANDOM % 10000))
     UPDATE_RESPONSE=$(curl -s -X PUT "$API_URL/api-settings/mappings/$MAPPING_ID" \
         -H "Authorization: Bearer $JWT_TOKEN" \
         -H "Content-Type: application/json" \
-        -d '{
-            "mapping_name":"Updated Test Mapping",
-            "description":"Updated description"
-        }')
+        -d "{
+            \"mapping_name\":\"Updated Test Mapping ${RANDOM_UPDATE_SUFFIX}\",
+            \"description\":\"Updated description\"
+        }")
     
     if check_json_field "$UPDATE_RESPONSE" '.id'; then
         # Check if mapping update was logged
@@ -337,7 +339,7 @@ echo ""
 
 # Test 10: Admin Permission Check
 echo -e "\n${YELLOW}Test 10: Admin Has Required Permissions${NC}"
-ADMIN_ID="230503b1-c544-469f-8c21-b8c45a536129"
+ADMIN_ID="9c18dd41-3edb-4342-885c-56fdf9af01e7"
 
 HAS_PERMISSION=$(docker exec rossumxml-db-1 psql -U postgres -d rossumxml -t -c \
     "SELECT user_has_permission('$ADMIN_ID', 'manage_api_keys');")

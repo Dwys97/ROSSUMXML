@@ -1831,25 +1831,31 @@ exports.handler = async (event) => {
                 
                 const client = await pool.connect();
                 try {
-                    // Get mapping name before deletion for logging
+                    // Set RLS context using set_config (required by RLS policies)
+                    await client.query("SELECT set_config('app.current_user_id', $1, false)", [user.id]);
+                    
+                    // Get mapping - check ownership explicitly
                     const mappingResult = await client.query(
                         'SELECT mapping_name FROM transformation_mappings WHERE id = $1 AND user_id = $2',
                         [mappingId, user.id]
                     );
                     
+                    if (mappingResult.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                    }
+                    
+                    // Delete mapping - RLS will now allow it
                     const result = await client.query(
                         'DELETE FROM transformation_mappings WHERE id = $1 AND user_id = $2 RETURNING id',
                         [mappingId, user.id]
                     );
                     
                     if (result.rows.length === 0) {
-                        return createResponse(404, JSON.stringify({ error: 'Mapping not found' }));
+                        return createResponse(404, JSON.stringify({ error: 'Mapping not found or access denied' }));
                     }
                     
                     // Log mapping deletion
-                    if (mappingResult.rows.length > 0) {
-                        await logMappingDeletion(pool, user.id, mappingId, mappingResult.rows[0].mapping_name, event);
-                    }
+                    await logMappingDeletion(pool, user.id, mappingId, mappingResult.rows[0].mapping_name, event);
                     
                     return createResponse(200, JSON.stringify({ message: 'Mapping deleted successfully' }));
                 } finally {
