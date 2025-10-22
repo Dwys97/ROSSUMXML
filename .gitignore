@@ -4,6 +4,13 @@ node_modules/
 frontend/build/
 backend/*.zip
 
+# AWS SAM build artifacts
+backend/.aws-sam/
+.aws-sam/
+
+# Database dumps
+*.dump
+
 # Webhook XML files (runtime-generated)
 webhook-xmls/source/
 webhook-xmls/transformed/
