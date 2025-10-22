@@ -5,8 +5,11 @@ const helmet = require('helmet');
 const authRoutes = require('./routes/auth.routes');
 const apiSettingsRoutes = require('./routes/api-settings.routes');
 const adminRoutes = require('./routes/admin.routes');
+const organizationRoutes = require('./routes/organization.routes');
+const invitationRoutes = require('./routes/invitation.routes');
 const { parseXmlToTree } = require('./services/xmlParser.service');
 const { getCorsOptions, helmetConfig } = require('./middleware/securityHeaders');
+const { ipRateLimiter } = require('./middleware/rateLimiter');
 const db = require('./db');
 
 const app = express();
@@ -17,6 +20,9 @@ app.use(helmetConfig);
 // CORS Configuration with whitelist
 app.use(cors(getCorsOptions()));
 
+// Global IP-based rate limiting (ISO 27001 - A.9.4)
+app.use(ipRateLimiter(100, 60000)); // 100 requests per minute per IP
+
 // Body parsing
 app.use(express.json());
 
@@ -24,6 +30,8 @@ app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/api-settings', apiSettingsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/invitations', invitationRoutes);
 
 // XML Transform endpoints
 app.post('/transform', async (req, res) => {
