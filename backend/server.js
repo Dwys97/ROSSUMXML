@@ -27,8 +27,8 @@ app.use(ipRateLimiter(100, 60000)); // 100 requests per minute per IP
 app.use(express.json());
 
 // Routes
-app.use('/auth', authRoutes);
-app.use('/api-settings', apiSettingsRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/api-settings', apiSettingsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/invitations', invitationRoutes);
