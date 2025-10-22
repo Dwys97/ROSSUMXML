@@ -509,9 +509,9 @@ router.post('/:id/invitations', writeOperationRateLimiter(), async (req, res) =>
             });
         }
         
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        // Validate email format (simple check, more secure regex)
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(email) || email.length > 255) {
             return res.status(400).json({
                 error: 'Invalid email format'
             });

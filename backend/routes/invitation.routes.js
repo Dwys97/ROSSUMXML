@@ -7,12 +7,13 @@ const express = require('express');
 const router = express.Router();
 const invitationService = require('../services/invitation.service');
 const authenticateJWT = require('../middleware/auth');
+const { readOperationRateLimiter, writeOperationRateLimiter } = require('../middleware/rateLimiter');
 
 /**
  * GET /api/invitations/validate/:token
  * Public endpoint to validate invitation token before registration
  */
-router.get('/validate/:token', async (req, res) => {
+router.get('/validate/:token', readOperationRateLimiter(), async (req, res) => {
     try {
         const { token } = req.params;
         
@@ -53,7 +54,7 @@ router.get('/validate/:token', async (req, res) => {
  * POST /api/invitations/accept/:token
  * Accept invitation (requires authentication)
  */
-router.post('/accept/:token', authenticateJWT, async (req, res) => {
+router.post('/accept/:token', authenticateJWT, writeOperationRateLimiter(), async (req, res) => {
     try {
         const { token } = req.params;
         const userId = req.user.user_id;
