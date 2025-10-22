@@ -10,7 +10,7 @@ if pgrep -f "auto-export-xmls.sh" > /dev/null; then
 fi
 
 # Start in background
-nohup bash auto-export-xmls.sh > /tmp/auto-export-xmls.log 2>&1 &
+nohup bash scripts/database/auto-export-xmls.sh > /tmp/auto-export-xmls.log 2>&1 &
 
 PID=$!
 echo "✅ Auto-export watcher started (PID: $PID)"

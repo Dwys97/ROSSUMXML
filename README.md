@@ -1,4 +1,4 @@
-# ROSSUMXML - Enterprise XML Transformation Platform
+# SCHEMABRIDGE - Enterprise XML Transformation Platform
 
 **Production-Ready XML Mapping & Transformation System with AI-Powered Suggestions**
 
@@ -10,13 +10,36 @@
 
 ## 🚀 Quick Start
 
-### Transform XML in 30 Seconds
+### First Time Setup (New Codespace or Fork)
 
 ```bash
-# Start the platform
-bash start-dev.sh
+# Automated setup (one command)
+bash scripts/setup/setup-project.sh
+```
 
-# Transform XML via API
+This will:
+- Install all dependencies
+- Initialize database with schema
+- Run all migrations  
+- Create admin users
+- Build backend
+- **Ready in ~2 minutes**
+
+### Daily Development
+
+```bash
+# Start all services
+bash start-dev.sh
+```
+
+**Access the application:**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+- Admin Login: `d.radionovs@gmail.com` / `password123`
+
+### Transform XML via API
+
+```bash
 curl -X POST http://localhost:3000/api/transform \
   -H "Content-Type: application/json" \
   -d '{
@@ -25,12 +48,7 @@ curl -X POST http://localhost:3000/api/transform \
   }'
 ```
 
-**Output:**
-```xml
-<Payment>
-  <Total>100</Total>
-</Payment>
-```
+**📚 Full Documentation:** See [`docs/setup/SETUP.md`](docs/setup/SETUP.md)
 
 ---
 
