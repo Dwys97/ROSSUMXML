@@ -160,10 +160,10 @@ async function logSecurityEvent(eventData) {
 /**
  * Middleware: Require specific permission
  * @param {string} permission - Required permission
- * @returns {Function} Express middleware
+ * @returns {Function} Express middleware with check method
  */
 function requirePermission(permission) {
-  return async (req, res, next) => {
+  const middleware = async (req, res, next) => {
     // Check if user is authenticated
     if (!req.user || !req.user.user_id) {
       await logSecurityEvent({
@@ -219,6 +219,13 @@ function requirePermission(permission) {
 
     next();
   };
+  
+  // Add check method for direct permission checking
+  middleware.check = async (userId) => {
+    return await userHasPermission(userId, permission);
+  };
+  
+  return middleware;
 }
 
 /**

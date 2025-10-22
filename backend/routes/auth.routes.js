@@ -3,10 +3,11 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const invitationService = require('../services/invitation.service');
 
 // Регистрация
 router.post('/register', async (req, res) => {
-    const { email, fullName, password, enableBilling, billingDetails } = req.body;
+    const { email, fullName, password, enableBilling, billingDetails, invitationToken } = req.body;
 
     if (!email || !password || !fullName) {
         return res.status(400).json({
@@ -15,6 +16,27 @@ router.post('/register', async (req, res) => {
     }
 
     try {
+        let invitation = null;
+        
+        // Validate invitation token if provided
+        if (invitationToken) {
+            invitation = await invitationService.validateInvitationToken(invitationToken);
+            
+            if (!invitation) {
+                return res.status(400).json({
+                    error: 'Недействительный или истекший код приглашения'
+                });
+            }
+            
+            // Verify email matches
+            if (invitation.email !== email) {
+                return res.status(400).json({
+                    error: 'Email не совпадает с приглашением',
+                    message: `Это приглашение предназначено для ${invitation.email}`
+                });
+            }
+        }
+        
         // Создаем имя пользователя из email
         const username = email.split('@')[0];
         
@@ -46,6 +68,11 @@ router.post('/register', async (req, res) => {
             );
 
             const userId = userResult.rows[0].id;
+            
+            // If invitation exists, accept it and link to organization
+            if (invitation) {
+                await invitationService.acceptInvitation(invitationToken, userId);
+            }
 
             // Создаем начальную подписку (бесплатную)
             await client.query(
@@ -81,7 +108,8 @@ router.post('/register', async (req, res) => {
             
             res.status(201).json({
                 message: 'Регистрация успешна',
-                user: { id: userId, email, username }
+                user: { id: userId, email, username },
+                organization_joined: invitation ? invitation.organization_name : null
             });
 
         } catch (err) {
