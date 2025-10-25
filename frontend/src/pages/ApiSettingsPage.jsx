@@ -46,6 +46,12 @@ const ApiSettingsPage = () => {
         is_default: false
     });
     
+    // Schema Template Library state
+    const [templates, setTemplates] = useState([]);
+    const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [templateCategories, setTemplateCategories] = useState([]);
+    const [templatesLoading, setTemplatesLoading] = useState(false);
+    
     // UI state
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
@@ -56,6 +62,7 @@ const ApiSettingsPage = () => {
         loadWebhookSettings();
         loadDeliverySettings();
         loadMappings();
+        loadTemplates(); // Load schema templates
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -245,6 +252,68 @@ const ApiSettingsPage = () => {
         }
     };
 
+    // ============== SCHEMA TEMPLATE LIBRARY ==============
+    
+    const loadTemplates = async () => {
+        setTemplatesLoading(true);
+        try {
+            const response = await fetch('/api/templates');
+            const data = await response.json();
+            setTemplates(data.templates || []);
+            // Extract unique categories
+            const categories = [...new Set(data.templates.map(t => t.category))];
+            setTemplateCategories(categories);
+        } catch (err) {
+            console.error('Error loading templates:', err);
+        } finally {
+            setTemplatesLoading(false);
+        }
+    };
+
+    const handleTemplateSelect = async (e) => {
+        const templateId = e.target.value;
+        
+        if (!templateId) {
+            // User selected "Custom Upload" - clear template
+            setSelectedTemplate(null);
+            setMappingForm({ ...mappingForm, destination_schema_xml: '' });
+            return;
+        }
+
+        setTemplatesLoading(true);
+        try {
+            const response = await fetch(`/api/templates/${templateId}`);
+            if (!response.ok) {
+                throw new Error('Failed to load template');
+            }
+            
+            const { template } = await response.json();
+            setSelectedTemplate(template);
+            
+            // Auto-populate destination schema XML and type
+            setMappingForm({
+                ...mappingForm,
+                destination_schema_xml: template.template_xml,
+                destination_schema_type: template.schema_type
+            });
+            
+            setMessage({ 
+                type: 'success', 
+                text: `✓ Template loaded: ${template.display_name}` 
+            });
+            setTimeout(() => setMessage(null), 3000);
+        } catch (err) {
+            console.error('Error loading template:', err);
+            setMessage({ 
+                type: 'error', 
+                text: 'Failed to load template. Please try again or use custom upload.' 
+            });
+            setSelectedTemplate(null);
+        } finally {
+            setTemplatesLoading(false);
+        }
+    };
+
     const openMappingModal = (mapping = null) => {
         if (mapping) {
             setEditingMapping(mapping);
@@ -257,6 +326,8 @@ const ApiSettingsPage = () => {
                 destination_schema_xml: mapping.destination_schema_xml || '',
                 is_default: mapping.is_default || false
             });
+            // Clear template selection when editing existing mapping
+            setSelectedTemplate(null);
         } else {
             setEditingMapping(null);
             setMappingForm({
@@ -268,6 +339,8 @@ const ApiSettingsPage = () => {
                 destination_schema_xml: '',
                 is_default: false
             });
+            // Clear template selection for new mapping
+            setSelectedTemplate(null);
         }
         setShowMappingModal(true);
     };
@@ -425,9 +498,12 @@ const ApiSettingsPage = () => {
 
                     <div className={styles.apiKeysList}>
                         {apiKeys.length === 0 ? (
-                            <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                                No API keys yet. Create one below to get started.
-                            </p>
+                            <div className={styles.emptyState}>
+                                <div className={styles.emptyStateIcon}>🔑</div>
+                                <div className={styles.emptyStateText}>
+                                    No API keys yet. Create one below to get started.
+                                </div>
+                            </div>
                         ) : (
                             apiKeys.map(key => (
                                 <div key={key.id} className={styles.apiKeyItem}>
@@ -804,7 +880,7 @@ const ApiSettingsPage = () => {
                                             </span>
                                         ))}
                                     </div>
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    <div className={styles.actionButtonGroup}>
                                         <input
                                             type="email"
                                             className={styles.input}
@@ -926,7 +1002,7 @@ const ApiSettingsPage = () => {
                                                 Updated: {formatDate(mapping.updated_at)}
                                             </span>
                                             {mapping.has_destination_schema && (
-                                                <span className={styles.metaItem} style={{ color: '#10b981' }}>
+                                                <span className={`${styles.metaItem} ${styles.metaItemSuccess}`}>
                                                     ✓ Destination schema included
                                                 </span>
                                             )}
@@ -988,7 +1064,7 @@ const ApiSettingsPage = () => {
                                         type="file"
                                         id="jsonFileUpload"
                                         accept=".json"
-                                        style={{ display: 'none' }}
+                                        className={styles.hidden}
                                         onChange={handleJsonFileUpload}
                                     />
                                     <button
@@ -998,45 +1074,110 @@ const ApiSettingsPage = () => {
                                     >
                                         📁 Upload JSON File
                                     </button>
-                                    <small style={{ color: '#666', marginLeft: '10px' }}>
+                                    <small className={styles.helperText}>
                                         or type/paste JSON below
                                     </small>
                                 </div>
                                 <textarea
-                                    className={`${styles.textarea} ${styles.jsonEditor}`}
+                                    className={`${styles.textarea} ${styles.jsonEditor} ${styles.monoText}`}
                                     value={mappingForm.mapping_json}
                                     onChange={(e) => setMappingForm({ ...mappingForm, mapping_json: e.target.value })}
                                     placeholder='{"field1": "value1", "field2": "value2"}'
                                     rows={12}
                                     required
-                                    style={{ fontFamily: 'monospace', fontSize: '13px' }}
                                 />
-                                <small style={{ color: '#666' }}>Enter valid JSON for the transformation mapping</small>
+                                <small className={styles.helperTextSmall}>Enter valid JSON for the transformation mapping</small>
                             </div>
 
                             <div className={styles.inputGroup}>
                                 <label className={styles.inputLabel}>Destination Schema XML *</label>
-                                <div className={styles.fileUploadSection}>
-                                    <input
-                                        type="file"
-                                        id="xmlFileUpload"
-                                        accept=".xml"
-                                        style={{ display: 'none' }}
-                                        onChange={handleXmlFileUpload}
-                                    />
-                                    <button
-                                        type="button"
-                                        className={`${styles.button} ${styles.buttonSecondary}`}
-                                        onClick={() => document.getElementById('xmlFileUpload').click()}
+                                
+                                {/* Template Selector */}
+                                <div className={styles.templateSelectorSection}>
+                                    <label className={styles.inputLabel}>
+                                        📚 Choose from Template Library or Upload Custom:
+                                    </label>
+                                    <select
+                                        className={styles.select}
+                                        value={selectedTemplate?.id || ''}
+                                        onChange={handleTemplateSelect}
+                                        disabled={templatesLoading}
                                     >
-                                        📄 Upload Destination Schema
-                                    </button>
-                                    <small style={{ color: '#666', marginLeft: '10px' }}>
-                                        {mappingForm.destination_schema_xml ? '✓ Schema uploaded' : 'Required for API transformations'}
-                                    </small>
+                                        <option value="">-- Custom Upload --</option>
+                                        {templateCategories.map(category => {
+                                            const categoryTemplates = templates.filter(t => t.category === category);
+                                            if (categoryTemplates.length === 0) return null;
+                                            
+                                            const categoryLabel = category === 'logistics' ? '🚢 Logistics Systems' :
+                                                                category === 'erp' ? '💼 ERP Systems' :
+                                                                category === 'accounting' ? '📊 Accounting Systems' :
+                                                                `📁 ${category.charAt(0).toUpperCase() + category.slice(1)}`;
+                                            
+                                            return (
+                                                <optgroup key={category} label={categoryLabel}>
+                                                    {categoryTemplates.map(template => (
+                                                        <option key={template.id} value={template.id}>
+                                                            {template.display_name} ({template.version})
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            );
+                                        })}
+                                    </select>
                                 </div>
-                                <small style={{ color: '#999', fontSize: '12px' }}>
-                                    Upload the destination XML schema template. Source schema will be provided via API/webhook call.
+
+                                {/* Template Selected - Show confirmation */}
+                                {selectedTemplate && (
+                                    <div className={styles.templateConfirmation}>
+                                        <div className={styles.successBox}>
+                                            ✅ Using template: <strong>{selectedTemplate.display_name}</strong>
+                                            <div className={styles.templateInfo}>
+                                                <small>
+                                                    {selectedTemplate.system_name} • {selectedTemplate.schema_type} • v{selectedTemplate.version}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className={`${styles.button} ${styles.buttonSecondary} ${styles.buttonSmall}`}
+                                            onClick={() => {
+                                                setSelectedTemplate(null);
+                                                setMappingForm({ ...mappingForm, destination_schema_xml: '' });
+                                            }}
+                                        >
+                                            Switch to custom upload
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Custom Upload - Show only if no template selected */}
+                                {!selectedTemplate && (
+                                    <div className={styles.fileUploadSection}>
+                                        <input
+                                            type="file"
+                                            id="xmlFileUpload"
+                                            accept=".xml"
+                                            className={styles.hidden}
+                                            onChange={handleXmlFileUpload}
+                                        />
+                                        <button
+                                            type="button"
+                                            className={`${styles.button} ${styles.buttonSecondary}`}
+                                            onClick={() => document.getElementById('xmlFileUpload').click()}
+                                        >
+                                            📄 Upload Destination Schema
+                                        </button>
+                                        <small className={styles.helperText}>
+                                            {mappingForm.destination_schema_xml ? '✓ Schema uploaded' : 'Required for API transformations'}
+                                        </small>
+                                    </div>
+                                )}
+                                
+                                <small className={styles.helperTextSmall}>
+                                    {selectedTemplate 
+                                        ? 'Template schema loaded automatically. Source schema will be provided via API/webhook call.'
+                                        : 'Upload the destination XML schema template. Source schema will be provided via API/webhook call.'
+                                    }
                                 </small>
                             </div>
 
@@ -1085,7 +1226,7 @@ const ApiSettingsPage = () => {
                             <p><strong>⚠️ Important:</strong> Save these credentials now. The API secret will not be shown again!</p>
                         </div>
 
-                        <div style={{ marginTop: '20px' }}>
+                        <div className={styles.marginTop}>
                             <div className={styles.inputGroup}>
                                 <label className={styles.inputLabel}>API Key</label>
                                 <div className={styles.apiKeyValue}>
@@ -1114,9 +1255,8 @@ const ApiSettingsPage = () => {
                         </div>
 
                         <button
-                            className={`${styles.button} ${styles.buttonPrimary}`}
+                            className={`${styles.button} ${styles.buttonPrimary} ${styles.fullWidth} ${styles.marginTop}`}
                             onClick={() => setShowSecretModal(false)}
-                            style={{ marginTop: '20px', width: '100%' }}
                         >
                             I've Saved My Credentials
                         </button>

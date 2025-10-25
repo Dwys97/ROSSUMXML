@@ -247,6 +247,10 @@ a.secondary-btn,
     text-align: center;
     cursor: pointer;
     transition: 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 220px; /* Fixed height to keep all dropzones aligned */
+    justify-content: space-between;
 }
 .upload-card:hover,
 .upload-card.dragover {
@@ -281,6 +285,61 @@ a.secondary-btn,
     margin: 0;
     color: #a5a9b5;
     font-size: 0.9rem;
+}
+
+/* Integrated dropdown selector styling */
+.dropzone-selector {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #3a506b;
+    cursor: default;
+}
+
+.dropzone-selector select {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid #3a506b;
+    border-radius: 6px;
+    background: #2c3e50;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dropzone-selector select:hover {
+    border-color: #1d72f3;
+    background: #34495e;
+}
+
+.dropzone-selector select:focus {
+    outline: none;
+    border-color: #1d72f3;
+    box-shadow: 0 0 0 2px rgba(29, 114, 243, 0.2);
+}
+
+.dropzone-selector select option {
+    background: #2c3e50;
+    color: #ffffff;
+    padding: 8px;
+}
+
+.dropzone-selector-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1d72f3;
+    text-align: left;
+}
+
+.dropzone-selector-divider {
+    margin: 10px 0;
+    font-size: 11px;
+    color: #7f8c8d;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .config-card {

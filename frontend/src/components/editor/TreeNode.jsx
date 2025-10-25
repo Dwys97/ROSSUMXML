@@ -165,4 +165,14 @@ function TreeNode({
     );
 }
 
-export default TreeNode;
+export default React.memo(TreeNode, (prevProps, nextProps) => {
+    // Custom comparison for memoization - only re-render if these props change
+    return (
+        prevProps.node.path === nextProps.node.path &&
+        prevProps.searchTerm === nextProps.searchTerm &&
+        prevProps.mappedPaths === nextProps.mappedPaths &&
+        prevProps.selectedCollection === nextProps.selectedCollection &&
+        prevProps.targetValueMap === nextProps.targetValueMap &&
+        prevProps.isSource === nextProps.isSource
+    );
+});

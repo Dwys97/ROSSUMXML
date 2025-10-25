@@ -1,9 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { tokenStorage } from '../../utils/tokenStorage';
+import { useDataPreload } from '../../contexts/DataPreloadContext';
+import BaseModal from './BaseModal';
 import styles from './ApiSettingsModal.module.css';
 
 const ApiSettingsModal = ({ isOpen, onClose }) => {
-    // API Keys state
+    // Get preloaded data from context
+    const {
+        apiKeys: preloadedApiKeys,
+        setApiKeys: setPreloadedApiKeys,
+        webhookSettings: preloadedWebhookSettings,
+        setWebhookSettings: setPreloadedWebhookSettings,
+        deliverySettings: preloadedDeliverySettings,
+        setDeliverySettings: setPreloadedDeliverySettings,
+        mappings: preloadedMappings,
+        setMappings: setPreloadedMappings,
+        apiSettingsLoading,
+        loadApiSettings
+    } = useDataPreload();
+    
+    // Local state for API Keys
     const [apiKeys, setApiKeys] = useState([]);
     const [newKeyName, setNewKeyName] = useState('');
     const [newKeyExpiry, setNewKeyExpiry] = useState('never');
@@ -51,12 +67,46 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
     const [message, setMessage] = useState(null);
     const [showSecretModal, setShowSecretModal] = useState(false);
 
+    // Load preloaded data into local state when modal opens
     useEffect(() => {
         if (isOpen) {
-            loadApiKeys();
-            loadWebhookSettings();
-            loadDeliverySettings();
-            loadMappings();
+            // Use preloaded data if available, otherwise trigger load
+            if (preloadedApiKeys && preloadedApiKeys.length >= 0) {
+                setApiKeys(preloadedApiKeys);
+            }
+            
+            if (preloadedWebhookSettings) {
+                setWebhookSettings({
+                    webhook_url: preloadedWebhookSettings.webhook_url || '',
+                    webhook_secret: preloadedWebhookSettings.webhook_secret || '',
+                    is_enabled: preloadedWebhookSettings.is_enabled || false,
+                    events: preloadedWebhookSettings.events || []
+                });
+            }
+            
+            if (preloadedDeliverySettings) {
+                setDeliverySettings({
+                    ftp_host: preloadedDeliverySettings.ftp_host || '',
+                    ftp_port: preloadedDeliverySettings.ftp_port || 21,
+                    ftp_username: preloadedDeliverySettings.ftp_username || '',
+                    ftp_password: preloadedDeliverySettings.ftp_password || '',
+                    ftp_path: preloadedDeliverySettings.ftp_path || '/',
+                    ftp_use_ssl: preloadedDeliverySettings.ftp_use_ssl !== false,
+                    email_recipients: preloadedDeliverySettings.email_recipients || [],
+                    email_subject: preloadedDeliverySettings.email_subject || 'XML Transformation Result',
+                    email_include_attachment: preloadedDeliverySettings.email_include_attachment !== false
+                });
+                setDeliveryMethod(preloadedDeliverySettings.delivery_method || 'download');
+            }
+            
+            if (preloadedMappings && preloadedMappings.length >= 0) {
+                setMappings(preloadedMappings);
+            }
+            
+            // If data is stale or missing, trigger a reload
+            if (!preloadedApiKeys && !apiSettingsLoading) {
+                loadApiSettings(true);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
@@ -85,6 +135,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         try {
             const keys = await apiCall('/keys');
             setApiKeys(keys);
+            setPreloadedApiKeys(keys); // Update context
         } catch (err) {
             console.error('Error loading API keys:', err);
         }
@@ -147,10 +198,12 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
 
     // ============== WEBHOOK ==============
     
+    // eslint-disable-next-line no-unused-vars
     const loadWebhookSettings = async () => {
         try {
             const settings = await apiCall('/webhook');
             setWebhookSettings(settings);
+            setPreloadedWebhookSettings(settings); // Update context
         } catch (err) {
             console.error('Error loading webhook settings:', err);
         }
@@ -166,6 +219,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                 body: JSON.stringify(webhookSettings)
             });
             setMessage({ type: 'success', text: 'Webhook settings saved successfully' });
+            setPreloadedWebhookSettings(webhookSettings); // Update context after save
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         } finally {
@@ -183,11 +237,13 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
 
     // ============== OUTPUT DELIVERY ==============
     
+    // eslint-disable-next-line no-unused-vars
     const loadDeliverySettings = async () => {
         try {
             const settings = await apiCall('/output-delivery');
             setDeliveryMethod(settings.delivery_method || 'download');
             setDeliverySettings(settings);
+            setPreloadedDeliverySettings(settings); // Update context
         } catch (err) {
             console.error('Error loading delivery settings:', err);
         }
@@ -198,11 +254,13 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         setMessage(null);
         
         try {
+            const savedSettings = { ...deliverySettings, delivery_method: deliveryMethod };
             await apiCall('/output-delivery', {
                 method: 'POST',
-                body: JSON.stringify({ ...deliverySettings, delivery_method: deliveryMethod })
+                body: JSON.stringify(savedSettings)
             });
             setMessage({ type: 'success', text: 'Output delivery settings saved successfully' });
+            setPreloadedDeliverySettings(savedSettings); // Update context after save
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         } finally {
@@ -242,6 +300,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         try {
             const data = await apiCall('/mappings');
             setMappings(data);
+            setPreloadedMappings(data); // Update context
         } catch (err) {
             console.error('Error loading mappings:', err);
         }
@@ -395,24 +454,15 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
         return new Date(dateString).toLocaleDateString();
     };
 
-    // Don't render if modal is not open
-    if (!isOpen) return null;
-
     return (
-        <div className={styles.modalOverlay} onClick={onClose}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                <button className={styles.closeButton} onClick={onClose} aria-label="Close">
-                    ✕
-                </button>
-                
-                <div className={styles.apiSettingsContainer}>
-                    <div className={styles.pageHeader}>
-                        <h1 className={styles.pageTitle}>API Settings</h1>
-                        <p className={styles.pageSubtitle}>
-                            Manage your API keys, webhooks, and output delivery preferences
-                        </p>
-                    </div>
-
+        <BaseModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="API Settings"
+            subtitle="Manage your API keys, webhooks, and output delivery preferences"
+            size="xl"
+            contentClassName={styles.modalContent}
+        >
             {message && (
                 <div className={message.type === 'success' ? styles.successMessage : styles.errorMessage}>
                     {message.type === 'success' ? '✓' : '⚠'} {message.text}
@@ -436,9 +486,12 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
 
                     <div className={styles.apiKeysList}>
                         {apiKeys.length === 0 ? (
-                            <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                                No API keys yet. Create one below to get started.
-                            </p>
+                            <div className={styles.emptyState}>
+                                <div className={styles.emptyStateIcon}>🔑</div>
+                                <div className={styles.emptyStateText}>
+                                    No API keys yet. Create one below to get started.
+                                </div>
+                            </div>
                         ) : (
                             apiKeys.map(key => (
                                 <div key={key.id} className={styles.apiKeyItem}>
@@ -815,7 +868,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                                             </span>
                                         ))}
                                     </div>
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    <div className={styles.actionButtonGroup}>
                                         <input
                                             type="email"
                                             className={styles.input}
@@ -937,7 +990,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                                                 Updated: {formatDate(mapping.updated_at)}
                                             </span>
                                             {mapping.has_destination_schema && (
-                                                <span className={styles.metaItem} style={{ color: '#10b981' }}>
+                                                <span className={`${styles.metaItem} ${styles.metaItemSuccess}`}>
                                                     ✓ Destination schema included
                                                 </span>
                                             )}
@@ -999,7 +1052,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                                         type="file"
                                         id="jsonFileUpload"
                                         accept=".json"
-                                        style={{ display: 'none' }}
+                                        className={styles.hidden}
                                         onChange={handleJsonFileUpload}
                                     />
                                     <button
@@ -1009,20 +1062,19 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                                     >
                                         📁 Upload JSON File
                                     </button>
-                                    <small style={{ color: '#666', marginLeft: '10px' }}>
+                                    <small className={styles.helperText}>
                                         or type/paste JSON below
                                     </small>
                                 </div>
                                 <textarea
-                                    className={`${styles.textarea} ${styles.jsonEditor}`}
+                                    className={`${styles.textarea} ${styles.jsonEditor} ${styles.monoText}`}
                                     value={mappingForm.mapping_json}
                                     onChange={(e) => setMappingForm({ ...mappingForm, mapping_json: e.target.value })}
                                     placeholder='{"field1": "value1", "field2": "value2"}'
                                     rows={12}
                                     required
-                                    style={{ fontFamily: 'monospace', fontSize: '13px' }}
                                 />
-                                <small style={{ color: '#666' }}>Enter valid JSON for the transformation mapping</small>
+                                <small className={styles.helperTextSmall}>Enter valid JSON for the transformation mapping</small>
                             </div>
 
                             <div className={styles.inputGroup}>
@@ -1032,7 +1084,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                                         type="file"
                                         id="xmlFileUpload"
                                         accept=".xml"
-                                        style={{ display: 'none' }}
+                                        className={styles.hidden}
                                         onChange={handleXmlFileUpload}
                                     />
                                     <button
@@ -1042,11 +1094,11 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                                     >
                                         📄 Upload Destination Schema
                                     </button>
-                                    <small style={{ color: '#666', marginLeft: '10px' }}>
+                                    <small className={styles.helperText}>
                                         {mappingForm.destination_schema_xml ? '✓ Schema uploaded' : 'Required for API transformations'}
                                     </small>
                                 </div>
-                                <small style={{ color: '#999', fontSize: '12px' }}>
+                                <small className={styles.helperTextSmall}>
                                     Upload the destination XML schema template. Source schema will be provided via API/webhook call.
                                 </small>
                             </div>
@@ -1096,7 +1148,7 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                             <p><strong>⚠️ Important:</strong> Save these credentials now. The API secret will not be shown again!</p>
                         </div>
 
-                        <div style={{ marginTop: '20px' }}>
+                        <div className={styles.marginTop}>
                             <div className={styles.inputGroup}>
                                 <label className={styles.inputLabel}>API Key</label>
                                 <div className={styles.apiKeyValue}>
@@ -1125,18 +1177,15 @@ const ApiSettingsModal = ({ isOpen, onClose }) => {
                         </div>
 
                         <button
-                            className={`${styles.button} ${styles.buttonPrimary}`}
+                            className={`${styles.button} ${styles.buttonPrimary} ${styles.fullWidth} ${styles.marginTop}`}
                             onClick={() => setShowSecretModal(false)}
-                            style={{ marginTop: '20px', width: '100%' }}
                         >
                             I've Saved My Credentials
                         </button>
                     </div>
                 </div>
             )}
-                </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 };
 

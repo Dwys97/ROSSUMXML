@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
+import { useDataPreload } from '../../contexts/DataPreloadContext';
 import { tokenStorage } from '../../utils/tokenStorage';
+import BaseModal from '../common/BaseModal';
 import styles from './UserProfile.module.css';
 
 const COUNTRIES = [
@@ -204,6 +206,13 @@ const COUNTRIES = [
 function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { 
+        userProfile: preloadedProfile, 
+        setUserProfile: setPreloadedProfile, 
+        userProfileLoading,
+        loadUserProfile 
+    } = useDataPreload();
+    
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -245,7 +254,8 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         address: '',
         city: '',
         country: '',
-        zipCode: ''
+        zipCode: '',
+        company: ''
     });
 
     const [billingForm, setBillingForm] = useState({
@@ -269,19 +279,9 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         }
         
         if (isOpen && user) {
-            setLoading(true);
-            fetch('/api/user/profile', {
-                headers: {
-                    'Authorization': `Bearer ${tokenStorage.getToken()}`
-                }
-            })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}: Profile endpoint not implemented yet`);
-                }
-                return res.json();
-            })
-            .then(data => {
+            // Try to use preloaded data first
+            if (preloadedProfile) {
+                const data = preloadedProfile;
                 setUserData(data);
                 setEditForm({
                     fullName: data.fullName || '',
@@ -289,7 +289,8 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                     address: data.address || '',
                     city: data.city || '',
                     country: data.country || '',
-                    zipCode: data.zipCode || ''
+                    zipCode: data.zipCode || '',
+                    company: data.company || ''
                 });
                 setBillingForm(prev => ({
                     ...prev,
@@ -302,14 +303,57 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                     cardExpiry: data.card_expiry || ''
                 }));
                 setError(null);
-            })
-            .catch(err => {
-                setError(`Failed to load profile: ${err.message}`);
-                console.error('Failed to load profile:', err);
-            })
-            .finally(() => setLoading(false));
+                
+                // If data is missing or stale, trigger reload in background
+                if (!preloadedProfile && !userProfileLoading) {
+                    loadUserProfile(true);
+                }
+            } else {
+                // No preloaded data, load from API
+                setLoading(true);
+                fetch('/api/user/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${tokenStorage.getToken()}`
+                    }
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: Profile endpoint not implemented yet`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    setUserData(data);
+                    setPreloadedProfile(data); // Update context
+                    setEditForm({
+                        fullName: data.fullName || '',
+                        phone: data.phone || '',
+                        address: data.address || '',
+                        city: data.city || '',
+                        country: data.country || '',
+                        zipCode: data.zipCode || '',
+                        company: data.company || ''
+                    });
+                    setBillingForm(prev => ({
+                        ...prev,
+                        billingAddress: data.billing_address || '',
+                        billingAddress2: data.billing_address2 || '',
+                        billingCity: data.billing_city || '',
+                        billingState: data.billing_state || '',
+                        billingCountry: data.billing_country || '',
+                        billingZip: data.billing_zip || '',
+                        cardExpiry: data.card_expiry || ''
+                    }));
+                    setError(null);
+                })
+                .catch(err => {
+                    setError(`Failed to load profile: ${err.message}`);
+                    console.error('Failed to load profile:', err);
+                })
+                .finally(() => setLoading(false));
+            }
         }
-    }, [user, navigate, isOpen, isLoggingOut, onLogout]);
+    }, [user, navigate, isOpen, isLoggingOut, onLogout, preloadedProfile, userProfileLoading, loadUserProfile, setPreloadedProfile]);
 
     // Remove the internal handleLogout - always use the parent's onLogout
 
@@ -479,15 +523,9 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
         }
     };
 
-    if (!isOpen) return null;
-
-    return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modal} onClick={e => e.stopPropagation()}>
-                <button className={styles.closeButton} onClick={onClose}>&times;</button>
-                
-                <div className={styles.content}>
-                    <div className={styles.tabs}>
+    // Tab navigation
+    const tabNavigation = (
+        <div className={styles.tabs}>
                         <button 
                             className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
                             onClick={() => { setActiveTab('profile'); clearMessages(); }}
@@ -519,13 +557,23 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                             </button>
                         )}
                     </div>
+    );
 
-                    <div className={styles.messageContainer}>
-                        {error && <div className={styles.error}>{error}</div>}
-                        {success && <div className={styles.success}>{success}</div>}
-                    </div>
+    return (
+        <BaseModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="User Profile"
+            headerSlot={tabNavigation}
+            size="large"
+            contentClassName={styles.modalContent}
+        >
+            <div className={styles.messageContainer}>
+                {error && <div className={styles.error}>{error}</div>}
+                {success && <div className={styles.success}>{success}</div>}
+            </div>
 
-                    {activeTab === 'profile' && (
+            {activeTab === 'profile' && (
                         <div className={styles.tabContent}>
                             <div className={styles.sectionHeader}>
                                 <h2>Profile Information</h2>
@@ -560,6 +608,16 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                                 value={editForm.phone}
                                                 onChange={(e) => setEditForm(prev => ({...prev, phone: e.target.value}))}
                                                 disabled={formSaved || loading}
+                                            />
+                                        </div>
+                                        <div className={styles.formField}>
+                                            <label>Company</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.company}
+                                                onChange={(e) => setEditForm(prev => ({...prev, company: e.target.value}))}
+                                                disabled={formSaved || loading}
+                                                placeholder="Your company name"
                                             />
                                         </div>
                                     </div>
@@ -643,6 +701,10 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                                         <div className={styles.field}>
                                             <label>Phone</label>
                                             <p>{userData.phone || 'Not provided'}</p>
+                                        </div>
+                                        <div className={styles.field}>
+                                            <label>Company</label>
+                                            <p>{userData.company || 'Not provided'}</p>
                                         </div>
                                     </div>
 
@@ -883,9 +945,7 @@ function UserProfile({ isOpen = true, onClose = () => {}, onLogout = null }) {
                             </form>
                         </div>
                     )}
-                </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 }
 

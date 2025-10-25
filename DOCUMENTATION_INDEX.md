@@ -1,112 +1,39 @@
 # ROSSUMXML Documentation Index
 
-**Welcome!** This guide will help you find the right documentation for your needs.
+Complete guide to all documentation in the ROSSUMXML project.
+
+## 📚 Documentation Structure
+
+All documentation is organized in the [`docs/`](docs/) directory:
+- `docs/setup/` - Setup and configuration
+- `docs/admin/` - Admin dashboard guides
+- `docs/api/` - API documentation
+- `docs/rossum/` - Rossum integration
+- `docs/security/` - Security & compliance
+- `docs/phases/` - Development history
+
+See [`STRUCTURE.md`](STRUCTURE.md) for complete repository organization.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-**New user? Start here:**
+### First-Time Setup
+1. **[Complete Setup Guide](docs/setup/SETUP.md)** - Step-by-step installation
+2. **[Quick Reference](docs/setup/QUICK_REFERENCE.md)** - Daily command cheat sheet
+3. **[Backend Dependencies](docs/setup/BACKEND_DEPENDENCIES.md)** - Backend packages
+4. **[Frontend Dependencies](docs/setup/FRONTEND_DEPENDENCIES.md)** - Frontend packages
 
-1. **[API_QUICKSTART.md](./API_QUICKSTART.md)** - 5-minute guide to transforming XML via API
-2. **[README_AI_IMPROVEMENTS.md](./README_AI_IMPROVEMENTS.md)** - AI mapping improvements overview
+### Quick Start
+```bash
+# Automated setup (new codespace or fork)
+bash scripts/setup/setup-project.sh
 
----
-
-## 📚 Complete Documentation
-
-### API Documentation
-- **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** (18KB) - Complete API reference
-  - All endpoints (`/api/transform`, `/api/webhook/transform`, `/api/schema/parse`)
-  - Authentication guide (API keys, JWT, no-auth)
-  - Working examples (tested with real data)
-  - Mapping format and syntax
-  - Error handling and troubleshooting
-  
-- **[API_QUICKSTART.md](./API_QUICKSTART.md)** (3.6KB) - Quick start guide
-  - 5-minute test examples
-  - Common commands
-  - Quick troubleshooting
-
-### AI Mapping Improvements
-- **[AI_COMPLETE_DOCUMENTATION.md](./AI_COMPLETE_DOCUMENTATION.md)** (30KB) - Complete AI improvements guide
-  - 40% faster suggestions (60s → 36-42s)
-  - +25% higher confidence (60-70% → 75-90%)
-  - Schema normalization, Code wrapper detection
-  - Prompt optimization, Enhanced semantic mappings
-  - Bug fixes (modal, background loading)
-  - Testing guide and deployment instructions
-
-- **[README_AI_IMPROVEMENTS.md](./README_AI_IMPROVEMENTS.md)** (5KB) - Quick AI improvements overview
-  - Executive summary
-  - 5-minute quick test
-  - Performance metrics
-
----
-
-## 📋 By Use Case
-
-### I want to...
-
-**Transform XML via API**
-→ Start: [API_QUICKSTART.md](./API_QUICKSTART.md)  
-→ Reference: [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
-
-**Use AI mapping suggestions**
-→ Overview: [README_AI_IMPROVEMENTS.md](./README_AI_IMPROVEMENTS.md)  
-→ Details: [AI_COMPLETE_DOCUMENTATION.md](./AI_COMPLETE_DOCUMENTATION.md)
-
-**Set up production webhooks**
-→ See: [API_DOCUMENTATION.md - Webhook Endpoint](./API_DOCUMENTATION.md#2-apiwebhooktransform---webhook-transformation-endpoint)
-
-**Understand mapping syntax**
-→ See: [API_DOCUMENTATION.md - Mapping Format](./API_DOCUMENTATION.md#mapping-format)
-
-**Debug transformation issues**
-→ See: [API_DOCUMENTATION.md - Troubleshooting](./API_DOCUMENTATION.md#troubleshooting)
-
-**Test AI improvements**
-→ See: [AI_COMPLETE_DOCUMENTATION.md - Testing Guide](./AI_COMPLETE_DOCUMENTATION.md#testing-guide)
-
----
-
-## 📁 Project Structure
-
+# Start development
+bash start-dev.sh
 ```
-/workspaces/ROSSUMXML/
-│
-├── API_DOCUMENTATION.md          ← 📖 Main API reference
-├── API_QUICKSTART.md             ← ⚡ 5-min API quick start
-├── AI_COMPLETE_DOCUMENTATION.md  ← 🤖 AI improvements (complete)
-├── README_AI_IMPROVEMENTS.md     ← 🎯 AI improvements (quick ref)
-├── THIS_FILE.md                  ← 📚 You are here
-│
-├── backend/                      ← Node.js backend (AWS SAM)
-│   ├── index.js                  ← Main Lambda handler
-│   ├── server.js                 ← Express server (legacy)
-│   ├── template.yml              ← SAM configuration
-│   ├── services/
-│   │   ├── xmlParser.service.js  ← XML transformation logic
-│   │   ├── aiMapping.service.js  ← AI mapping suggestions
-│   │   └── user.service.js       ← User management
-│   └── db/
-│       └── init.sql              ← Database schema
-│
-├── frontend/                     ← React frontend (Vite)
-│   └── src/
-│       ├── pages/
-│       │   ├── EditorPage.jsx    ← Main mapping editor
-│       │   └── TransformerPage.jsx
-│       └── components/
-│           └── editor/
-│               ├── AIBatchSuggestionModal.jsx
-│               └── MappingsList.jsx
-│
-└── docs/
-    └── archive/                  ← Old/historical docs
-        ├── api-old/              ← Old API docs (5 files)
-        └── AI_*.md               ← Old AI docs (45 files)
-```
+
+---
 
 ---
 

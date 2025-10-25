@@ -47,6 +47,29 @@
                 "panel": "dedicated",
                 "group": "dev"
             }
+        },
+        {
+            "label": "Start DB Watcher",
+            "type": "shell",
+            "command": "bash auto-export-xmls.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            }
+        },
+        {
+            "label": "Start NGROK",
+            "type": "shell",
+            "command": "bash start-ngrok.sh",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            }
         }
     ]
 }

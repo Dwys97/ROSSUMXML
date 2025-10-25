@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { DataPreloadProvider } from './contexts/DataPreloadContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import EditorPage from './pages/EditorPage';
@@ -12,14 +13,17 @@ import SolutionsPage from './pages/SolutionsPage';
 import EnterprisePage from './pages/EnterprisePage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import ApiDocsPage from './pages/ApiDocsPage';
 import UserProfile from './components/profile/UserProfile';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <div className="app-container">
+        <DataPreloadProvider>
           <Routes>
             {/* Публичные маршруты */}
             <Route path="/" element={<LandingPage />} />
@@ -30,6 +34,7 @@ function App() {
             <Route path="/enterprise" element={<EnterprisePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/api-docs" element={<ApiDocsPage />} />
             
             {/* Защищенные маршруты */}
             <Route 
@@ -56,8 +61,24 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/analytics" 
+              element={
+                <ProtectedRoute>
+                  <AnalyticsDashboardPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
-        </div>
+        </DataPreloadProvider>
       </AuthProvider>
     </BrowserRouter>
   );

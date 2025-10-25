@@ -83,7 +83,7 @@ CREATE INDEX idx_role_permissions_permission ON role_permissions(permission_id);
 CREATE TABLE IF NOT EXISTS resource_ownership (
     id SERIAL PRIMARY KEY,
     resource_type VARCHAR(50) NOT NULL, -- 'mapping', 'api_key', 'schema', etc.
-    resource_id INTEGER NOT NULL, -- ID of the resource
+    resource_id TEXT NOT NULL, -- ID of the resource (supports both UUID and integer)
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(resource_type, resource_id) -- Each resource has one owner
@@ -93,6 +93,7 @@ CREATE INDEX idx_resource_ownership_owner ON resource_ownership(owner_id);
 CREATE INDEX idx_resource_ownership_resource ON resource_ownership(resource_type, resource_id);
 
 COMMENT ON TABLE resource_ownership IS 'Tracks ownership of resources for access control';
+COMMENT ON COLUMN resource_ownership.resource_id IS 'Resource identifier (supports both UUID and integer as text)';
 
 -- ============================================================================
 -- Table: access_control_list (ACL)
@@ -101,7 +102,7 @@ COMMENT ON TABLE resource_ownership IS 'Tracks ownership of resources for access
 CREATE TABLE IF NOT EXISTS access_control_list (
     id SERIAL PRIMARY KEY,
     resource_type VARCHAR(50) NOT NULL,
-    resource_id INTEGER NOT NULL,
+    resource_id TEXT NOT NULL, -- Supports both UUID and integer IDs
     grantee_type VARCHAR(20) NOT NULL CHECK (grantee_type IN ('user', 'role')),
     grantee_id VARCHAR(100) NOT NULL, -- user_id (UUID as string) or role_id (integer as string)
     access_type VARCHAR(20) NOT NULL CHECK (access_type IN ('read', 'write', 'delete', 'admin')),
@@ -115,6 +116,7 @@ CREATE INDEX idx_acl_grantee ON access_control_list(grantee_type, grantee_id);
 CREATE INDEX idx_acl_expires ON access_control_list(expires_at) WHERE expires_at IS NOT NULL;
 
 COMMENT ON TABLE access_control_list IS 'Explicit access control lists for resources';
+COMMENT ON COLUMN access_control_list.resource_id IS 'Resource identifier (supports both UUID and integer as text)';
 COMMENT ON COLUMN access_control_list.grantee_id IS 'UUID for users, integer for roles (stored as string)';
 
 -- ============================================================================

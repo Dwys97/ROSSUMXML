@@ -65,16 +65,17 @@ COMMENT ON TABLE permissions IS 'Granular permission definitions';
 CREATE TABLE IF NOT EXISTS resource_ownership (
     ownership_id SERIAL PRIMARY KEY,
     resource_type VARCHAR(50) NOT NULL,
-    resource_id INTEGER NOT NULL,
-    owner_user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    resource_id TEXT NOT NULL, -- Supports both UUID and integer IDs
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(resource_type, resource_id)
 );
 
-CREATE INDEX idx_resource_ownership_user ON resource_ownership(owner_user_id);
+CREATE INDEX idx_resource_ownership_owner ON resource_ownership(owner_id);
 CREATE INDEX idx_resource_ownership_resource ON resource_ownership(resource_type, resource_id);
 
 COMMENT ON TABLE resource_ownership IS 'Tracks ownership of resources (mappings, schemas) for access control';
+COMMENT ON COLUMN resource_ownership.resource_id IS 'Resource identifier (supports both UUID and integer as text)';
 
 -- =====================================================
 -- 5. ACCESS_CONTROL_LIST (ACL) for shared resources
@@ -82,11 +83,11 @@ COMMENT ON TABLE resource_ownership IS 'Tracks ownership of resources (mappings,
 CREATE TABLE IF NOT EXISTS access_control_list (
     acl_id SERIAL PRIMARY KEY,
     resource_type VARCHAR(50) NOT NULL,
-    resource_id INTEGER NOT NULL,
-    user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
+    resource_id TEXT NOT NULL, -- Supports both UUID and integer IDs
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     role_id INTEGER REFERENCES roles(role_id) ON DELETE CASCADE,
     permissions JSONB NOT NULL DEFAULT '["read"]', -- Array of permissions
-    granted_by INTEGER REFERENCES users(user_id),
+    granted_by UUID REFERENCES users(id),
     granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP,
     is_active BOOLEAN DEFAULT true,
@@ -98,6 +99,7 @@ CREATE INDEX idx_acl_user ON access_control_list(user_id);
 CREATE INDEX idx_acl_role ON access_control_list(role_id);
 
 COMMENT ON TABLE access_control_list IS 'Fine-grained access control for shared resources';
+COMMENT ON COLUMN access_control_list.resource_id IS 'Resource identifier (supports both UUID and integer as text)';
 
 -- =====================================================
 -- 6. SECURITY_AUDIT_LOG
@@ -106,7 +108,7 @@ CREATE TABLE IF NOT EXISTS security_audit_log (
     audit_id BIGSERIAL PRIMARY KEY,
     event_type VARCHAR(100) NOT NULL, -- 'authentication', 'authorization', 'resource_access', 'permission_change'
     event_action VARCHAR(50) NOT NULL, -- 'success', 'failure', 'blocked'
-    user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     ip_address INET,
     user_agent TEXT,
     resource_type VARCHAR(50),
@@ -324,7 +326,7 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- Insert ownership record when new mapping is created
     IF TG_OP = 'INSERT' THEN
-        INSERT INTO resource_ownership (resource_type, resource_id, owner_user_id)
+        INSERT INTO resource_ownership (resource_type, resource_id, owner_id)
         VALUES ('mapping', NEW.mapping_id, NEW.user_id)
         ON CONFLICT (resource_type, resource_id) DO NOTHING;
     END IF;

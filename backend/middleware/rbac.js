@@ -160,10 +160,10 @@ async function logSecurityEvent(eventData) {
 /**
  * Middleware: Require specific permission
  * @param {string} permission - Required permission
- * @returns {Function} Express middleware
+ * @returns {Function} Express middleware with check method
  */
 function requirePermission(permission) {
-  return async (req, res, next) => {
+  const middleware = async (req, res, next) => {
     // Check if user is authenticated
     if (!req.user || !req.user.user_id) {
       await logSecurityEvent({
@@ -219,6 +219,13 @@ function requirePermission(permission) {
 
     next();
   };
+  
+  // Add check method for direct permission checking
+  middleware.check = async (userId) => {
+    return await userHasPermission(userId, permission);
+  };
+  
+  return middleware;
 }
 
 /**
@@ -283,9 +290,10 @@ function requireResourceAccess(resourceType, action, resourceIdParam = 'id') {
       });
     }
 
-    const resourceId = parseInt(req.params[resourceIdParam] || req.body[resourceIdParam]);
+    // Resource IDs may be UUIDs (strings) or integers; do not coerce to integer.
+    const resourceId = req.params[resourceIdParam] || req.body[resourceIdParam];
 
-    if (!resourceId || isNaN(resourceId)) {
+    if (!resourceId) {
       return res.status(400).json({
         error: 'Invalid resource ID'
       });
@@ -350,8 +358,14 @@ function requireResourceAccess(resourceType, action, resourceIdParam = 'id') {
 function setRLSContext(req, res, next) {
   if (req.user && req.user.user_id) {
     // Set current user ID for row-level security policies
-    db.query(`SET LOCAL app.current_user_id = ${req.user.user_id}`)
-      .catch(err => console.error('[RBAC] Failed to set RLS context:', err));
+    try {
+      // Ensure the UUID string is safely quoted to avoid SQL syntax errors
+      const uid = String(req.user.user_id).replace("'", "''");
+      db.query(`SET LOCAL app.current_user_id = '${uid}'`)
+        .catch(err => console.error('[RBAC] Failed to set RLS context:', err));
+    } catch (err) {
+      console.error('[RBAC] Failed preparing RLS context value:', err);
+    }
   }
   next();
 }

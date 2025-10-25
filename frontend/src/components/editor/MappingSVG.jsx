@@ -4,20 +4,38 @@ const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, t
     const [lines, setLines] = useState([]);
 
     const updateLines = useCallback(() => {
-        if (!editorRef.current || !sourceTreeRef.current || !targetTreeRef.current) return;
+        if (!editorRef.current || !sourceTreeRef.current || !targetTreeRef.current) {
+            console.warn('⚠️ [SVG] Missing refs:', {
+                editor: !!editorRef.current,
+                sourceTree: !!sourceTreeRef.current,
+                targetTree: !!targetTreeRef.current
+            });
+            return;
+        }
+
+        console.log('🎨 [SVG] updateLines called with', mappings.length, 'mappings');
+        console.log('📊 [SVG] Available node refs:', nodeRefs.current.size);
 
         const svgRect = editorRef.current.getBoundingClientRect();
         const sourceTreeRect = sourceTreeRef.current.getBoundingClientRect();
         const targetTreeRect = targetTreeRef.current.getBoundingClientRect();
         
         const newLines = mappings
-            .map(m => {
+            .map((m, idx) => {
                 if (m.type === 'custom_element' || !m.source) return null;
                 
                 const sEl = nodeRefs.current.get(m.source);
                 const tEl = nodeRefs.current.get(m.target);
 
-                if (!sEl || !tEl) return null;
+                if (!sEl || !tEl) {
+                    console.warn(`⚠️ [SVG] Missing node ref for mapping ${idx}:`, {
+                        source: m.source,
+                        target: m.target,
+                        hasSource: !!sEl,
+                        hasTarget: !!tEl
+                    });
+                    return null;
+                }
 
                 const sRect = sEl.getBoundingClientRect();
                 const tRect = tEl.getBoundingClientRect();
@@ -42,6 +60,7 @@ const MappingSVG = forwardRef(({ mappings, nodeRefs, editorRef, sourceTreeRef, t
             })
             .filter(Boolean);
         
+        console.log('✅ [SVG] Drew', newLines.length, 'lines out of', mappings.length, 'mappings');
         setLines(newLines);
     }, [mappings, nodeRefs, editorRef, sourceTreeRef, targetTreeRef]);
 

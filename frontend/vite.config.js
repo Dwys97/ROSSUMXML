@@ -10,7 +10,7 @@ export default defineConfig({
     host: true,       // 0.0.0.0
     port: 5173,
     strictPort: true, // fail if port busy
-    hmr: false,       // disable HMR for Codespaces
+    hmr: true,       // enable HMR for Codespaces
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
