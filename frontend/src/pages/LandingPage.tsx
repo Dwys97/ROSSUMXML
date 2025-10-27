@@ -75,7 +75,7 @@ function LandingPage() {
 			<section className="mx-24">
 				<section className="flex justify-between items-center">
 					<div className="flex flex-col gap-12">
-						<h1 className="text-6xl">Effortless XML Integration</h1>
+						<h1 className="text-6xl font-bold">Effortless XML Integration</h1>
 						<p>
 							Eliminate weeks of manual XML integration work. Our platform automatically maps, validates and transforms
 							complex data structures in seconds, saving your team thousands of hours on every integration project.
@@ -83,6 +83,32 @@ function LandingPage() {
 						<button className="w-fit font-bold text-white bg-blue-600 px-6 py-3 rounded-xl shadow-xl">Get started</button>
 					</div>
 					<img src={editorImg} alt="Image of the editor" className="w-auto" />;
+				</section>
+				<section className="mt-24">
+					<h1 className="text-6xl font-bold">How it works</h1>
+					<div className="flex flex-row gap-6 mt-12">
+						<div className="w-1/3 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Schema Analysis</h1>
+							<p>
+								Our platform analyzes your existing XML schemas and data structures, identifying transformation patterns and
+								mapping opportunities for optimal integration.
+							</p>
+						</div>
+						<div className="w-1/3 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Configuration and testing</h1>
+							<p>
+								Configure transformation rules through our enterprise dashboard with comprehensive validation, testing
+								environments, and rollback capabilities.
+							</p>
+						</div>
+						<div className="w-1/3 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Production deployment</h1>
+							<p>
+								Deploy to production with enterprise-grade monitoring, automatic scaling, and 24/7 support for
+								mission-critical operations.
+							</p>
+						</div>
+					</div>
 				</section>
 			</section>
 		</>
