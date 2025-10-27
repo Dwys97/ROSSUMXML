@@ -71,17 +71,19 @@ function LandingPage() {
 	return (
 		<>
 			<TopNav />
-			<section className="mx-24">
+			<section className="mx-24 mt-12">
 				<section className="flex justify-between items-center">
 					<div className="flex flex-col gap-12">
 						<h1 className="text-6xl font-bold">Effortless XML Integration</h1>
-						<p>
+						<p className="text-lg">
 							Eliminate weeks of manual XML integration work. Our platform automatically maps, validates and transforms
 							complex data structures in seconds, saving your team thousands of hours on every integration project.
 						</p>
-						<button className="w-fit font-bold text-white bg-blue-600 px-6 py-3 rounded-xl shadow-xl">Get started</button>
+						<Link to="/register">
+							<button className="w-fit font-bold text-white bg-blue-600 px-6 py-3 rounded-xl shadow-xl">Get started</button>
+						</Link>
 					</div>
-					<img src={editorImg} alt="Image of the editor" className="w-auto" />;
+					<img src={editorImg} alt="Image of the editor" className="w-1/2 rounded-4xl shadow-2xl" />;
 				</section>
 				<section className="mt-24">
 					<h1 className="text-4xl font-bold text-center">How it works</h1>
