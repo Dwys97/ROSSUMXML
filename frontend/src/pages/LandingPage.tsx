@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import Footer from "../components/common/Footer";
 // import styles from "./LandingPage.module.css";
-import transformerImg from "../assets/transformer.png";
+// import transformerImg from "../assets/transformer.png";
 import editorImg from "../assets/editor.png";
 
 function LandingPage() {
@@ -70,7 +70,22 @@ function LandingPage() {
 	//   }, []);
 
 	return (
-		<h1 class="text-3xl font-bold underline text-white">Hello world!</h1>
+		<>
+			<TopNav />
+			<section className="mx-24">
+				<section className="flex justify-between items-center">
+					<div className="flex flex-col gap-12">
+						<h1 className="text-6xl">Effortless XML Integration</h1>
+						<p>
+							Eliminate weeks of manual XML integration work. Our platform automatically maps, validates and transforms
+							complex data structures in seconds, saving your team thousands of hours on every integration project.
+						</p>
+						<button className="w-fit font-bold text-white bg-blue-600 px-6 py-3 rounded-xl shadow-xl">Get started</button>
+					</div>
+					<img src={editorImg} alt="Image of the editor" className="w-auto" />;
+				</section>
+			</section>
+		</>
 
 		// <>
 		// 	<TopNav />
