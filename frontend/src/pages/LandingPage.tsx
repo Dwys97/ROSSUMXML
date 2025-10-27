@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import Footer from "../components/common/Footer";
-// import styles from "./LandingPage.module.css";
 // import transformerImg from "../assets/transformer.png";
 import editorImg from "../assets/editor.png";
 
@@ -85,7 +84,7 @@ function LandingPage() {
 					<img src={editorImg} alt="Image of the editor" className="w-auto" />;
 				</section>
 				<section className="mt-24">
-					<h1 className="text-6xl font-bold">How it works</h1>
+					<h1 className="text-4xl font-bold text-center">How it works</h1>
 					<div className="flex flex-row gap-6 mt-12">
 						<div className="w-1/3 border-2 p-5 rounded-md">
 							<h1 className="text-3xl font-bold">Schema Analysis</h1>
@@ -110,7 +109,48 @@ function LandingPage() {
 						</div>
 					</div>
 				</section>
+				<section className="mt-24">
+					<h1 className="text-4xl font-bold text-center">Why?</h1>
+					<div className="flex flex-row gap-6 mt-12">
+						<div className="w-1/4 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Schema Analysis</h1>
+							<p>
+								Our platform analyzes your existing XML schemas and data structures, identifying transformation patterns and
+								mapping opportunities for optimal integration.
+							</p>
+						</div>
+						<div className="w-1/4 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Configuration and testing</h1>
+							<p>
+								Configure transformation rules through our enterprise dashboard with comprehensive validation, testing
+								environments, and rollback capabilities.
+							</p>
+						</div>
+						<div className="w-1/4 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Production deployment</h1>
+							<p>
+								Deploy to production with enterprise-grade monitoring, automatic scaling, and 24/7 support for
+								mission-critical operations.
+							</p>
+						</div>
+						<div className="w-1/4 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Production deployment</h1>
+							<p>
+								Deploy to production with enterprise-grade monitoring, automatic scaling, and 24/7 support for
+								mission-critical operations.
+							</p>
+						</div>
+					</div>
+				</section>
+				<section className="mt-24">
+					<div>
+						<h1>Get started now</h1>
+						<button className="w-fit font-bold text-white bg-blue-600 px-6 py-3 rounded-xl shadow-xl">Start free trial</button>
+						<button className="w-fit font-bold text-white bg-blue-600 px-6 py-3 rounded-xl shadow-xl">Request free demo</button>
+					</div>
+				</section>
 			</section>
+			<Footer />
 		</>
 
 		// <>
