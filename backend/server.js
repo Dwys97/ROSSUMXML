@@ -7,6 +7,7 @@ const apiSettingsRoutes = require('./routes/api-settings.routes');
 const adminRoutes = require('./routes/admin.routes');
 const organizationRoutes = require('./routes/organization.routes');
 const invitationRoutes = require('./routes/invitation.routes');
+const invoiceRoutes = require('./routes/invoice.routes');
 const { parseXmlToTree } = require('./services/xmlParser.service');
 const { getCorsOptions, helmetConfig } = require('./middleware/securityHeaders');
 const { ipRateLimiter } = require('./middleware/rateLimiter');
@@ -32,6 +33,7 @@ app.use('/api/api-settings', apiSettingsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/invitations', invitationRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 // XML Transform endpoints
 app.post('/transform', async (req, res) => {
