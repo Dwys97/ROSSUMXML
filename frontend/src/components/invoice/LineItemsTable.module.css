@@ -1,0 +1,153 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.empty {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+}
+
+.empty p {
+    margin: 0 0 1rem 0;
+}
+
+.tableWrapper {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.table thead {
+    background: #f8f9fa;
+}
+
+.table th {
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.table td {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.inputSmall {
+    width: 80px;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.removeBtn {
+    padding: 0.25rem 0.5rem;
+    background: #ffebee;
+    color: #c62828;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.removeBtn:hover {
+    background: #ffcdd2;
+}
+
+.actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.editActions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.addBtn,
+.editBtn,
+.saveBtn,
+.cancelBtn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.addBtn {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.addBtn:hover {
+    background: #bbdefb;
+}
+
+.editBtn {
+    background: #0066cc;
+    color: white;
+}
+
+.editBtn:hover {
+    background: #0052a3;
+}
+
+.saveBtn {
+    background: #2e7d32;
+    color: white;
+}
+
+.saveBtn:hover {
+    background: #1b5e20;
+}
+
+.cancelBtn {
+    background: #f5f5f5;
+    color: #666;
+}
+
+.cancelBtn:hover {
+    background: #e0e0e0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .table {
+        font-size: 0.75rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

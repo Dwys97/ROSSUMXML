@@ -1,0 +1,162 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+}
+
+/* Toolbar */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.toolbarLeft,
+.toolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.toolBtn {
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.toolBtn:hover:not(:disabled) {
+    background: #e9ecef;
+    border-color: #0066cc;
+}
+
+.toolBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pageInfo,
+.zoomLevel {
+    font-size: 0.9rem;
+    color: #666;
+    padding: 0 0.5rem;
+}
+
+/* Viewer */
+.viewer {
+    flex: 1;
+    overflow: auto;
+    background: #e9ecef;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+}
+
+.document {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+    position: relative;
+    min-width: 400px;
+    min-height: 500px;
+}
+
+/* Placeholders */
+.pdfPlaceholder,
+.imagePlaceholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    text-align: center;
+}
+
+.placeholderIcon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.placeholderText {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.placeholderHint {
+    margin: 0 0 1rem 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.placeholderDetails {
+    margin: 0;
+    color: #999;
+    font-size: 0.8rem;
+    word-break: break-all;
+    max-width: 400px;
+}
+
+/* Bounding Box */
+.boundingBox {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px dashed #0066cc;
+    background: rgba(0, 102, 204, 0.1);
+    padding: 2rem;
+    border-radius: 4px;
+}
+
+.boundingBoxLabel {
+    background: #0066cc;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Info Note */
+.infoNote {
+    background: #fff3cd;
+    border-top: 1px solid #ffc107;
+    padding: 0.75rem 1rem;
+}
+
+.infoNote p {
+    margin: 0;
+    color: #856404;
+    font-size: 0.85rem;
+}
+
+.infoNote strong {
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .toolbar {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .viewer {
+        padding: 1rem;
+    }
+    
+    .document {
+        min-width: 300px;
+        min-height: 400px;
+    }
+}
