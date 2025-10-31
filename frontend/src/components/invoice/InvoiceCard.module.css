@@ -1,0 +1,191 @@
+.card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    border-color: #0066cc;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.fileInfo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.fileIcon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.fileName {
+    font-weight: 600;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Status Badge */
+.statusBadge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.toReview {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.reviewing {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.queried {
+    background: #fce4ec;
+    color: #c2185b;
+}
+
+.postponed {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.rejected {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.exported {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.default {
+    background: #f5f5f5;
+    color: #757575;
+}
+
+/* Body */
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.label {
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.value {
+    font-size: 0.9rem;
+    color: #333;
+    font-weight: 600;
+}
+
+/* Confidence Badge */
+.confidenceBadge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.confidenceHigh {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.confidenceMedium {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.confidenceLow {
+    background: #ffebee;
+    color: #c62828;
+}
+
+/* Footer */
+.footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+.uploadDate {
+    font-size: 0.8rem;
+    color: #999;
+}
+
+.reviewBtn {
+    padding: 0.5rem 1rem;
+    background: #0066cc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.reviewBtn:hover {
+    background: #0052a3;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .card {
+        padding: 1rem;
+    }
+    
+    .header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .statusBadge {
+        align-self: flex-start;
+    }
+}

@@ -1,0 +1,104 @@
+.container {
+    position: relative;
+}
+
+.fileInput {
+    display: none;
+}
+
+.dropzone {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: white;
+    min-width: 250px;
+}
+
+.dropzone:hover {
+    border-color: #0066cc;
+    background: #f0f7ff;
+}
+
+.dropzone.dragging {
+    border-color: #0066cc;
+    background: #e6f2ff;
+    transform: scale(1.02);
+}
+
+.uploadIcon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.uploadText {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+    color: #333;
+}
+
+.uploadText strong {
+    color: #0066cc;
+}
+
+.uploadHint {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.uploadFormats {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.8rem;
+    color: #999;
+}
+
+.uploading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #0066cc;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.uploading p {
+    margin: 0;
+    color: #666;
+}
+
+.error {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    color: #856404;
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dropzone {
+        padding: 1.5rem;
+        min-width: 200px;
+    }
+    
+    .uploadIcon {
+        font-size: 2rem;
+    }
+}
