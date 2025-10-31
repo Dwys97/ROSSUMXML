@@ -6,6 +6,7 @@ const fs = require('fs').promises;
 const db = require('../db');
 const authenticate = require('../middleware/auth');
 const { requirePermission } = require('../middleware/rbac');
+const { exportAsXML, exportAsCSV, exportAsXLS } = require('../services/invoiceExport.service');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -489,11 +490,32 @@ router.post('/:id/export', authenticate, requirePermission('invoice:export'), as
         
         await client.query('COMMIT');
         
-        // TODO: Generate export file using invoiceExport.service
-        res.json({ 
-            message: 'Invoice exported successfully',
-            format: format
-        });
+        // Generate export file
+        let exportContent;
+        let contentType;
+        let filename;
+        
+        switch (format) {
+            case 'xml':
+                exportContent = await exportAsXML(id);
+                contentType = 'application/xml';
+                filename = `invoice-${id}.xml`;
+                break;
+            case 'csv':
+                exportContent = await exportAsCSV(id);
+                contentType = 'text/csv';
+                filename = `invoice-${id}.csv`;
+                break;
+            case 'xls':
+                exportContent = await exportAsXLS(id);
+                contentType = 'application/vnd.ms-excel';
+                filename = `invoice-${id}.xls`;
+                break;
+        }
+        
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(exportContent);
         
     } catch (error) {
         await client.query('ROLLBACK');
