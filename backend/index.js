@@ -6123,10 +6123,13 @@ exports.handler = async (event) => {
         if (path === '/api/ml/health' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             try {
                 const axios = require('axios');
-                const mlHealth = await axios.get('http://localhost:5001/health').catch(() => ({ data: { status: 'offline' } }));
+                // Use 10.0.0.18 (host IP) to access ML service from Docker
+                const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://10.0.0.18:5001';
+                const mlHealth = await axios.get(`${mlServiceUrl}/health`, { timeout: 3000 }).catch(() => ({ data: { status: 'offline' } }));
                 
                 return createResponse(200, JSON.stringify({
                     ml_service: mlHealth.data,
+                    ml_service_url: mlServiceUrl,
                     backend: 'healthy',
                     timestamp: new Date().toISOString()
                 }));
