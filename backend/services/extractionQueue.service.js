@@ -124,8 +124,7 @@ async function addExtractionJob(jobData, options = {}) {
         return {
             jobId: job.id,
             invoiceId,
-            status: 'queued',
-            position: await job.getPosition()
+            status: 'queued'
         };
 
     } catch (error) {

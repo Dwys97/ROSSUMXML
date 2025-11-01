@@ -4,7 +4,7 @@
  */
 
 const { extractionQueue } = require('../services/extractionQueue.service');
-const { pool } = require('../db');
+const pool = require('../db');
 const axios = require('axios');
 const fs = require('fs').promises;
 const logger = require('../utils/logger');
@@ -74,8 +74,8 @@ async function processExtractionJob(job) {
         await job.progress(10);
         socketEvents.emitExtractionProgress(invoiceId, 10, 'Invoice loaded from database');
 
-        // Update invoice status to 'extracting'
-        await updateInvoiceStatus(invoiceId, 'extracting', null);
+        // Update invoice status to 'processing'
+        await updateInvoiceStatus(invoiceId, 'processing', null);
 
         // Read file
         await job.progress(20);
@@ -186,14 +186,13 @@ async function updateInvoiceStatus(invoiceId, status, confidence, errorMessage =
     const query = `
         UPDATE invoices
         SET 
-            status = $1,
-            ml_confidence = $2,
-            error_message = $3,
+            extraction_status = $1,
+            extraction_confidence = $2,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $4
+        WHERE id = $3
     `;
 
-    await pool.query(query, [status, confidence, errorMessage, invoiceId]);
+    await pool.query(query, [status, confidence, invoiceId]);
 }
 
 /**
@@ -215,7 +214,7 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
                 total_amount = $4,
                 tax_amount = $5,
                 net_amount = $6,
-                ml_confidence = $7,
+                extraction_confidence = $7,
                 vendor_profile_id = $8,
                 extracted_data = $9,
                 updated_at = CURRENT_TIMESTAMP
@@ -260,8 +259,8 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
  */
 async function saveInvoiceParties(client, invoiceId, extractedData) {
     const partiesQuery = `
-        INSERT INTO invoice_parties (invoice_id, party_type, name, address, vat_number, tax_id, country, ml_confidence)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO invoice_parties (invoice_id, party_type, name, address, vat_number, tax_id, country, confidence_scores)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
         ON CONFLICT (invoice_id, party_type) 
         DO UPDATE SET
             name = EXCLUDED.name,
@@ -269,11 +268,17 @@ async function saveInvoiceParties(client, invoiceId, extractedData) {
             vat_number = EXCLUDED.vat_number,
             tax_id = EXCLUDED.tax_id,
             country = EXCLUDED.country,
-            ml_confidence = EXCLUDED.ml_confidence
+            confidence_scores = EXCLUDED.confidence_scores
     `;
 
     // Seller
     if (extractedData.seller) {
+        const sellerConfidence = JSON.stringify({
+            name: extractedData.seller.nameConfidence || 0,
+            address: extractedData.seller.addressConfidence || 0,
+            vat_number: extractedData.seller.vatConfidence || 0
+        });
+        
         await client.query(partiesQuery, [
             invoiceId,
             'seller',
@@ -282,12 +287,18 @@ async function saveInvoiceParties(client, invoiceId, extractedData) {
             extractedData.seller.vatNumber || null,
             extractedData.seller.taxId || null,
             extractedData.seller.country || null,
-            extractedData.seller.nameConfidence || 0
+            sellerConfidence
         ]);
     }
 
     // Buyer
     if (extractedData.buyer) {
+        const buyerConfidence = JSON.stringify({
+            name: extractedData.buyer.nameConfidence || 0,
+            address: extractedData.buyer.addressConfidence || 0,
+            vat_number: extractedData.buyer.vatConfidence || 0
+        });
+        
         await client.query(partiesQuery, [
             invoiceId,
             'buyer',
@@ -296,7 +307,7 @@ async function saveInvoiceParties(client, invoiceId, extractedData) {
             extractedData.buyer.vatNumber || null,
             extractedData.buyer.taxId || null,
             extractedData.buyer.country || null,
-            extractedData.buyer.nameConfidence || 0
+            buyerConfidence
         ]);
     }
 }
@@ -311,13 +322,20 @@ async function saveLineItems(client, invoiceId, lineItems) {
     const insertQuery = `
         INSERT INTO invoice_line_items (
             invoice_id, line_number, description, quantity, unit_price, 
-            amount, currency, hs_code, country_of_origin, ml_confidence
+            amount, currency, hs_code, country_of_origin, confidence_scores
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
     `;
 
     for (let i = 0; i < lineItems.length; i++) {
         const item = lineItems[i];
+        const itemConfidence = JSON.stringify({
+            description: item.descriptionConfidence || 0,
+            quantity: item.quantityConfidence || 0,
+            unit_price: item.unitPriceConfidence || 0,
+            amount: item.amountConfidence || 0
+        });
+        
         await client.query(insertQuery, [
             invoiceId,
             i + 1,
@@ -328,7 +346,7 @@ async function saveLineItems(client, invoiceId, lineItems) {
             item.currency || null,
             item.hs_code || null,
             item.country_of_origin || null,
-            item.confidence || 0
+            itemConfidence
         ]);
     }
 }

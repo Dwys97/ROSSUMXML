@@ -19,11 +19,13 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField }) => {
     useEffect(() => {
         if (!invoiceId) {
             setLoading(false);
+            setError('No invoice selected');
             return;
         }
 
         if (!fileType?.includes('pdf')) {
             setLoading(false);
+            setError('File type is not PDF');
             return;
         }
 
@@ -48,14 +50,40 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField }) => {
                     throw new Error('Authentication failed. Please log in again.');
                 }
                 
+                if (response.status === 404) {
+                    throw new Error('Invoice file not found. The file may not have been uploaded yet.');
+                }
+                
                 if (!response.ok) {
                     throw new Error(`Failed to load file (HTTP ${response.status})`);
                 }
                 
-                const arrayBuffer = await response.arrayBuffer();
-                if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('pdf')) {
+                    throw new Error('Server returned non-PDF content');
+                }
+                
+                // Backend returns base64 encoded PDF with isBase64Encoded=true
+                // We need to decode it manually
+                const base64String = await response.text();
+                if (!base64String || base64String.length === 0) {
                     throw new Error('Empty file received from server');
                 }
+                
+                // Decode base64 to binary
+                const binaryString = atob(base64String);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                // Validate PDF header
+                const pdfHeader = String.fromCharCode(...bytes.slice(0, 5));
+                if (pdfHeader !== '%PDF-') {
+                    throw new Error('Invalid PDF file format');
+                }
+                
+                const arrayBuffer = bytes.buffer;
                 
                 const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
                 const pdf = await loadingTask.promise;
@@ -67,6 +95,7 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField }) => {
                 console.error('Error loading PDF:', err);
                 setError(err.message || 'Failed to load PDF');
                 setLoading(false);
+                setPdfDoc(null);
             }
         };
 

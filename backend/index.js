@@ -5696,7 +5696,7 @@ exports.handler = async (event) => {
         }
         
         // Get invoice file (PDF/Image download)
-        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]+\/file$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]{36}\/file$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             try {
                 const user = await verifyJWT(event);
                 const id = path.split('/')[3];
@@ -6143,23 +6143,70 @@ exports.handler = async (event) => {
             try {
                 const user = await verifyJWT(event);
                 const body = JSON.parse(event.body || '{}');
+                const { invoiceId, vendorId } = body;
                 
-                // Import extraction queue service
-                const { createExtractionJob } = require('./services/extractionQueue.service');
+                if (!invoiceId) {
+                    return createResponse(400, JSON.stringify({ error: 'invoiceId is required' }));
+                }
                 
-                // Create extraction job
-                const job = await createExtractionJob({
-                    userId: user.id,
-                    filePath: body.filePath,
-                    fileName: body.fileName,
-                    vendorId: body.vendorId || null
-                });
-                
-                return createResponse(200, JSON.stringify({
-                    success: true,
-                    jobId: job.id,
-                    message: 'Extraction job created successfully'
-                }));
+                // Get invoice details from database
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        'SELECT id, file_name, file_type, user_id, file_data FROM invoices WHERE id = $1',
+                        [invoiceId]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'Invoice not found' }));
+                    }
+                    
+                    const invoice = result.rows[0];
+                    
+                    // Save file to temp location for ML service
+                    const fs = require('fs');
+                    const path = require('path');
+                    
+                    // Use /tmp which is accessible from Lambda container
+                    const tempDir = '/tmp/invoice-uploads';
+                    if (!fs.existsSync(tempDir)) {
+                        fs.mkdirSync(tempDir, { recursive: true });
+                    }
+                    
+                    const tempFilePath = path.join(tempDir, `${invoiceId}.pdf`);
+                    const fileBuffer = Buffer.from(invoice.file_data, 'base64');
+                    fs.writeFileSync(tempFilePath, fileBuffer);
+                    
+                    console.log('[ML EXTRACT] Saved file to:', tempFilePath);
+                    console.log('[ML EXTRACT] File size:', fileBuffer.length, 'bytes');
+                    
+                    // Import extraction queue service
+                    const { addExtractionJob } = require('./services/extractionQueue.service');
+                    
+                    // Create extraction job
+                    const job = await addExtractionJob({
+                        invoiceId: invoice.id,
+                        filePath: tempFilePath,
+                        fileType: invoice.file_type || 'application/pdf',
+                        userId: user.id,
+                        organizationId: user.organization_id,
+                        vendorId: vendorId || null
+                    });
+                    
+                    // Update invoice status
+                    await client.query(
+                        'UPDATE invoices SET extraction_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                        ['processing', invoiceId]
+                    );
+                    
+                    return createResponse(200, JSON.stringify({
+                        success: true,
+                        jobId: job.jobId,
+                        message: 'Extraction job created successfully'
+                    }));
+                } finally {
+                    client.release();
+                }
             } catch (err) {
                 console.error('ML extract error:', err);
                 if (err.message && err.message.includes('token')) {
