@@ -6119,6 +6119,22 @@ exports.handler = async (event) => {
         // ML EXTRACTION ENDPOINTS
         // ============================================================================
 
+        // ML Service Health Check (GET /api/ml/health) - No auth required for testing
+        if (path === '/api/ml/health' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const axios = require('axios');
+                const mlHealth = await axios.get('http://localhost:5001/health').catch(() => ({ data: { status: 'offline' } }));
+                
+                return createResponse(200, JSON.stringify({
+                    ml_service: mlHealth.data,
+                    backend: 'healthy',
+                    timestamp: new Date().toISOString()
+                }));
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
         // Trigger ML extraction (POST /api/ml/extract)
         if (path === '/api/ml/extract' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
@@ -6143,6 +6159,9 @@ exports.handler = async (event) => {
                 }));
             } catch (err) {
                 console.error('ML extract error:', err);
+                if (err.message && err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized', details: err.message }));
+                }
                 return createResponse(500, JSON.stringify({
                     error: 'Failed to create extraction job',
                     details: err.message
