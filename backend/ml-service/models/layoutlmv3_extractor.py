@@ -62,12 +62,12 @@ class LayoutLMv3Extractor:
         38: "I-GROSS_WEIGHT",
     }
     
-    def __init__(self, model_name: str = "microsoft/layoutlmv3-base", device: str = "cpu"):
+    def __init__(self, model_name: str = "nielsr/layoutlmv3-finetuned-cord", device: str = "cpu"):
         """
         Initialize LayoutLMv3 model.
         
         Args:
-            model_name: HuggingFace model identifier
+            model_name: HuggingFace model identifier (default: pre-trained on CORD invoice dataset)
             device: 'cpu' or 'cuda'
         """
         self.device = device
@@ -76,20 +76,22 @@ class LayoutLMv3Extractor:
         logger.info(f"Loading LayoutLMv3 model: {model_name} on {device}")
         
         # Load processor and model
+        # nielsr/layoutlmv3-finetuned-cord is pre-trained on receipts/invoices (CORD dataset)
         self.processor = LayoutLMv3Processor.from_pretrained(
             model_name,
-            apply_ocr=False  # We'll use our own OCR
+            apply_ocr=False  # We use PaddleOCR for better accuracy
         )
         
         self.model = LayoutLMv3ForTokenClassification.from_pretrained(
-            model_name,
-            num_labels=len(self.FIELD_LABELS)
+            model_name
+            # Model already has proper num_labels from fine-tuning
         )
         
         self.model.to(self.device)
         self.model.eval()
         
-        logger.info("LayoutLMv3 model loaded successfully")
+        logger.info(f"LayoutLMv3 model loaded successfully ({model_name})")
+        logger.info(f"Model has {self.model.config.num_labels} labels (pre-trained on invoices/receipts)")
     
     def extract_fields(
         self,

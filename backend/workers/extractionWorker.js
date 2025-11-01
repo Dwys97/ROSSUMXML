@@ -77,13 +77,33 @@ async function processExtractionJob(job) {
         // Update invoice status to 'processing'
         await updateInvoiceStatus(invoiceId, 'processing', null);
 
-        // Read file
+        // Read file - either from filesystem or database
         await job.progress(20);
         socketEvents.emitExtractionProgress(invoiceId, 20, 'Reading invoice file');
-        const fileBuffer = await fs.readFile(filePath);
-        const base64File = fileBuffer.toString('base64');
-
-        logger.info(`File loaded: ${filePath} (${fileBuffer.length} bytes)`);
+        
+        let base64File;
+        let fileBuffer;
+        
+        if (filePath) {
+            // Read from filesystem (if file path provided)
+            fileBuffer = await fs.readFile(filePath);
+            base64File = fileBuffer.toString('base64');
+            logger.info(`File loaded from filesystem: ${filePath} (${fileBuffer.length} bytes)`);
+        } else {
+            // Read from database (file_data column)
+            const invoiceResult = await pool.query(
+                'SELECT file_data FROM invoices WHERE id = $1',
+                [invoiceId]
+            );
+            
+            if (invoiceResult.rows.length === 0) {
+                throw new Error('Invoice not found in database');
+            }
+            
+            base64File = invoiceResult.rows[0].file_data;
+            fileBuffer = Buffer.from(base64File, 'base64');
+            logger.info(`File loaded from database: ${fileBuffer.length} bytes`);
+        }
 
         // Get vendor profile if exists
         await job.progress(30);
@@ -136,10 +156,9 @@ async function processExtractionJob(job) {
         socketEvents.emitExtractionProgress(invoiceId, 80, 'Saving extraction results');
         await saveExtractionResults(invoiceId, extractedData, vendorProfileId);
 
-        // Update invoice status to 'to_review'
+        // Extraction completed - status already set to 'completed' in saveExtractionResults
         await job.progress(90);
         socketEvents.emitExtractionProgress(invoiceId, 90, 'Finalizing extraction');
-        await updateInvoiceStatus(invoiceId, 'to_review', extractedData.confidence);
 
         // Save OCR cache for future training
         await saveOCRCache(invoiceId, filePath, {
@@ -169,8 +188,8 @@ async function processExtractionJob(job) {
     } catch (error) {
         logger.error(`Extraction failed for invoice ${invoiceId}:`, error);
 
-        // Update invoice status to 'extraction_failed'
-        await updateInvoiceStatus(invoiceId, 'extraction_failed', null, error.message);
+        // Update invoice status to 'failed'
+        await updateInvoiceStatus(invoiceId, 'failed', null);
         
         // Emit extraction failed event
         socketEvents.emitExtractionFailed(invoiceId, error.message, job.attemptsMade);
@@ -213,12 +232,13 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
                 currency = $3,
                 total_amount = $4,
                 tax_amount = $5,
-                net_amount = $6,
+                subtotal = $6,
                 extraction_confidence = $7,
                 vendor_profile_id = $8,
                 extracted_data = $9,
+                extraction_status = $10,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $10
+            WHERE id = $11
         `;
 
         await client.query(updateInvoiceQuery, [
@@ -231,6 +251,7 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
             extractedData.confidence || 0,
             vendorProfileId,
             JSON.stringify(extractedData),
+            'completed',
             invoiceId
         ]);
 
@@ -259,12 +280,12 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
  */
 async function saveInvoiceParties(client, invoiceId, extractedData) {
     const partiesQuery = `
-        INSERT INTO invoice_parties (invoice_id, party_type, name, address, vat_number, tax_id, country, confidence_scores)
+        INSERT INTO invoice_parties (invoice_id, party_type, name, address_line1, vat_number, tax_id, country, confidence_scores)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
         ON CONFLICT (invoice_id, party_type) 
         DO UPDATE SET
             name = EXCLUDED.name,
-            address = EXCLUDED.address,
+            address_line1 = EXCLUDED.address_line1,
             vat_number = EXCLUDED.vat_number,
             tax_id = EXCLUDED.tax_id,
             country = EXCLUDED.country,
@@ -322,9 +343,9 @@ async function saveLineItems(client, invoiceId, lineItems) {
     const insertQuery = `
         INSERT INTO invoice_line_items (
             invoice_id, line_number, description, quantity, unit_price, 
-            amount, currency, hs_code, country_of_origin, confidence_scores
+            total_value, hs_code, country_of_origin, confidence_scores
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
     `;
 
     for (let i = 0; i < lineItems.length; i++) {
@@ -343,7 +364,6 @@ async function saveLineItems(client, invoiceId, lineItems) {
             item.quantity || null,
             item.unit_price || null,
             item.amount || null,
-            item.currency || null,
             item.hs_code || null,
             item.country_of_origin || null,
             itemConfidence

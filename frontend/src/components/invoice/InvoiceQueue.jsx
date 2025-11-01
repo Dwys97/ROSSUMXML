@@ -52,14 +52,17 @@ const InvoiceQueue = ({ invoices, viewMode, onInvoiceClick, onDeleteInvoice, pag
     
     // Get confidence indicator
     const getConfidenceIndicator = (confidence) => {
-        if (!confidence) return { class: styles.confidenceLow, text: 'Unknown' };
+        // Parse confidence to number (could be string from database)
+        const conf = parseFloat(confidence);
         
-        if (confidence >= 90) {
-            return { class: styles.confidenceHigh, text: `${confidence.toFixed(0)}%` };
-        } else if (confidence >= 70) {
-            return { class: styles.confidenceMedium, text: `${confidence.toFixed(0)}%` };
+        if (!conf || isNaN(conf)) return { class: styles.confidenceLow, text: 'Unknown' };
+        
+        if (conf >= 90) {
+            return { class: styles.confidenceHigh, text: `${conf.toFixed(0)}%` };
+        } else if (conf >= 70) {
+            return { class: styles.confidenceMedium, text: `${conf.toFixed(0)}%` };
         } else {
-            return { class: styles.confidenceLow, text: `${confidence.toFixed(0)}%` };
+            return { class: styles.confidenceLow, text: `${conf.toFixed(0)}%` };
         }
     };
     

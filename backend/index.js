@@ -6163,30 +6163,14 @@ exports.handler = async (event) => {
                     
                     const invoice = result.rows[0];
                     
-                    // Save file to temp location for ML service
-                    const fs = require('fs');
-                    const path = require('path');
-                    
-                    // Use /tmp which is accessible from Lambda container
-                    const tempDir = '/tmp/invoice-uploads';
-                    if (!fs.existsSync(tempDir)) {
-                        fs.mkdirSync(tempDir, { recursive: true });
-                    }
-                    
-                    const tempFilePath = path.join(tempDir, `${invoiceId}.pdf`);
-                    const fileBuffer = Buffer.from(invoice.file_data, 'base64');
-                    fs.writeFileSync(tempFilePath, fileBuffer);
-                    
-                    console.log('[ML EXTRACT] Saved file to:', tempFilePath);
-                    console.log('[ML EXTRACT] File size:', fileBuffer.length, 'bytes');
-                    
                     // Import extraction queue service
                     const { addExtractionJob } = require('./services/extractionQueue.service');
                     
                     // Create extraction job
+                    // NOTE: Worker will read file_data directly from database
+                    // Don't pass filePath as it's only accessible within Lambda container
                     const job = await addExtractionJob({
                         invoiceId: invoice.id,
-                        filePath: tempFilePath,
                         fileType: invoice.file_type || 'application/pdf',
                         userId: user.id,
                         organizationId: user.organization_id,

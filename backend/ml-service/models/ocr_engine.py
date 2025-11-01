@@ -33,17 +33,22 @@ class InvoiceOCR:
         
         logger.info(f"Initializing OCR engines for languages: {languages}")
         
-        # Initialize EasyOCR (better for non-English, handwriting)
-        try:
-            self.easyocr_reader = easyocr.Reader(
-                languages,
-                gpu=use_gpu,
-                verbose=False
-            )
-            logger.info("EasyOCR initialized successfully")
-        except Exception as e:
-            logger.error(f"EasyOCR initialization failed: {str(e)}")
-            self.easyocr_reader = None
+        # TEMPORARY: Disable EasyOCR to reduce memory usage
+        # EasyOCR uses heavy neural networks that cause OOM on limited resources
+        logger.warning("EasyOCR disabled - using Tesseract only (memory optimization)")
+        self.easyocr_reader = None
+        
+        # Initialize EasyOCR (better for non-English, handwriting) - DISABLED
+        # try:
+        #     self.easyocr_reader = easyocr.Reader(
+        #         languages,
+        #         gpu=use_gpu,
+        #         verbose=False
+        #     )
+        #     logger.info("EasyOCR initialized successfully")
+        # except Exception as e:
+        #     logger.error(f"EasyOCR initialization failed: {str(e)}")
+        #     self.easyocr_reader = None
         
         # Tesseract is initialized on-the-fly (faster startup)
         self.tesseract_config = '--psm 6 --oem 3'  # Assume uniform block of text, LSTM mode
@@ -180,6 +185,11 @@ class InvoiceOCR:
             Tuple of (words, bounding_boxes, confidence_scores)
         """
         try:
+            # Check if EasyOCR is available
+            if self.easyocr_reader is None:
+                logger.info("EasyOCR not available, using Tesseract only")
+                return self.extract_text_tesseract(image)
+            
             # Try EasyOCR first (better for diverse layouts)
             words, boxes, confidences = self.extract_text_easyocr(image)
             

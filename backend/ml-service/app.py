@@ -1,7 +1,7 @@
 """
-LayoutLMv3 + OCR ML Service for Invoice Data Extraction
-Hybrid OCR (EasyOCR + Tesseract) + LayoutLMv3 Document Understanding
-Optimized for Customs Clearance Commercial Invoices
+LayoutLMv3 + PaddleOCR + Rule-Based ML Service for Invoice Data Extraction
+Hybrid Extraction: PaddleOCR + LayoutLMv3 (CORD pre-trained) + Rule-Based Patterns
+Optimized for Customs Clearance Commercial Invoices with Self-Learning
 """
 
 from flask import Flask, request, jsonify
@@ -16,9 +16,8 @@ import base64
 import numpy as np
 from typing import Dict, List
 
-# Import our custom models
-from models.ocr_engine import InvoiceOCR
-from models.layoutlmv3_extractor import LayoutLMv3Extractor
+# Import hybrid extractor (PaddleOCR + LayoutLMv3-CORD + Rules)
+from extractors.hybrid_extractor import HybridExtractor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,14 +27,13 @@ app = Flask(__name__)
 CORS(app)
 
 # Global model variables (loaded on startup)
-ocr_engine = None
-layoutlmv3_extractor = None
+hybrid_extractor = None
 device = None
 
 
 def load_model():
-    """Load OCR engine and LayoutLMv3 model on startup"""
-    global ocr_engine, layoutlmv3_extractor, device
+    """Load Hybrid Extractor (PaddleOCR + LayoutLMv3-CORD + Rules) on startup"""
+    global hybrid_extractor, device
     
     try:
         logger.info("Initializing ML Service...")
@@ -44,22 +42,17 @@ def load_model():
         device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Using device: {device}")
         
-        # Initialize OCR engine (multi-language support)
-        logger.info("Loading OCR engine...")
-        ocr_engine = InvoiceOCR(
-            languages=['en'],  # Add more: ['en', 'de', 'fr', 'es']
-            use_gpu=(device == "cuda")
-        )
-        logger.info("OCR engine loaded successfully")
+        # Initialize Hybrid Extractor
+        logger.info("Loading Hybrid Extractor (PaddleOCR + LayoutLMv3-CORD + Rules)...")
+        model_name = os.environ.get('MODEL_NAME', 'nielsr/layoutlmv3-finetuned-cord')
         
-        # Initialize LayoutLMv3 extractor
-        logger.info("Loading LayoutLMv3 model...")
-        model_name = os.environ.get('MODEL_NAME', 'microsoft/layoutlmv3-base')
-        layoutlmv3_extractor = LayoutLMv3Extractor(
+        hybrid_extractor = HybridExtractor(
             model_name=model_name,
-            device=device
+            device=device,
+            ml_confidence_threshold=0.70,
+            rule_confidence_threshold=0.60
         )
-        logger.info("LayoutLMv3 model loaded successfully")
+        logger.info("Hybrid Extractor loaded successfully")
         
         return True
         
@@ -103,48 +96,22 @@ def extract_from_pdf(pdf_bytes: bytes) -> List[Image.Image]:
         raise
 
 
-def process_invoice_page(image: Image.Image, confidence_threshold: float = 0.7) -> Dict:
+def process_invoice_page(image: Image.Image, combine_strategy: str = "best") -> Dict:
     """
-    Process a single invoice page with OCR + LayoutLMv3.
+    Process a single invoice page with Hybrid Extractor.
     
     Args:
         image: PIL Image of invoice page
-        confidence_threshold: Minimum confidence for field extraction
+        combine_strategy: 'best', 'ml_first', or 'rules_fallback'
         
     Returns:
         Extracted data with confidence scores
     """
     try:
-        # Step 1: OCR to extract words and bounding boxes
-        logger.info("Running hybrid OCR...")
-        words, boxes, ocr_confidences = ocr_engine.extract_text_hybrid(image)
+        logger.info(f"Processing invoice page (strategy: {combine_strategy})...")
         
-        if not words:
-            logger.warning("No text detected by OCR")
-            return {
-                "success": False,
-                "error": "No text detected in image",
-                "confidence": 0.0
-            }
-        
-        # Step 2: Normalize boxes for LayoutLMv3 (0-1000 scale)
-        width, height = image.size
-        normalized_boxes = ocr_engine.normalize_boxes(boxes, width, height)
-        
-        logger.info(f"OCR detected {len(words)} words")
-        
-        # Step 3: Extract structured fields with LayoutLMv3
-        logger.info("Running LayoutLMv3 field extraction...")
-        extracted_fields = layoutlmv3_extractor.extract_fields(
-            image,
-            words,
-            normalized_boxes,
-            confidence_threshold
-        )
-        
-        # Add OCR metadata
-        extracted_fields["ocr_word_count"] = len(words)
-        extracted_fields["avg_ocr_confidence"] = float(np.mean(ocr_confidences) * 100)
+        # Run hybrid extraction (PaddleOCR + LayoutLMv3-CORD + Rules)
+        extracted_fields = hybrid_extractor.extract(image, combine_strategy=combine_strategy)
         
         return {
             "success": True,
@@ -203,9 +170,9 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         "status": "healthy",
-        "model_loaded": layoutlmv3_extractor is not None and ocr_engine is not None,
+        "model_loaded": hybrid_extractor is not None,
         "device": str(device),
-        "model": "LayoutLMv3 + EasyOCR/Tesseract"
+        "model": "Hybrid: PaddleOCR + LayoutLMv3-CORD + Rules"
     }), 200
 
 
@@ -237,7 +204,7 @@ def extract_invoice():
     }
     """
     try:
-        if not layoutlmv3_extractor or not ocr_engine:
+        if not hybrid_extractor:
             return jsonify({
                 "error": "Models not loaded",
                 "success": False
@@ -276,11 +243,14 @@ def extract_invoice():
         
         logger.info(f"Processing {len(images)} page(s)...")
         
+        # Get combine strategy from request (default: 'best')
+        combine_strategy = data.get('combineStrategy', 'best')
+        
         # Process each page
         page_results = []
         for i, image in enumerate(images):
             logger.info(f"Processing page {i+1}/{len(images)}...")
-            result = process_invoice_page(image, confidence_threshold)
+            result = process_invoice_page(image, combine_strategy)
             page_results.append(result)
         
         # Merge results if multi-page
@@ -294,7 +264,7 @@ def extract_invoice():
         return jsonify({
             "success": True,
             "data": final_result,
-            "model": "LayoutLMv3 + Hybrid OCR"
+            "model": "Hybrid: PaddleOCR + LayoutLMv3-CORD + Rules"
         }), 200
         
     except Exception as e:
@@ -334,7 +304,7 @@ def fine_tune():
     }
     """
     try:
-        if not layoutlmv3_extractor:
+        if not hybrid_extractor:
             return jsonify({
                 "success": False,
                 "error": "Model not loaded"
@@ -384,8 +354,8 @@ def fine_tune():
             }
             training_samples.append(sample)
         
-        # Call fine-tuning method
-        adapter_path = layoutlmv3_extractor.fine_tune_from_corrections(
+        # Call fine-tuning method on the LayoutLMv3 extractor component
+        adapter_path = hybrid_extractor.ml_extractor.fine_tune_from_corrections(
             training_data=training_samples,
             output_dir=adapters_dir,
             epochs=epochs

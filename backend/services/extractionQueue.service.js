@@ -75,7 +75,7 @@ extractionQueue.on('stalled', (job) => {
  * Add an invoice extraction job to the queue
  * @param {Object} jobData - Job data
  * @param {string} jobData.invoiceId - Invoice UUID
- * @param {string} jobData.filePath - Path to invoice file
+ * @param {string} jobData.filePath - Path to invoice file (optional - worker reads from DB if not provided)
  * @param {string} jobData.fileType - File MIME type
  * @param {string} jobData.userId - User who triggered extraction
  * @param {string} jobData.organizationId - Organization ID
@@ -88,7 +88,7 @@ async function addExtractionJob(jobData, options = {}) {
     try {
         const {
             invoiceId,
-            filePath,
+            filePath = null,
             fileType,
             userId,
             organizationId,
@@ -96,8 +96,8 @@ async function addExtractionJob(jobData, options = {}) {
             confidenceThreshold = 0.7
         } = jobData;
 
-        if (!invoiceId || !filePath || !fileType) {
-            throw new Error('Missing required job data: invoiceId, filePath, or fileType');
+        if (!invoiceId || !fileType) {
+            throw new Error('Missing required job data: invoiceId or fileType');
         }
 
         const job = await extractionQueue.add(
