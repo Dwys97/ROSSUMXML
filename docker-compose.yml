@@ -12,8 +12,32 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       JWT_SECRET: 6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e
+      ML_SERVICE_URL: http://ml-service:5001
     depends_on:
       - db
+      - ml-service
+
+  ml-service:
+    build: ./backend/ml-service
+    ports:
+      - "5001:5001"
+    environment:
+      MODEL_NAME: naver-clova-ix/donut-base-finetuned-docvqa
+      PYTHONUNBUFFERED: 1
+    # Uncomment for GPU support (requires nvidia-docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   db:
     image: postgres:13

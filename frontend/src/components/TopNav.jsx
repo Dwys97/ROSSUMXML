@@ -107,6 +107,9 @@ const TopNav = memo(function TopNav() {
                                         <NavLink to="/" className={styles.navLink} onClick={handleNavLinkClick}>
                                             🏠 Home
                                         </NavLink>
+                                        <NavLink to="/invoices" className={styles.navLink} onClick={handleNavLinkClick}>
+                                            📄 Invoice Extractor
+                                        </NavLink>
                                         {user?.isAdmin && (
                                             <NavLink to="/admin" className={styles.navLink} onClick={handleNavLinkClick}>
                                                 👨‍💼 Admin
@@ -216,6 +219,9 @@ const TopNav = memo(function TopNav() {
                                     <>
                                         <NavLink to="/" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
                                             🏠 Home
+                                        </NavLink>
+                                        <NavLink to="/invoices" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            📄 Invoice Extractor
                                         </NavLink>
                                         {user?.isAdmin && (
                                             <NavLink to="/admin" className={styles.mobileNavLink} onClick={handleNavLinkClick}>

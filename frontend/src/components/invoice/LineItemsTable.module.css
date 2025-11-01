@@ -7,7 +7,7 @@
 .empty {
     text-align: center;
     padding: 2rem;
-    color: #666;
+    color: #a0aec0;
 }
 
 .empty p {
@@ -25,53 +25,71 @@
 }
 
 .table thead {
-    background: #f8f9fa;
+    background: rgba(45, 55, 72, 0.6);
 }
 
 .table th {
     padding: 0.75rem 0.5rem;
     text-align: left;
     font-weight: 600;
-    color: #495057;
-    border-bottom: 2px solid #dee2e6;
+    color: #e2e8f0;
+    border-bottom: 2px solid rgba(29, 114, 243, 0.5);
     white-space: nowrap;
 }
 
 .table td {
     padding: 0.75rem 0.5rem;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
 }
 
 .input {
     width: 100%;
     padding: 0.5rem;
-    border: 1px solid #dee2e6;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 4px;
     font-size: 0.85rem;
+    background: rgba(45, 55, 72, 0.6);
+    color: #e2e8f0;
+}
+
+.input:focus {
+    outline: none;
+    border-color: rgba(29, 114, 243, 0.5);
+    background: rgba(45, 55, 72, 0.8);
 }
 
 .inputSmall {
     width: 80px;
     padding: 0.5rem;
-    border: 1px solid #dee2e6;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 4px;
     font-size: 0.85rem;
+    background: rgba(45, 55, 72, 0.6);
+    color: #e2e8f0;
+}
+
+.inputSmall:focus {
+    outline: none;
+    border-color: rgba(29, 114, 243, 0.5);
+    background: rgba(45, 55, 72, 0.8);
 }
 
 .removeBtn {
     padding: 0.25rem 0.5rem;
-    background: #ffebee;
-    color: #c62828;
-    border: none;
+    background: rgba(198, 40, 40, 0.2);
+    color: #ef5350;
+    border: 1px solid rgba(198, 40, 40, 0.3);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: 600;
-    transition: background 0.2s;
+    transition: all 0.2s;
 }
 
 .removeBtn:hover {
-    background: #ffcdd2;
+    background: rgba(198, 40, 40, 0.3);
+    border-color: rgba(198, 40, 40, 0.5);
 }
 
 .actions {
@@ -100,39 +118,43 @@
 }
 
 .addBtn {
-    background: #e3f2fd;
-    color: #1976d2;
+    background: rgba(29, 114, 243, 0.2);
+    color: #64b5f6;
+    border: 1px solid rgba(29, 114, 243, 0.3);
 }
 
 .addBtn:hover {
-    background: #bbdefb;
+    background: rgba(29, 114, 243, 0.3);
+    border-color: rgba(29, 114, 243, 0.5);
 }
 
 .editBtn {
-    background: #0066cc;
+    background: #1d72f3;
     color: white;
 }
 
 .editBtn:hover {
-    background: #0052a3;
+    background: #1557b8;
 }
 
 .saveBtn {
-    background: #2e7d32;
-    color: white;
+    background: rgba(46, 125, 50, 0.3);
+    color: #81c784;
+    border: 1px solid rgba(46, 125, 50, 0.5);
 }
 
 .saveBtn:hover {
-    background: #1b5e20;
+    background: rgba(46, 125, 50, 0.5);
 }
 
 .cancelBtn {
-    background: #f5f5f5;
-    color: #666;
+    background: rgba(45, 55, 72, 0.6);
+    color: #a0aec0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .cancelBtn:hover {
-    background: #e0e0e0;
+    background: rgba(45, 55, 72, 0.8);
 }
 
 /* Responsive */

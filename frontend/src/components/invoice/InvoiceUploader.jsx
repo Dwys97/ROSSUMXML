@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import styles from './InvoiceUploader.module.css';
 
 const InvoiceUploader = ({ onUploadSuccess }) => {
-    const { user, token } = useAuth();
+    const { getToken } = useAuth();
     const [isDragging, setIsDragging] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState(null);
@@ -55,33 +55,48 @@ const InvoiceUploader = ({ onUploadSuccess }) => {
         setError(null);
         
         try {
-            const formData = new FormData();
-            formData.append('file', file);
+            // Convert file to base64
+            const base64 = await fileToBase64(file);
             
-            if (user?.currentOrganization) {
-                formData.append('organizationId', user.currentOrganization);
-            }
+            const payload = {
+                fileName: file.name,
+                fileType: file.type,
+                fileSize: file.size,
+                fileData: base64
+                // organizationId is optional - backend will use default organization
+            };
             
             const response = await fetch('/api/invoices/upload', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json'
                 },
-                body: formData
+                body: JSON.stringify(payload)
             });
             
+            const contentType = response.headers.get('content-type');
+            let errorData;
+            
+            if (contentType && contentType.includes('application/json')) {
+                errorData = await response.json();
+            } else {
+                errorData = { error: await response.text() };
+            }
+            
             if (!response.ok) {
-                const errorData = await response.json();
                 throw new Error(errorData.error || 'Upload failed');
             }
             
-            const data = await response.json();
+            const data = errorData; // Response is already parsed
             
             // Trigger extraction after upload
-            await triggerExtraction(data.invoice.id);
+            if (data.invoice && data.invoice.id) {
+                await triggerExtraction(data.invoice.id);
+            }
             
             // Notify parent component
-            if (onUploadSuccess) {
+            if (onUploadSuccess && data.invoice) {
                 onUploadSuccess(data.invoice);
             }
             
@@ -93,12 +108,26 @@ const InvoiceUploader = ({ onUploadSuccess }) => {
         }
     };
     
+    // Helper function to convert file to base64
+    const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                // Remove data URL prefix (e.g., "data:application/pdf;base64,")
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = error => reject(error);
+        });
+    };
+    
     const triggerExtraction = async (invoiceId) => {
         try {
             await fetch(`/api/invoices/${invoiceId}/extract`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
                 }
             });

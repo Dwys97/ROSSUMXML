@@ -1,11 +1,12 @@
 .container {
-    background: white;
+    background: rgba(26, 32, 44, 0.8);
     border-radius: 8px;
     padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    backdrop-filter: blur(10px);
 }
 
 /* Section */
@@ -19,18 +20,18 @@
     margin: 0 0 0.5rem 0;
     font-size: 1rem;
     font-weight: 600;
-    color: #333;
+    color: #e2e8f0;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid #0066cc;
+    border-bottom: 2px solid #1d72f3;
 }
 
 .noData {
-    color: #999;
+    color: #718096;
     font-size: 0.9rem;
     font-style: italic;
     margin: 0;
     padding: 1rem;
-    background: #f8f9fa;
+    background: rgba(45, 55, 72, 0.6);
     border-radius: 4px;
     text-align: center;
 }
@@ -41,13 +42,15 @@
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.75rem;
-    background: #f8f9fa;
+    background: rgba(45, 55, 72, 0.5);
     border-radius: 4px;
     transition: background 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .fieldRow:hover {
-    background: #e9ecef;
+    background: rgba(45, 55, 72, 0.7);
+    border-color: rgba(29, 114, 243, 0.3);
 }
 
 .fieldHeader {
@@ -60,17 +63,17 @@
 .fieldLabel {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #666;
+    color: #a0aec0;
 }
 
 .fieldValue {
     font-size: 0.95rem;
-    color: #333;
+    color: #e2e8f0;
     padding: 0.25rem 0;
 }
 
 .emptyValue {
-    color: #999;
+    color: #718096;
     font-style: italic;
     font-size: 0.9rem;
 }
@@ -93,30 +96,36 @@
 }
 
 .acceptBtn {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: rgba(46, 125, 50, 0.2);
+    color: #81c784;
+    border: 1px solid rgba(46, 125, 50, 0.3);
 }
 
 .acceptBtn:hover {
-    background: #c8e6c9;
+    background: rgba(46, 125, 50, 0.3);
+    border-color: rgba(46, 125, 50, 0.5);
 }
 
 .queryBtn {
-    background: #fff3e0;
-    color: #f57c00;
+    background: rgba(245, 124, 0, 0.2);
+    color: #ffb74d;
+    border: 1px solid rgba(245, 124, 0, 0.3);
 }
 
 .queryBtn:hover {
-    background: #ffe0b2;
+    background: rgba(245, 124, 0, 0.3);
+    border-color: rgba(245, 124, 0, 0.5);
 }
 
 .rejectBtn {
-    background: #ffebee;
-    color: #c62828;
+    background: rgba(198, 40, 40, 0.2);
+    color: #ef5350;
+    border: 1px solid rgba(198, 40, 40, 0.3);
 }
 
 .rejectBtn:hover {
-    background: #ffcdd2;
+    background: rgba(198, 40, 40, 0.3);
+    border-color: rgba(198, 40, 40, 0.5);
 }
 
 /* Responsive */

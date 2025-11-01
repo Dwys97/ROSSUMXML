@@ -23,13 +23,14 @@
 .title {
     font-size: 2rem;
     font-weight: 600;
-    color: #1a1a1a;
+    color: #ffffff;
     margin: 0 0 0.5rem 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .subtitle {
     font-size: 1rem;
-    color: #666;
+    color: #a5a9b5;
     margin: 0;
 }
 
@@ -40,9 +41,11 @@
     align-items: center;
     margin-bottom: 2rem;
     padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
     gap: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .statusFilters {
@@ -54,30 +57,33 @@
 
 .statusFilter {
     padding: 0.5rem 1rem;
-    border: 1px solid #ddd;
-    background: white;
-    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    color: #ffffff;
 }
 
 .statusFilter:hover {
-    border-color: #0066cc;
-    background: #f0f7ff;
+    border-color: rgba(29, 114, 243, 0.6);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 20px rgba(29, 114, 243, 0.2);
 }
 
 .statusFilter.active {
-    background: #0066cc;
-    color: white;
-    border-color: #0066cc;
+    background: rgba(29, 114, 243, 0.2);
+    color: #1d72f3;
+    border-color: rgba(29, 114, 243, 0.6);
 }
 
 .statusCount {
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.1);
     padding: 0.1rem 0.4rem;
     border-radius: 10px;
     font-size: 0.8rem;
@@ -85,17 +91,19 @@
 }
 
 .statusFilter.active .statusCount {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(29, 114, 243, 0.3);
+    color: #ffffff;
 }
 
 /* View Mode Toggle */
 .viewModeToggle {
     display: flex;
     gap: 0.25rem;
-    background: white;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
     padding: 0.25rem;
-    border: 1px solid #ddd;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .viewModeBtn {
@@ -103,25 +111,27 @@
     border: none;
     background: transparent;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 1.2rem;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
+    color: #a5a9b5;
 }
 
 .viewModeBtn:hover {
-    background: #f0f7ff;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
 }
 
 .viewModeBtn.active {
-    background: #0066cc;
-    color: white;
+    background: rgba(29, 114, 243, 0.2);
+    color: #1d72f3;
 }
 
 /* Error Message */
 .error {
-    background: #fff3cd;
-    border: 1px solid #ffc107;
-    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 12px;
     padding: 1rem;
     margin-bottom: 2rem;
     display: flex;
@@ -131,20 +141,23 @@
 
 .error p {
     margin: 0;
-    color: #856404;
+    color: #fca5a5;
 }
 
 .error button {
     padding: 0.5rem 1rem;
-    background: #ffc107;
+    background: #ef4444;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
+    color: #ffffff;
+    transition: all 0.3s ease;
 }
 
 .error button:hover {
-    background: #e0a800;
+    background: #dc2626;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
 }
 
 /* Loading State */
@@ -160,8 +173,8 @@
 .spinner {
     width: 48px;
     height: 48px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #0066cc;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid #1d72f3;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 1rem;
@@ -173,7 +186,7 @@
 }
 
 .loading p {
-    color: #666;
+    color: #ffffff;
     font-size: 1rem;
 }
 

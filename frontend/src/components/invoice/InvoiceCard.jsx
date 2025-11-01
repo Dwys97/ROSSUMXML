@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './InvoiceCard.module.css';
 
-const InvoiceCard = ({ invoice, onClick }) => {
+const InvoiceCard = ({ invoice, onClick, onDelete }) => {
     
     // Format date
     const formatDate = (dateString) => {
@@ -108,9 +108,27 @@ const InvoiceCard = ({ invoice, onClick }) => {
                 <span className={styles.uploadDate}>
                     Uploaded {formatDate(invoice.created_at)}
                 </span>
-                <button className={styles.reviewBtn}>
-                    Review →
-                </button>
+                <div className={styles.footerActions}>
+                    <button 
+                        className={styles.reviewBtn}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClick();
+                        }}
+                    >
+                        Review →
+                    </button>
+                    <button 
+                        className={styles.deleteBtn}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(invoice.id, e);
+                        }}
+                        title="Delete Invoice"
+                    >
+                        🗑️
+                    </button>
+                </div>
             </div>
         </div>
     );

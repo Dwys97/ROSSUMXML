@@ -7,52 +7,56 @@
 }
 
 .dropzone {
-    border: 2px dashed #ccc;
-    border-radius: 8px;
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
     padding: 2rem;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s;
-    background: white;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
     min-width: 250px;
 }
 
 .dropzone:hover {
-    border-color: #0066cc;
-    background: #f0f7ff;
+    border-color: rgba(29, 114, 243, 0.6);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 20px rgba(29, 114, 243, 0.2);
 }
 
 .dropzone.dragging {
-    border-color: #0066cc;
-    background: #e6f2ff;
+    border-color: rgba(29, 114, 243, 0.8);
+    background: rgba(29, 114, 243, 0.1);
+    box-shadow: 0 0 30px rgba(29, 114, 243, 0.3);
     transform: scale(1.02);
 }
 
 .uploadIcon {
     font-size: 3rem;
     margin-bottom: 1rem;
+    color: #1d72f3;
 }
 
 .uploadText {
     margin: 0.5rem 0;
     font-size: 1rem;
-    color: #333;
+    color: #ffffff;
 }
 
 .uploadText strong {
-    color: #0066cc;
+    color: #1d72f3;
 }
 
 .uploadHint {
     margin: 0.25rem 0;
     font-size: 0.9rem;
-    color: #666;
+    color: #a5a9b5;
 }
 
 .uploadFormats {
     margin: 0.5rem 0 0 0;
     font-size: 0.8rem;
-    color: #999;
+    color: #a5a9b5;
 }
 
 .uploading {
@@ -65,8 +69,8 @@
 .spinner {
     width: 32px;
     height: 32px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #0066cc;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid #1d72f3;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -78,16 +82,16 @@
 
 .uploading p {
     margin: 0;
-    color: #666;
+    color: #ffffff;
 }
 
 .error {
     margin-top: 1rem;
     padding: 0.75rem;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
-    border-radius: 4px;
-    color: #856404;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #fca5a5;
     font-size: 0.9rem;
 }
 

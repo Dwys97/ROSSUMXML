@@ -9,18 +9,18 @@ import styles from './InvoiceAnnotationPage.module.css';
 
 const InvoiceAnnotationPage = () => {
     const { id } = useParams();
-    const { token } = useAuth();
+    const { getToken } = useAuth();
     const navigate = useNavigate();
     
     const [invoice, setInvoice] = useState(null);
     const [parties, setParties] = useState([]);
     const [lineItems, setLineItems] = useState([]);
-    const [corrections, setCorrections] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedField, setSelectedField] = useState(null);
     const [showQueryModal, setShowQueryModal] = useState(false);
     const [modalAction, setModalAction] = useState(null); // 'query' or 'reject'
+    const [extracting, setExtracting] = useState(false);
     
     // Fetch invoice details
     const fetchInvoiceDetails = async () => {
@@ -30,7 +30,7 @@ const InvoiceAnnotationPage = () => {
         try {
             const response = await fetch(`/api/invoices/${id}`, {
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -44,7 +44,6 @@ const InvoiceAnnotationPage = () => {
             setInvoice(data.invoice);
             setParties(data.parties || []);
             setLineItems(data.lineItems || []);
-            setCorrections(data.corrections || []);
             
         } catch (err) {
             console.error('Error fetching invoice:', err);
@@ -58,6 +57,7 @@ const InvoiceAnnotationPage = () => {
         if (id) {
             fetchInvoiceDetails();
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
     
     // Handle field acceptance
@@ -66,7 +66,7 @@ const InvoiceAnnotationPage = () => {
             await fetch(`/api/invoices/${id}/correct`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -105,7 +105,7 @@ const InvoiceAnnotationPage = () => {
             await fetch(`/api/invoices/${id}/status`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -129,7 +129,7 @@ const InvoiceAnnotationPage = () => {
             const response = await fetch(`/api/invoices/${id}/export`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ format })
@@ -146,6 +146,61 @@ const InvoiceAnnotationPage = () => {
         } catch (err) {
             console.error('Error exporting invoice:', err);
             alert('Export failed: ' + err.message);
+        }
+    };
+    
+    // Handle ML extraction
+    const handleExtract = async () => {
+        setExtracting(true);
+        try {
+            const response = await fetch(`/api/invoices/${id}/extract`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Extraction failed');
+            }
+            
+            alert('Extraction started! The invoice will be processed in the background.');
+            
+            // Poll for updates
+            const pollInterval = setInterval(async () => {
+                const checkResponse = await fetch(`/api/invoices/${id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (checkResponse.ok) {
+                    const data = await checkResponse.json();
+                    if (data.invoice.extraction_status === 'completed') {
+                        clearInterval(pollInterval);
+                        fetchInvoiceDetails();
+                        alert('Extraction completed successfully!');
+                        setExtracting(false);
+                    } else if (data.invoice.extraction_status === 'failed') {
+                        clearInterval(pollInterval);
+                        alert('Extraction failed. Please try again.');
+                        setExtracting(false);
+                    }
+                }
+            }, 3000); // Check every 3 seconds
+            
+            // Stop polling after 2 minutes
+            setTimeout(() => {
+                clearInterval(pollInterval);
+                setExtracting(false);
+            }, 120000);
+            
+        } catch (err) {
+            console.error('Error extracting invoice:', err);
+            alert('Extraction failed: ' + err.message);
+            setExtracting(false);
         }
     };
     
@@ -202,6 +257,13 @@ const InvoiceAnnotationPage = () => {
                 </div>
                 <div className={styles.headerRight}>
                     <button 
+                        onClick={handleExtract}
+                        className={styles.extractBtn}
+                        disabled={extracting || invoice?.extraction_status === 'processing'}
+                    >
+                        {extracting || invoice?.extraction_status === 'processing' ? '🔄 Extracting...' : '🤖 Extract Data'}
+                    </button>
+                    <button 
                         onClick={() => handleExport('xml')}
                         className={styles.exportBtn}
                     >
@@ -227,7 +289,7 @@ const InvoiceAnnotationPage = () => {
                 {/* Left Panel - PDF Viewer */}
                 <div className={styles.leftPanel}>
                     <PDFViewer
-                        filePath={invoice.file_path}
+                        invoiceId={id}
                         fileName={invoice.file_name}
                         fileType={invoice.file_type}
                         selectedField={selectedField}

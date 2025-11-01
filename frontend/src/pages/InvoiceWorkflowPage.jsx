@@ -6,7 +6,7 @@ import InvoiceQueue from '../components/invoice/InvoiceQueue';
 import styles from './InvoiceWorkflowPage.module.css';
 
 const InvoiceWorkflowPage = () => {
-    const { user, token } = useAuth();
+    const { user, getToken } = useAuth();
     const navigate = useNavigate();
     
     const [invoices, setInvoices] = useState([]);
@@ -53,7 +53,7 @@ const InvoiceWorkflowPage = () => {
             
             const response = await fetch(`/api/invoices?${params.toString()}`, {
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -78,10 +78,11 @@ const InvoiceWorkflowPage = () => {
     // Load invoices on component mount and when filters change
     useEffect(() => {
         fetchInvoices(1, selectedStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedStatus, user?.currentOrganization]);
     
     // Handle invoice upload success
-    const handleUploadSuccess = (newInvoice) => {
+    const handleUploadSuccess = () => {
         // Refresh the invoice list
         fetchInvoices(pagination.page, selectedStatus);
     };
@@ -99,6 +100,39 @@ const InvoiceWorkflowPage = () => {
     // Handle page change
     const handlePageChange = (newPage) => {
         fetchInvoices(newPage, selectedStatus);
+    };
+    
+    // Handle invoice deletion
+    const handleDeleteInvoice = async (invoiceId, e) => {
+        if (e) {
+            e.stopPropagation(); // Prevent row click
+        }
+        
+        if (!window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/invoices/${invoiceId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to delete invoice');
+            }
+            
+            // Refresh the invoice list
+            fetchInvoices(pagination.page, selectedStatus);
+            
+        } catch (err) {
+            console.error('Error deleting invoice:', err);
+            alert(`Failed to delete invoice: ${err.message}`);
+        }
     };
     
     return (
@@ -178,6 +212,7 @@ const InvoiceWorkflowPage = () => {
                     invoices={invoices}
                     viewMode={viewMode}
                     onInvoiceClick={handleInvoiceClick}
+                    onDeleteInvoice={handleDeleteInvoice}
                     pagination={pagination}
                     onPageChange={handlePageChange}
                 />

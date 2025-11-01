@@ -11,8 +11,9 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.75rem 1rem;
-    background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
+    background: rgba(26, 32, 44, 0.8);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
 }
 
 .toolbarLeft,
@@ -24,17 +25,18 @@
 
 .toolBtn {
     padding: 0.5rem 0.75rem;
-    background: white;
-    border: 1px solid #dee2e6;
+    background: rgba(45, 55, 72, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
     transition: all 0.2s;
+    color: #e2e8f0;
 }
 
 .toolBtn:hover:not(:disabled) {
-    background: #e9ecef;
-    border-color: #0066cc;
+    background: rgba(45, 55, 72, 0.8);
+    border-color: rgba(29, 114, 243, 0.5);
 }
 
 .toolBtn:disabled {
@@ -45,7 +47,7 @@
 .pageInfo,
 .zoomLevel {
     font-size: 0.9rem;
-    color: #666;
+    color: #a0aec0;
     padding: 0 0.5rem;
 }
 
@@ -53,7 +55,7 @@
 .viewer {
     flex: 1;
     overflow: auto;
-    background: #e9ecef;
+    background: rgba(16, 20, 30, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -61,8 +63,8 @@
 }
 
 .document {
-    background: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
     transition: transform 0.2s;
     position: relative;
     min-width: 400px;
@@ -112,14 +114,14 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    border: 2px dashed #0066cc;
-    background: rgba(0, 102, 204, 0.1);
+    border: 2px dashed #1d72f3;
+    background: rgba(29, 114, 243, 0.15);
     padding: 2rem;
     border-radius: 4px;
 }
 
 .boundingBoxLabel {
-    background: #0066cc;
+    background: #1d72f3;
     color: white;
     padding: 0.5rem 1rem;
     border-radius: 4px;
@@ -129,19 +131,20 @@
 
 /* Info Note */
 .infoNote {
-    background: #fff3cd;
-    border-top: 1px solid #ffc107;
+    background: rgba(245, 124, 0, 0.2);
+    border-top: 1px solid rgba(245, 124, 0, 0.5);
     padding: 0.75rem 1rem;
 }
 
 .infoNote p {
     margin: 0;
-    color: #856404;
+    color: #ffb74d;
     font-size: 0.85rem;
 }
 
 .infoNote strong {
     font-weight: 600;
+    color: #ffa726;
 }
 
 /* Responsive */

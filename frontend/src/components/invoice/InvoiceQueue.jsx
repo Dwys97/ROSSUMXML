@@ -2,7 +2,7 @@ import React from 'react';
 import InvoiceCard from './InvoiceCard';
 import styles from './InvoiceQueue.module.css';
 
-const InvoiceQueue = ({ invoices, viewMode, onInvoiceClick, pagination, onPageChange }) => {
+const InvoiceQueue = ({ invoices, viewMode, onInvoiceClick, onDeleteInvoice, pagination, onPageChange }) => {
     
     // Format date for display
     const formatDate = (dateString) => {
@@ -123,15 +123,28 @@ const InvoiceQueue = ({ invoices, viewMode, onInvoiceClick, pagination, onPageCh
                                     </td>
                                     <td>{formatDate(invoice.created_at)}</td>
                                     <td>
-                                        <button 
-                                            className={styles.actionBtn}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onInvoiceClick(invoice);
-                                            }}
-                                        >
-                                            Review →
-                                        </button>
+                                        <div className={styles.actionButtons}>
+                                            <button 
+                                                className={styles.reviewBtn}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onInvoiceClick(invoice);
+                                                }}
+                                                title="Review Invoice"
+                                            >
+                                                Review
+                                            </button>
+                                            <button 
+                                                className={styles.deleteBtn}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onDeleteInvoice(invoice.id, e);
+                                                }}
+                                                title="Delete Invoice"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             );
@@ -175,6 +188,7 @@ const InvoiceQueue = ({ invoices, viewMode, onInvoiceClick, pagination, onPageCh
                     key={invoice.id}
                     invoice={invoice}
                     onClick={() => onInvoiceClick(invoice)}
+                    onDelete={onDeleteInvoice}
                 />
             ))}
             

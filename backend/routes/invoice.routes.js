@@ -7,6 +7,7 @@ const db = require('../db');
 const authenticate = require('../middleware/auth');
 const { requirePermission } = require('../middleware/rbac');
 const { exportAsXML, exportAsCSV, exportAsXLS } = require('../services/invoiceExport.service');
+const { startExtractionJob, getExtractionJobStatus } = require('../services/invoiceExtraction.service');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -373,14 +374,21 @@ router.post('/:id/extract', authenticate, requirePermission('invoice:upload'), a
         
         await client.query('COMMIT');
         
-        // Trigger async ML extraction (will be implemented in service)
-        // For now, just return success
-        res.json({ 
-            message: 'ML extraction triggered successfully',
-            status: 'processing'
+        // Start extraction job in background queue
+        const jobInfo = await startExtractionJob(id, userId, {
+            confidenceThreshold: req.body.confidenceThreshold || 0.7,
+            priority: req.body.priority || 5
         });
         
-        // TODO: Import and call invoiceExtraction.service.extract(id)
+        res.json({ 
+            success: true,
+            message: 'Extraction job started in background',
+            jobId: jobInfo.jobId,
+            invoiceId: jobInfo.invoiceId,
+            status: jobInfo.status,
+            queuePosition: jobInfo.position,
+            estimatedTime: jobInfo.estimatedTime
+        });
         
     } catch (error) {
         await client.query('ROLLBACK');
@@ -391,6 +399,53 @@ router.post('/:id/extract', authenticate, requirePermission('invoice:upload'), a
         });
     } finally {
         client.release();
+    }
+});
+
+// =====================================================
+// 5B. GET EXTRACTION JOB STATUS
+// =====================================================
+router.get('/:id/extraction-status', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        
+        // Verify user has access to this invoice
+        const result = await db.query(
+            'SELECT id, organization_id FROM invoices WHERE id = $1',
+            [id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        
+        // Check if user belongs to the same organization
+        const orgCheck = await db.query(
+            'SELECT id FROM users WHERE id = $1 AND organization_id = $2',
+            [userId, result.rows[0].organization_id]
+        );
+        
+        if (orgCheck.rows.length === 0) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+        
+        // Construct job ID from invoice ID (format: extraction-{invoiceId})
+        const jobId = `extraction-${id}`;
+        const jobStatus = await getExtractionJobStatus(jobId);
+        
+        res.json({
+            success: true,
+            invoiceId: id,
+            job: jobStatus
+        });
+        
+    } catch (error) {
+        console.error('Get extraction status error:', error);
+        res.status(500).json({ 
+            error: 'Failed to get extraction status',
+            details: error.message 
+        });
     }
 });
 
