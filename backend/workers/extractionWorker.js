@@ -4,17 +4,17 @@
  */
 
 const { extractionQueue } = require('../services/extractionQueue.service');
-const pool = require('../db/pool');
+const { pool } = require('../db');
 const axios = require('axios');
 const fs = require('fs').promises;
 const logger = require('../utils/logger');
 const io = require('socket.io-client');
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3001';
 
-// Socket.io client for emitting events to main server
-const socket = io(BACKEND_URL, {
+// Socket.io client for emitting events to Socket.io server
+const socket = io(SOCKET_SERVER_URL, {
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 10
