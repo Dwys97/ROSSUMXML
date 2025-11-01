@@ -6116,6 +6116,64 @@ exports.handler = async (event) => {
         }
 
         // ============================================================================
+        // ML EXTRACTION ENDPOINTS
+        // ============================================================================
+
+        // Trigger ML extraction (POST /api/ml/extract)
+        if (path === '/api/ml/extract' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const body = JSON.parse(event.body || '{}');
+                
+                // Import extraction queue service
+                const { createExtractionJob } = require('./services/extractionQueue.service');
+                
+                // Create extraction job
+                const job = await createExtractionJob({
+                    userId: user.id,
+                    filePath: body.filePath,
+                    fileName: body.fileName,
+                    vendorId: body.vendorId || null
+                });
+                
+                return createResponse(200, JSON.stringify({
+                    success: true,
+                    jobId: job.id,
+                    message: 'Extraction job created successfully'
+                }));
+            } catch (err) {
+                console.error('ML extract error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to create extraction job',
+                    details: err.message
+                }));
+            }
+        }
+
+        // Get job status (GET /api/jobs/:id)
+        if (path.match(/^\/api\/jobs\/[^/]+$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const jobId = path.split('/').pop();
+                
+                const { getJobStatus } = require('./services/extractionQueue.service');
+                const status = await getJobStatus(jobId);
+                
+                if (!status) {
+                    return createResponse(404, JSON.stringify({ error: 'Job not found' }));
+                }
+                
+                return createResponse(200, JSON.stringify(status));
+            } catch (err) {
+                console.error('Get job status error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to get job status',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ============================================================================
         // END OF INVOICE EXTRACTION ENDPOINTS
         // ============================================================================
 
