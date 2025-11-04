@@ -51,10 +51,10 @@ class RuleBasedExtractor:
     
     # HS Code patterns (Harmonized System Code - 6-10 digits)
     HS_CODE_PATTERNS = [
-        r'HS\s*(?:Code|#)[\s:]*(\d{6,10})',
-        r'Harmonized\s*(?:System\s*)?Code[\s:]*(\d{6,10})',
-        r'Tariff\s*Code[\s:]*(\d{6,10})',
-        r'\b(\d{6}\.\d{2}\.\d{2})\b',  # HS code format: 1234.56.78
+        r'HS\s*(?:Code|#)?[\s:]*(\d{4}[\.\s]?\d{2}[\.\s]?\d{2,4})',  # With dots/spaces
+        r'HS\s*(?:Code|#)?[\s:]*(\d{6,10})',  # Without separators
+        r'Harmonized\s*(?:System\s*)?Code[\s:]*(\d{4}[\.\s]?\d{2}[\.\s]?\d{2,4})',
+        r'Tariff\s*Code[\s:]*(\d{4}[\.\s]?\d{2}[\.\s]?\d{2,4})',
     ]
     
     # Incoterms patterns (international commercial terms)
