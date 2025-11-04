@@ -5482,7 +5482,7 @@ exports.handler = async (event) => {
                     // Store file as base64 in database (no filesystem needed)
                     const fileBase64 = buffer.toString('base64');
                     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-                    const fileExtension = fileName.split('.').pop();
+                    const fileExtension = fileName.split('.').pop().toLowerCase(); // Normalize to lowercase
                     const filePath = `db:${uniqueSuffix}.${fileExtension}`; // Virtual path for reference
                     
                     console.log('[UPLOAD] File will be stored in DB with reference:', filePath);
