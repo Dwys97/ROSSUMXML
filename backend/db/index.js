@@ -9,27 +9,20 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'rossumxml'
 });
 
-// Override connect to ensure clean transaction state
-const originalConnect = pool.connect.bind(pool);
-pool.connect = async function() {
-    const client = await originalConnect();
-    
-    // Check if there's an active transaction and rollback if aborted
+// Wrap pool.query to handle aborted transactions
+const originalPoolQuery = pool.query.bind(pool);
+pool.query = async function(...args) {
     try {
-        const result = await Promise.race([
-            client.query("SELECT current_setting('transaction_isolation', true) as isolation"),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 100))
-        ]);
-        
-        // If query succeeded, there might be a transaction - try rollback
-        if (result && result.rows) {
-            await client.query('ROLLBACK').catch(() => {});
-        }
+        return await originalPoolQuery(...args);
     } catch (err) {
-        // Timeout or error - skip rollback
+        // If transaction is aborted, end the pool and recreate it
+        if (err.code === '25P02') {
+            console.warn('Detected aborted transaction, ending pool connections');
+            await pool.end().catch(() => {});
+            throw err;
+        }
+        throw err;
     }
-    
-    return client;
 };
 
 // Helper to safely release client even if transaction is aborted
