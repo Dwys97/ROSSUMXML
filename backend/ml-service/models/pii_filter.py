@@ -200,27 +200,42 @@ class PIIFilter:
                 'text': match.group()
             })
         
-        # Phone pattern (international formats)
-        phone_pattern = r'\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}'
+        # Phone pattern (more restrictive for international formats)
+        # Matches formats like: +44 20 1234 5678, (555) 123-4567, +1-555-123-4567
+        phone_pattern = r'(?:\+\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}(?!\d)'
         for match in re.finditer(phone_pattern, text):
-            entities.append({
-                'type': 'PHONE',
-                'start': match.start(),
-                'end': match.end(),
-                'score': 0.8,
-                'text': match.group()
-            })
+            # Additional validation: must be at least 7 digits total
+            digits_only = ''.join(filter(str.isdigit, match.group()))
+            if len(digits_only) >= 7:
+                entities.append({
+                    'type': 'PHONE',
+                    'start': match.start(),
+                    'end': match.end(),
+                    'score': 0.8,
+                    'text': match.group()
+                })
         
-        # VAT number pattern (EU)
-        vat_pattern = r'\b[A-Z]{2}\d{8,12}\b'
-        for match in re.finditer(vat_pattern, text):
-            entities.append({
-                'type': 'VAT_NUMBER',
-                'start': match.start(),
-                'end': match.end(),
-                'score': 0.9,
-                'text': match.group()
-            })
+        # VAT number pattern (more comprehensive for EU countries)
+        # Covers major EU VAT formats: GB, FR, DE, IT, ES, etc.
+        vat_patterns = [
+            (r'\bGB\d{9}\b', 'VAT_NUMBER'),  # UK: GB123456789
+            (r'\bFR[A-Z0-9]{11}\b', 'VAT_NUMBER'),  # France: FR12345678901
+            (r'\bDE\d{9}\b', 'VAT_NUMBER'),  # Germany: DE123456789
+            (r'\bIT\d{11}\b', 'VAT_NUMBER'),  # Italy: IT12345678901
+            (r'\bES[A-Z0-9]{9}\b', 'VAT_NUMBER'),  # Spain: ESA12345678
+            (r'\bNL\d{9}B\d{2}\b', 'VAT_NUMBER'),  # Netherlands: NL123456789B01
+            (r'\b[A-Z]{2}\d{8,12}\b', 'VAT_NUMBER')  # Generic EU VAT (fallback)
+        ]
+        
+        for pattern, entity_type in vat_patterns:
+            for match in re.finditer(pattern, text):
+                entities.append({
+                    'type': entity_type,
+                    'start': match.start(),
+                    'end': match.end(),
+                    'score': 0.9,
+                    'text': match.group()
+                })
         
         # IBAN pattern
         iban_pattern = r'\b[A-Z]{2}\d{2}[A-Z0-9]{1,30}\b'

@@ -6,6 +6,7 @@ Tests PII filtering and GDPR compliance of the invoice extraction pipeline
 
 import sys
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -14,12 +15,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Add ml-service to path (portable)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ML_SERVICE_DIR = os.path.join(SCRIPT_DIR, 'backend', 'ml-service')
+
 def test_pii_filter_import():
     """Test 1: Verify PII filter can be imported"""
     logger.info("Test 1: Import PII Filter")
     try:
         # Add ml-service to path
-        sys.path.insert(0, '/home/runner/work/ROSSUMXML/ROSSUMXML/backend/ml-service')
+        sys.path.insert(0, ML_SERVICE_DIR)
         
         from models.pii_filter import PIIFilter, get_pii_filter
         logger.info("✓ PII Filter imported successfully")
@@ -34,7 +39,7 @@ def test_pii_detection():
     logger.info("\nTest 2: PII Detection")
     
     try:
-        sys.path.insert(0, '/home/runner/work/ROSSUMXML/ROSSUMXML/backend/ml-service')
+        sys.path.insert(0, ML_SERVICE_DIR)
         from models.pii_filter import PIIFilter
         
         # Initialize filter
@@ -72,7 +77,7 @@ def test_pii_obfuscation():
     logger.info("\nTest 3: PII Obfuscation")
     
     try:
-        sys.path.insert(0, '/home/runner/work/ROSSUMXML/ROSSUMXML/backend/ml-service')
+        sys.path.insert(0, ML_SERVICE_DIR)
         from models.pii_filter import PIIFilter
         
         pii_filter = PIIFilter(use_presidio=False)
@@ -100,7 +105,7 @@ def test_customs_data_filtering():
     logger.info("\nTest 4: Customs Data Filtering")
     
     try:
-        sys.path.insert(0, '/home/runner/work/ROSSUMXML/ROSSUMXML/backend/ml-service')
+        sys.path.insert(0, ML_SERVICE_DIR)
         from models.pii_filter import PIIFilter
         
         pii_filter = PIIFilter(use_presidio=False)
@@ -204,7 +209,7 @@ def test_gdpr_validation():
     logger.info("\nTest 5: GDPR Validation")
     
     try:
-        sys.path.insert(0, '/home/runner/work/ROSSUMXML/ROSSUMXML/backend/ml-service')
+        sys.path.insert(0, ML_SERVICE_DIR)
         from models.pii_filter import PIIFilter
         
         pii_filter = PIIFilter(use_presidio=False)

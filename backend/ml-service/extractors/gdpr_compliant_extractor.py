@@ -234,8 +234,12 @@ class GDPRCompliantInvoiceExtractor:
             
             classified_tokens = []
             for i, (word, box, pred) in enumerate(zip(words, boxes, predictions)):
-                if i < len(probabilities):
-                    prob = probabilities[i][pred] if isinstance(probabilities[i], list) else probabilities[pred]
+                # Safely get probability with bounds checking
+                if isinstance(probabilities, list) and i < len(probabilities):
+                    if isinstance(probabilities[i], list) and pred < len(probabilities[i]):
+                        prob = probabilities[i][pred]
+                    else:
+                        prob = probabilities[pred] if pred < len(probabilities) else 0.0
                 else:
                     prob = 0.0
                 
@@ -391,7 +395,11 @@ class GDPRCompliantInvoiceExtractor:
         elif 'total' in entity_lower or 'amount' in entity_lower or 'subtotal' in entity_lower:
             if 'total' in entity_lower:
                 try:
-                    extracted['totals']['total_amount'] = float(text.replace(',', '').replace('$', '').replace('€', ''))
+                    # Remove common currency symbols and separators
+                    cleaned_text = text
+                    for symbol in ['$', '€', '£', '¥', '₹', '₽', 'USD', 'EUR', 'GBP', 'JPY', 'INR', 'RUB', ',', ' ']:
+                        cleaned_text = cleaned_text.replace(symbol, '')
+                    extracted['totals']['total_amount'] = float(cleaned_text)
                     extracted['totals']['totalConfidence'] = float(avg_conf)
                 except ValueError:
                     extracted['totals']['total_amount'] = text
