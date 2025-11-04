@@ -2,25 +2,24 @@
 # Three-Model Pipeline: Surya OCR + Qwen2.5-3B + Qwen2.5-1.5B
 
 # Core dependencies
-flask==3.0.0
-flask-cors==4.0.0
-pillow==10.1.0
-numpy==1.24.3
-torch==2.1.0
-transformers==4.36.0
+flask>=3.0.0
+flask-cors>=4.0.0
+pillow>=10.1.0
+numpy>=1.26.0
+torch>=2.1.0
+transformers>=4.40.0
 
 # Surya OCR (Layout-Aware)
-surya-ocr==0.4.0
+surya-ocr>=0.4.14
 
-# Quantization for CPU efficiency
-bitsandbytes==0.41.3
-accelerate==0.25.0
+# Quantization for CPU efficiency (CPU-only, skip bitsandbytes)
+accelerate>=0.27.0
 
 # PDF processing
-PyMuPDF==1.23.8
+PyMuPDF>=1.23.8
 
 # Image preprocessing
-opencv-python-headless==4.8.1.78
+opencv-python-headless>=4.8.1.78
 
 # Logging
-python-json-logger==2.0.7
+python-json-logger>=2.0.7

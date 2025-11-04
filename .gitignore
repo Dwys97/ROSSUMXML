@@ -80,10 +80,18 @@ coverage/
 # yarn.lock
 
 # ML Training Artifacts (auto-generated during training)
-backend/ml/checkpoints/*
-!backend/ml/checkpoints/.gitkeep
-backend/ml/adapters/*
-!backend/ml/adapters/.gitkeep
+# ML Models and Training Artifacts
+backend/ml-service/venv/
+backend/ml-service/layoutlmv3_model/
+backend/ml-service/checkpoints/
+backend/ml-service/adapters/
+backend/ml-service/model_cache/
+backend/ml-service/**/__pycache__/
+backend/ml-service/**/*.pyc
+
+# Node modules
+node_modules/
+frontend-old/
 backend/ml-service/models/*.pt
 backend/ml-service/models/*.pth
 backend/ml-service/models/*.bin
