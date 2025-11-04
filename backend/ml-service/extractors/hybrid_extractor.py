@@ -26,7 +26,7 @@ class HybridExtractor:
     
     def __init__(
         self,
-        model_name: str = "nielsr/layoutlmv3-finetuned-cord",
+        model_name: str = "rubentito/layoutlmv3-base-mpdocvqa",
         device: str = "cpu",
         ml_confidence_threshold: float = 0.70,
         rule_confidence_threshold: float = 0.60
@@ -40,7 +40,7 @@ class HybridExtractor:
             ml_confidence_threshold: Minimum confidence for ML extraction
             rule_confidence_threshold: Minimum confidence for rule-based extraction
         """
-        logger.info("Initializing Hybrid Extractor (PaddleOCR + LayoutLMv3-CORD + Rules)")
+        logger.info(f"Initializing Hybrid Extractor (PaddleOCR + {model_name} + Rules)")
         
         self.ml_threshold = ml_confidence_threshold
         self.rule_threshold = rule_confidence_threshold

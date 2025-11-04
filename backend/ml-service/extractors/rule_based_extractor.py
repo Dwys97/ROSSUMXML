@@ -49,6 +49,34 @@ class RuleBasedExtractor:
         r'GST[\s#:]*([A-Z0-9]{15})',  # India GST
     ]
     
+    # HS Code patterns (Harmonized System Code - 6-10 digits)
+    HS_CODE_PATTERNS = [
+        r'HS\s*(?:Code|#)[\s:]*(\d{6,10})',
+        r'Harmonized\s*(?:System\s*)?Code[\s:]*(\d{6,10})',
+        r'Tariff\s*Code[\s:]*(\d{6,10})',
+        r'\b(\d{6}\.\d{2}\.\d{2})\b',  # HS code format: 1234.56.78
+    ]
+    
+    # Incoterms patterns (international commercial terms)
+    INCOTERMS_PATTERNS = [
+        r'\b(EXW|FCA|CPT|CIP|DAP|DPU|DDP|FAS|FOB|CFR|CIF)\b',  # Standard Incoterms 2020
+        r'Incoterms?[\s:]*([A-Z]{3})',
+        r'Terms\s*of\s*delivery[\s:]*([A-Z]{3})',
+    ]
+    
+    # Weight patterns (net and gross weight in kg)
+    WEIGHT_PATTERNS = [
+        r'(?:Net\s*Weight|N\.W\.)[\s:]*(\d+(?:\.\d+)?)\s*(?:kg|KG|kilogram)',
+        r'(?:Gross\s*Weight|G\.W\.)[\s:]*(\d+(?:\.\d+)?)\s*(?:kg|KG|kilogram)',
+        r'Weight[\s:]*(\d+(?:\.\d+)?)\s*(?:kg|KG)',
+    ]
+    
+    # Currency patterns
+    CURRENCY_PATTERNS = [
+        r'\b(USD|EUR|GBP|JPY|CNY|AUD|CAD|CHF|SEK|NZD)\b',
+        r'Currency[\s:]*([A-Z]{3})',
+    ]
+    
     # Email pattern
     EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
     
@@ -61,6 +89,10 @@ class RuleBasedExtractor:
         self.date_patterns = [re.compile(p, re.IGNORECASE) for p in self.DATE_PATTERNS]
         self.amount_patterns = [re.compile(p, re.IGNORECASE) for p in self.AMOUNT_PATTERNS]
         self.vat_patterns = [re.compile(p, re.IGNORECASE) for p in self.VAT_PATTERNS]
+        self.hs_code_patterns = [re.compile(p, re.IGNORECASE) for p in self.HS_CODE_PATTERNS]
+        self.incoterms_patterns = [re.compile(p, re.IGNORECASE) for p in self.INCOTERMS_PATTERNS]
+        self.weight_patterns = [re.compile(p, re.IGNORECASE) for p in self.WEIGHT_PATTERNS]
+        self.currency_patterns = [re.compile(p, re.IGNORECASE) for p in self.CURRENCY_PATTERNS]
         self.email_pattern = re.compile(self.EMAIL_PATTERN)
         self.phone_pattern = re.compile(self.PHONE_PATTERN)
     
@@ -144,15 +176,54 @@ class RuleBasedExtractor:
             result['seller']['phoneConfidence'] = 65.0  # Medium-high confidence
             logger.info(f"Extracted {len(phones)} phone numbers")
         
+        # Extract customs-specific fields
+        
+        # Extract HS Codes
+        hs_codes = self._extract_hs_codes(text)
+        if hs_codes:
+            # Store in shipping section or as separate field
+            if 'shipping' not in result:
+                result['shipping'] = {}
+            result['shipping']['hs_code'] = hs_codes[0]
+            result['shipping']['hs_codeConfidence'] = 70.0
+            logger.info(f"Extracted {len(hs_codes)} HS code(s): {hs_codes[0]}")
+        
+        # Extract Incoterms
+        incoterms = self._extract_incoterms(text)
+        if incoterms:
+            if 'shipping' not in result:
+                result['shipping'] = {}
+            result['shipping']['incoterms'] = incoterms[0]
+            result['shipping']['incotermsConfidence'] = 80.0
+            logger.info(f"Extracted Incoterms: {incoterms[0]}")
+        
+        # Extract Currency
+        currencies = self._extract_currency(text)
+        if currencies:
+            result['invoice']['currency'] = currencies[0]
+            result['invoice']['currencyConfidence'] = 75.0
+            logger.info(f"Extracted currency: {currencies[0]}")
+        
+        # Extract Weights
+        weights = self._extract_weights(text)
+        if weights:
+            for weight_type, value in weights.items():
+                result['totals'][weight_type] = value
+                result['totals'][f"{weight_type}Confidence"] = 65.0
+            logger.info(f"Extracted weights: {weights}")
+        
         # Calculate confidence based on fields found (0-100 scale)
         fields_found = sum([
             1 if result['invoice'].get('number') else 0,
             1 if result['invoice'].get('date') else 0,
+            1 if result['invoice'].get('currency') else 0,
             1 if result['totals'].get('total') else 0,
             1 if result['seller'].get('vat_id') else 0,
             1 if result['seller'].get('email') else 0,
+            1 if result.get('shipping', {}).get('incoterms') else 0,
+            1 if result.get('shipping', {}).get('hs_code') else 0,
         ])
-        result['confidence'] = min(fields_found * 15.0, 75.0)  # Max 75% for rules (0-100 scale)
+        result['confidence'] = min(fields_found * 12.0, 75.0)  # Max 75% for rules (0-100 scale)
         
         logger.info(f"Rule-based extraction confidence: {result['confidence']:.1f}%")
         return result
@@ -236,3 +307,62 @@ class RuleBasedExtractor:
         matches = self.phone_pattern.findall(text)
         # Filter out short/invalid matches
         return [m for m in matches if len(m.replace('-', '').replace(' ', '')) >= 7]
+    
+    def _extract_hs_codes(self, text: str) -> List[str]:
+        """Extract HS (Harmonized System) codes."""
+        hs_codes = []
+        for pattern in self.hs_code_patterns:
+            matches = pattern.findall(text)
+            for match in matches:
+                # Validate HS code (6-10 digits)
+                cleaned = match.replace('.', '').replace('-', '')
+                if 6 <= len(cleaned) <= 10 and cleaned.isdigit():
+                    if match not in hs_codes:
+                        hs_codes.append(match)
+        return hs_codes
+    
+    def _extract_incoterms(self, text: str) -> List[str]:
+        """Extract Incoterms (International Commercial Terms)."""
+        incoterms = []
+        for pattern in self.incoterms_patterns:
+            matches = pattern.findall(text)
+            for match in matches:
+                # Validate it's a known Incoterm
+                term = match.upper().strip()
+                valid_terms = ['EXW', 'FCA', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP', 'FAS', 'FOB', 'CFR', 'CIF']
+                if term in valid_terms and term not in incoterms:
+                    incoterms.append(term)
+        return incoterms
+    
+    def _extract_currency(self, text: str) -> List[str]:
+        """Extract currency codes."""
+        currencies = []
+        for pattern in self.currency_patterns:
+            matches = pattern.findall(text)
+            for match in matches:
+                currency = match.upper().strip()
+                if len(currency) == 3 and currency not in currencies:
+                    currencies.append(currency)
+        return currencies
+    
+    def _extract_weights(self, text: str) -> Dict[str, float]:
+        """Extract net and gross weights."""
+        weights = {}
+        
+        for pattern in self.weight_patterns:
+            matches = pattern.finditer(text)
+            for match in matches:
+                weight_text = match.group(0).lower()
+                weight_value = float(match.group(1))
+                
+                if 'net' in weight_text or 'n.w.' in weight_text:
+                    if 'net_weight' not in weights:
+                        weights['net_weight'] = weight_value
+                elif 'gross' in weight_text or 'g.w.' in weight_text:
+                    if 'gross_weight' not in weights:
+                        weights['gross_weight'] = weight_value
+                elif 'weight' in weight_text and 'net_weight' not in weights:
+                    # Generic weight, assume net weight if not specified
+                    weights['net_weight'] = weight_value
+        
+        return weights
