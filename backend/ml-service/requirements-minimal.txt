@@ -1,0 +1,19 @@
+# Minimal ML Service Requirements for Quick Start
+# Web Framework
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# ML Core - CPU-only
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.4.1
+transformers>=4.44.0
+
+# Document Processing
+pillow>=10.1.0
+PyMuPDF>=1.23.8
+numpy>=1.26.0
+
+# OCR - PaddleOCR only
+paddleocr>=2.7.3
+paddlepaddle>=2.6.1
+opencv-python-headless>=4.8.1.78

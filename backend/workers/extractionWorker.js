@@ -12,6 +12,48 @@ const io = require('socket.io-client');
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
 const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3001';
+const ML_HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
+const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+
+// Track ML service health
+let mlServiceHealthy = false;
+let lastHealthCheck = 0;
+
+/**
+ * Check ML service health
+ * Performs a health check on the ML service with caching to avoid excessive requests.
+ * Health check results are cached for 30 seconds.
+ * 
+ * @returns {Promise<boolean>} True if service is healthy and responding, false otherwise
+ */
+async function checkMLServiceHealth() {
+    // Cache health check for 30 seconds to avoid excessive requests
+    const now = Date.now();
+    if (mlServiceHealthy && (now - lastHealthCheck) < HEALTH_CHECK_INTERVAL) {
+        return true;
+    }
+
+    try {
+        const response = await axios.get(`${ML_SERVICE_URL}/health`, {
+            timeout: ML_HEALTH_CHECK_TIMEOUT
+        });
+        
+        mlServiceHealthy = response.status === 200 && response.data.status === 'healthy';
+        lastHealthCheck = now;
+        
+        if (mlServiceHealthy) {
+            const mode = response.data.mode || 'production';
+            const modelLoaded = response.data.model_loaded;
+            logger.info(`ML service health check passed (mode: ${mode}, model loaded: ${modelLoaded})`);
+        }
+        
+        return mlServiceHealthy;
+    } catch (error) {
+        mlServiceHealthy = false;
+        logger.error(`ML service health check failed: ${error.message}`);
+        return false;
+    }
+}
 
 // Socket.io client for emitting events to Socket.io server
 const socket = io(SOCKET_SERVER_URL, {
@@ -131,6 +173,17 @@ async function processExtractionJob(job) {
         // Call ML service
         await job.progress(40);
         socketEvents.emitExtractionProgress(invoiceId, 40, 'Running AI extraction');
+        
+        // Check ML service health before making request
+        const isHealthy = await checkMLServiceHealth();
+        if (!isHealthy) {
+            throw new Error(
+                `ML service is not available at ${ML_SERVICE_URL}. ` +
+                `Please ensure the ML service is running. ` +
+                `Start it with: ./start-ml-mock.sh (development) or ./start-ml-service.sh (production)`
+            );
+        }
+        
         logger.info(`Calling ML service for invoice ${invoiceId}`);
 
         const startTime = Date.now();
@@ -191,15 +244,28 @@ async function processExtractionJob(job) {
         return result;
 
     } catch (error) {
-        logger.error(`Extraction failed for invoice ${invoiceId}:`, error);
+        // Provide more helpful error messages
+        let errorMessage = error.message;
+        
+        if (error.code === 'ECONNREFUSED') {
+            errorMessage = `Cannot connect to ML service at ${ML_SERVICE_URL}. ` +
+                          `Please start the ML service with: ./start-ml-mock.sh (development) or ./start-ml-service.sh (production)`;
+        } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+            errorMessage = `ML service request timed out. The service may be overloaded or processing a large file.`;
+        } else if (error.response) {
+            // HTTP error response from ML service
+            errorMessage = `ML service error (${error.response.status}): ${error.response.data?.error || error.message}`;
+        }
+        
+        logger.error(`Extraction failed for invoice ${invoiceId}:`, errorMessage);
 
         // Update invoice status to 'failed'
         await updateInvoiceStatus(invoiceId, 'failed', null);
         
-        // Emit extraction failed event
-        socketEvents.emitExtractionFailed(invoiceId, error.message, job.attemptsMade);
+        // Emit extraction failed event with improved error message
+        socketEvents.emitExtractionFailed(invoiceId, errorMessage, job.attemptsMade);
 
-        throw error;
+        throw new Error(errorMessage);
     }
 }
 
@@ -412,7 +478,24 @@ extractionQueue.on('failed', (job, error) => {
     logger.error(`Worker failed job ${job.id}:`, error.message);
 });
 
-logger.info('Extraction worker started and ready to process jobs');
+// Perform initial ML service health check
+(async () => {
+    logger.info('Extraction worker started');
+    logger.info(`ML service URL: ${ML_SERVICE_URL}`);
+    
+    const isHealthy = await checkMLServiceHealth();
+    if (isHealthy) {
+        logger.info('✅ ML service is healthy and ready');
+    } else {
+        logger.warn('⚠️  ML service health check failed');
+        logger.warn('   Extraction jobs will fail until ML service is available');
+        logger.warn('   Start ML service with: ./start-ml-mock.sh');
+    }
+    
+    logger.info('Worker is ready to process extraction jobs');
+})();
+
+logger.info('Extraction worker initialized');
 
 module.exports = {
     processExtractionJob
