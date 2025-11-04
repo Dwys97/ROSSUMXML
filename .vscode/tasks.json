@@ -61,6 +61,42 @@
             }
         },
         {
+            "label": "Start ML Service",
+            "type": "shell",
+            "command": "bash start-ml-service.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            }
+        },
+        {
+            "label": "Start Socket Server",
+            "type": "shell",
+            "command": "bash start-socket-server.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            }
+        },
+        {
+            "label": "Start Worker",
+            "type": "shell",
+            "command": "bash start-worker.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            }
+        },
+        {
             "label": "Start NGROK",
             "type": "shell",
             "command": "bash start-ngrok.sh",

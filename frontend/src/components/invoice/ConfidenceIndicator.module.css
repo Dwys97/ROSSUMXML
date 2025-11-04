@@ -1,0 +1,38 @@
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.icon {
+    font-size: 0.9rem;
+}
+
+.label {
+    font-size: 0.8rem;
+}
+
+.high {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.medium {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.low {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.unknown {
+    background: #f5f5f5;
+    color: #757575;
+}

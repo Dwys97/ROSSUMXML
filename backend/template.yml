@@ -44,6 +44,10 @@ Resources:
           POSTGRES_PORT: "5432"
           JWT_SECRET: "a_secure_secret_key_for_jwt"
           GEMINI_API_KEY: "AIzaSyDGoYZ0PkpEAtW2G7Y6YkobU3jGR8XKo28"
+          REDIS_HOST: "10.0.0.18"
+          REDIS_PORT: "6379"
+          SOCKET_SERVER_URL: "http://10.0.0.18:3001"
+          ML_SERVICE_URL: "http://10.0.0.18:5001"
       # --- END BLOCK ---
       Events:
         # Define a specific, public endpoint for user registration

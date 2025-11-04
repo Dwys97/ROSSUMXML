@@ -1,7 +1,15 @@
-import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { tokenStorage, INACTIVITY_TIMEOUT } from '../utils/tokenStorage';
 
 export const AuthContext = createContext(null);
+
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+};
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -127,8 +135,12 @@ export const AuthProvider = ({ children }) => {
         startInactivityTimer();
     }, [startInactivityTimer]);
 
+    const getToken = useCallback(() => {
+        return tokenStorage.getToken();
+    }, []);
+
     return (
-        <AuthContext.Provider value={{ user, login, logout, checkAuth, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, checkAuth, loading, getToken }}>
             {children}
         </AuthContext.Provider>
     );

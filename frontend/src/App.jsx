@@ -17,6 +17,8 @@ import ApiDocsPage from './pages/ApiDocsPage';
 import UserProfile from './components/profile/UserProfile';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
+import InvoiceWorkflowPage from './pages/InvoiceWorkflowPage';
+import InvoiceAnnotationPage from './pages/InvoiceAnnotationPage';
 import './App.css';
 
 function App() {
@@ -74,6 +76,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/invoices" 
+              element={
+                <ProtectedRoute>
+                  <InvoiceWorkflowPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/invoices/:id" 
+              element={
+                <ProtectedRoute>
+                  <InvoiceAnnotationPage />
                 </ProtectedRoute>
               } 
             />
