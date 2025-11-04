@@ -4,7 +4,10 @@ import styles from './ConfidenceIndicator.module.css';
 const ConfidenceIndicator = ({ confidence }) => {
     // Determine confidence level and styling
     const getConfidenceLevel = () => {
-        if (!confidence || confidence === 0) {
+        // Parse confidence to number and handle null/undefined/invalid values
+        const confidenceValue = parseFloat(confidence);
+        
+        if (!confidence || isNaN(confidenceValue) || confidenceValue === 0) {
             return {
                 class: styles.unknown,
                 label: 'Unknown',
@@ -12,22 +15,22 @@ const ConfidenceIndicator = ({ confidence }) => {
             };
         }
         
-        if (confidence >= 90) {
+        if (confidenceValue >= 90) {
             return {
                 class: styles.high,
-                label: `${confidence.toFixed(0)}%`,
+                label: `${confidenceValue.toFixed(0)}%`,
                 icon: '✓'
             };
-        } else if (confidence >= 70) {
+        } else if (confidenceValue >= 70) {
             return {
                 class: styles.medium,
-                label: `${confidence.toFixed(0)}%`,
+                label: `${confidenceValue.toFixed(0)}%`,
                 icon: '!'
             };
         } else {
             return {
                 class: styles.low,
-                label: `${confidence.toFixed(0)}%`,
+                label: `${confidenceValue.toFixed(0)}%`,
                 icon: '⚠'
             };
         }
