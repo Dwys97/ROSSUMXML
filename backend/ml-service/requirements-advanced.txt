@@ -1,25 +1,33 @@
-# Advanced ML Service Requirements
-# Three-Model Pipeline: Surya OCR + Qwen2.5-3B + Qwen2.5-1.5B
+# GDPR-Compliant ML Service Requirements
+# Optimized for 31GB codespace constraints
+# Uses LayoutLMv3 (invoice-finetuned) + Surya OCR + PII Filtering
 
 # Core dependencies
 flask>=3.0.0
 flask-cors>=4.0.0
 pillow>=10.1.0
 numpy>=1.26.0
-torch>=2.1.0
-transformers>=4.40.0
 
-# Surya OCR (Layout-Aware)
+# PII Detection & GDPR Compliance
+presidio-analyzer>=2.2.354
+presidio-anonymizer>=2.2.354
+spacy>=3.7.0
+# SpaCy model will be downloaded separately: python -m spacy download en_core_web_sm
+
+# Surya OCR (Layout-Aware) - lightweight
 surya-ocr>=0.4.14
 
-# Quantization for CPU efficiency (CPU-only, skip bitsandbytes)
-accelerate>=0.27.0
+# LayoutLMv3 for invoice extraction
+transformers>=4.44.0
+torch>=2.4.1
+# Use CPU-only version for codespace
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Existing dependencies (already installed)
+paddleocr>=2.7.0
 
 # PDF processing
 PyMuPDF>=1.23.8
 
 # Image preprocessing
 opencv-python-headless>=4.8.1.78
-
-# Logging
-python-json-logger>=2.0.7

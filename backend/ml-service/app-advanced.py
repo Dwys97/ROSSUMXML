@@ -1,11 +1,8 @@
 """
-Advanced ML Service for Invoice Data Extraction
-Three-Model Pipeline:
-1. Surya OCR (Layout-Aware OCR)
-2. Qwen2.5-3B-Instruct (Intelligent Extraction LLM)
-3. Qwen2.5-1.5B-Instruct (Validation LLM)
-
-All models CPU-optimized with 4-bit quantization
+Lightweight ML Service for Invoice Data Extraction
+Optimized for Codespace Constraints (31GB total)
+Uses: Surya OCR (Layout-Aware) + Enhanced Rule-Based Extraction
+Memory footprint: ~500MB (no heavy LLMs)
 """
 
 from flask import Flask, request, jsonify
@@ -18,8 +15,8 @@ import os
 import base64
 from typing import List
 
-# Import advanced extractor
-from extractors.advanced_hybrid_extractor import AdvancedHybridExtractor
+# Import lightweight extractor
+from extractors.lightweight_hybrid_extractor import LightweightHybridExtractor
 
 # Configure logging
 logging.basicConfig(
@@ -32,28 +29,26 @@ app = Flask(__name__)
 CORS(app)
 
 # Global extractor instance
-advanced_extractor = None
+lightweight_extractor = None
 
 
 def load_models():
-    """Load the three-model pipeline on startup"""
-    global advanced_extractor
+    """Load the lightweight pipeline on startup"""
+    global lightweight_extractor
     
     try:
         logger.info("="*80)
-        logger.info("INITIALIZING ADVANCED ML SERVICE")
+        logger.info("INITIALIZING LIGHTWEIGHT ML SERVICE")
         logger.info("="*80)
         
-        # Initialize Advanced Hybrid Extractor
-        # This will load all three models:
-        # 1. Surya OCR
-        # 2. Qwen2.5-3B-Instruct
-        # 3. Qwen2.5-1.5B-Instruct
-        advanced_extractor = AdvancedHybridExtractor()
+        # Initialize Lightweight Hybrid Extractor
+        # Surya OCR + Enhanced Rules (~500MB memory)
+        lightweight_extractor = LightweightHybridExtractor()
         
         logger.info("="*80)
-        logger.info("ADVANCED ML SERVICE READY")
-        logger.info("Pipeline: Surya OCR → Qwen2.5-3B → Qwen2.5-1.5B")
+        logger.info("LIGHTWEIGHT ML SERVICE READY")
+        logger.info("Pipeline: Surya OCR (Layout-Aware) → Enhanced Rules")
+        logger.info("Memory footprint: ~500MB")
         logger.info("="*80)
         
         return True
@@ -103,9 +98,10 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'service': 'Advanced ML Service',
-        'pipeline': 'Surya OCR → Qwen2.5-3B → Qwen2.5-1.5B',
-        'models_loaded': advanced_extractor is not None
+        'service': 'Lightweight ML Service',
+        'pipeline': 'Surya OCR → Enhanced Rules',
+        'memory_footprint': '~500MB',
+        'models_loaded': lightweight_extractor is not None
     })
 
 
@@ -122,7 +118,7 @@ def extract_invoice():
         - Structured invoice data with validation
     """
     try:
-        if not advanced_extractor:
+        if not lightweight_extractor:
             return jsonify({'error': 'ML models not loaded'}), 500
         
         data = request.get_json()
@@ -151,15 +147,14 @@ def extract_invoice():
         logger.info(f"Processing {file_type} - Image size: {image.size}")
         
         # Run extraction pipeline
-        logger.info("Starting 3-model extraction pipeline...")
-        result = advanced_extractor.extract(
+        logger.info("Starting lightweight extraction pipeline...")
+        result = lightweight_extractor.extract(
             image=image,
             context="customs clearance commercial invoice"
         )
         
         logger.info("Extraction completed successfully")
         logger.info(f"Confidence: {result.get('confidence', 0):.1f}%")
-        logger.info(f"Validation: {result.get('validation', {})}")
         
         return jsonify(result), 200
         
@@ -172,30 +167,25 @@ def extract_invoice():
 def models_info():
     """Get information about loaded models"""
     return jsonify({
-        'pipeline': '3-Model Advanced Extraction',
+        'pipeline': 'Lightweight Extraction (Codespace-Optimized)',
         'models': [
             {
                 'name': 'Surya OCR',
                 'purpose': 'Layout-aware text extraction',
                 'type': 'OCR',
+                'memory': '~500MB',
                 'device': 'CPU'
             },
             {
-                'name': 'Qwen2.5-3B-Instruct',
-                'purpose': 'Intelligent field extraction',
-                'type': 'LLM',
-                'quantization': '4-bit',
-                'device': 'CPU'
-            },
-            {
-                'name': 'Qwen2.5-1.5B-Instruct',
-                'purpose': 'Validation and correction',
-                'type': 'LLM',
-                'quantization': '4-bit',
+                'name': 'Enhanced Rule-Based Extractor',
+                'purpose': 'Pattern-based field extraction with layout hints',
+                'type': 'Rules',
+                'memory': '~1MB',
                 'device': 'CPU'
             }
         ],
-        'loaded': advanced_extractor is not None
+        'total_memory': '~500MB',
+        'loaded': lightweight_extractor is not None
     })
 
 
