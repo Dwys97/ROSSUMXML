@@ -9,6 +9,21 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'rossumxml'
 });
 
+// Override connect to ensure clean transaction state
+const originalConnect = pool.connect.bind(pool);
+pool.connect = async function() {
+    const client = await originalConnect();
+    
+    // Try to rollback any aborted transaction from previous use
+    try {
+        await client.query('ROLLBACK');
+    } catch (err) {
+        // Ignore errors - no transaction may be active
+    }
+    
+    return client;
+};
+
 // Helper to safely release client even if transaction is aborted
 pool.safeRelease = async (client) => {
     try {
