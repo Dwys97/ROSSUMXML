@@ -16,18 +16,20 @@ pool.connect = async function(...args) {
     const originalRelease = client.release.bind(client);
     
     // Wrap release to ensure transaction cleanup
-    client.release = async function(err) {
-        try {
-            // If there's an error or the transaction is aborted, rollback
-            const result = await client.query('SELECT pg_current_xact_id_if_assigned() as xid');
-            if (result.rows[0].xid !== null) {
-                // There's an active transaction, try to rollback
-                await client.query('ROLLBACK').catch(() => {});
-            }
-        } catch (e) {
-            // Ignore errors during cleanup check
-        }
-        return originalRelease(err);
+    client.release = function(err) {
+        // Check for active transaction and rollback if needed
+        client.query('SELECT pg_current_xact_id_if_assigned() as xid')
+            .then(result => {
+                if (result.rows[0].xid !== null) {
+                    // There's an active transaction, rollback before releasing
+                    return client.query('ROLLBACK').catch(() => {});
+                }
+            })
+            .catch(() => {})
+            .finally(() => {
+                // Always call original release
+                originalRelease(err);
+            });
     };
     
     return client;
