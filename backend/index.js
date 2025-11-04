@@ -5943,7 +5943,9 @@ exports.handler = async (event) => {
                             invoice_id, user_id, action, field_changed, 
                             value_before, value_after, ip_address, user_agent
                         ) VALUES ($1, $2, 'correct', $3, $4, $5, $6, $7)`,
-                        [id, user.id, fieldPath, originalValue, correctedValue, event.requestContext?.http?.sourceIp || '', event.headers?.['user-agent'] || '']
+                        [id, user.id, fieldPath, originalValue, correctedValue, 
+                         event.requestContext?.http?.sourceIp || null, 
+                         event.headers?.['user-agent'] || null]
                     );
                     
                     await client.query('COMMIT');
@@ -5951,6 +5953,9 @@ exports.handler = async (event) => {
                     return createResponse(200, JSON.stringify({
                         message: 'Correction submitted successfully'
                     }));
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    throw err;
                 } finally {
                     client.release();
                 }

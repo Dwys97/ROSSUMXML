@@ -9,34 +9,6 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'rossumxml'
 });
 
-// Wrap pool.query to handle aborted transactions
-const originalPoolQuery = pool.query.bind(pool);
-pool.query = async function(...args) {
-    try {
-        return await originalPoolQuery(...args);
-    } catch (err) {
-        // If transaction is aborted, end the pool and recreate it
-        if (err.code === '25P02') {
-            console.warn('Detected aborted transaction, ending pool connections');
-            await pool.end().catch(() => {});
-            throw err;
-        }
-        throw err;
-    }
-};
-
-// Helper to safely release client even if transaction is aborted
-pool.safeRelease = async (client) => {
-    try {
-        // Try to rollback any active transaction
-        await client.query('ROLLBACK');
-    } catch (err) {
-        // Ignore rollback errors (transaction may not exist or already rolled back)
-    } finally {
-        client.release();
-    }
-};
-
 // Обработчик ошибок подключения
 pool.on('error', (err, client) => {
     console.error('Unexpected error on idle client', err);
