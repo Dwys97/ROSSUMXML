@@ -9,6 +9,30 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'rossumxml'
 });
 
+// Override pool.connect to automatically rollback aborted transactions
+const originalConnect = pool.connect.bind(pool);
+pool.connect = async function(...args) {
+    const client = await originalConnect(...args);
+    const originalRelease = client.release.bind(client);
+    
+    // Wrap release to ensure transaction cleanup
+    client.release = async function(err) {
+        try {
+            // If there's an error or the transaction is aborted, rollback
+            const result = await client.query('SELECT pg_current_xact_id_if_assigned() as xid');
+            if (result.rows[0].xid !== null) {
+                // There's an active transaction, try to rollback
+                await client.query('ROLLBACK').catch(() => {});
+            }
+        } catch (e) {
+            // Ignore errors during cleanup check
+        }
+        return originalRelease(err);
+    };
+    
+    return client;
+};
+
 // Обработчик ошибок подключения
 pool.on('error', (err, client) => {
     console.error('Unexpected error on idle client', err);
