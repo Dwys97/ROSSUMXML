@@ -43,8 +43,8 @@ def load_model():
         logger.info(f"Using device: {device}")
         
         # Initialize Hybrid Extractor
-        logger.info("Loading Hybrid Extractor (PaddleOCR + LayoutLMv3-CORD + Rules)...")
-        model_name = os.environ.get('MODEL_NAME', 'nielsr/layoutlmv3-finetuned-cord')
+        logger.info("Loading Hybrid Extractor (PaddleOCR + LayoutLMv3-MPDOCVQA + Rules)...")
+        model_name = os.environ.get('MODEL_NAME', 'rubentito/layoutlmv3-base-mpdocvqa')
         
         hybrid_extractor = HybridExtractor(
             model_name=model_name,

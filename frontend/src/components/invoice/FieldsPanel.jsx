@@ -76,13 +76,6 @@ const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject }) =>
                     confidence={invoice?.extraction_confidence}
                     fieldPath="invoice.currency"
                 />
-                
-                <FieldRow
-                    label="Incoterms"
-                    value={invoice?.incoterms}
-                    confidence={invoice?.extraction_confidence}
-                    fieldPath="invoice.incoterms"
-                />
             </div>
             
             <div className={styles.section}>
@@ -197,6 +190,31 @@ const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject }) =>
                     value={invoice?.total_net_weight}
                     confidence={invoice?.extraction_confidence}
                     fieldPath="totals.net_weight"
+                />
+            </div>
+            
+            <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>Customs Data</h3>
+                
+                <FieldRow
+                    label="Incoterms"
+                    value={invoice?.incoterms}
+                    confidence={invoice?.extraction_confidence}
+                    fieldPath="shipping.incoterms"
+                />
+                
+                <FieldRow
+                    label="HS Code"
+                    value={invoice?.hs_code}
+                    confidence={invoice?.extraction_confidence}
+                    fieldPath="shipping.hs_code"
+                />
+                
+                <FieldRow
+                    label="Country of Origin"
+                    value={invoice?.country_of_origin}
+                    confidence={invoice?.extraction_confidence}
+                    fieldPath="shipping.country_of_origin"
                 />
             </div>
         </div>

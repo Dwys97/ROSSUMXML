@@ -26,7 +26,7 @@ class HybridExtractor:
     
     def __init__(
         self,
-        model_name: str = "nielsr/layoutlmv3-finetuned-cord",
+        model_name: str = "rubentito/layoutlmv3-base-mpdocvqa",
         device: str = "cpu",
         ml_confidence_threshold: float = 0.70,
         rule_confidence_threshold: float = 0.60
@@ -40,7 +40,7 @@ class HybridExtractor:
             ml_confidence_threshold: Minimum confidence for ML extraction
             rule_confidence_threshold: Minimum confidence for rule-based extraction
         """
-        logger.info("Initializing Hybrid Extractor (PaddleOCR + LayoutLMv3-CORD + Rules)")
+        logger.info(f"Initializing Hybrid Extractor (PaddleOCR + {model_name} + Rules)")
         
         self.ml_threshold = ml_confidence_threshold
         self.rule_threshold = rule_confidence_threshold
@@ -176,12 +176,13 @@ class HybridExtractor:
             all_fields = set(list(ml_section.keys()) + list(rule_section.keys()))
             
             for field in all_fields:
-                # Skip confidence fields
-                if 'confidence' in field.lower():
+                # Skip confidence and bounding box fields (they're handled separately)
+                if 'confidence' in field.lower() or 'boundingbox' in field.lower():
                     continue
                 
                 ml_value = ml_section.get(field)
                 ml_conf = ml_section.get(f"{field}Confidence", 0.0)
+                ml_bbox = ml_section.get(f"{field}BoundingBox")
                 
                 rule_value = rule_section.get(field)
                 rule_conf = rule_section.get(f"{field}Confidence", 0.0)
@@ -190,12 +191,14 @@ class HybridExtractor:
                 selected_value = None
                 selected_method = None
                 selected_conf = 0.0
+                selected_bbox = None
                 
                 if strategy == "best":
                     if ml_conf >= rule_conf and ml_value:
                         selected_value = ml_value
                         selected_method = "ml"
                         selected_conf = ml_conf
+                        selected_bbox = ml_bbox
                     elif rule_value:
                         selected_value = rule_value
                         selected_method = "rules"
@@ -206,6 +209,7 @@ class HybridExtractor:
                         selected_value = ml_value
                         selected_method = "ml"
                         selected_conf = ml_conf
+                        selected_bbox = ml_bbox
                     elif rule_value:
                         selected_value = rule_value
                         selected_method = "rules"
@@ -216,6 +220,7 @@ class HybridExtractor:
                         selected_value = ml_value
                         selected_method = "ml"
                         selected_conf = ml_conf
+                        selected_bbox = ml_bbox
                     elif rule_value and rule_conf >= self.rule_threshold * 100:
                         selected_value = rule_value
                         selected_method = "rules"
@@ -224,6 +229,8 @@ class HybridExtractor:
                 if selected_value:
                     combined[section][field] = selected_value
                     combined[section][f"{field}Confidence"] = selected_conf
+                    if selected_bbox:
+                        combined[section][f"{field}BoundingBox"] = selected_bbox
                     combined['extraction_methods'][f"{section}.{field}"] = selected_method
         
         # Line items typically come from ML only (rules can't extract tabular data well)

@@ -1,0 +1,54 @@
+# Web Framework
+flask>=3.0.0
+flask-cors>=4.0.0
+gunicorn>=21.2.0
+
+# ML Core - CPU-only versions for Python 3.12
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.4.1
+torchvision>=0.19.1
+transformers>=4.44.0
+tokenizers>=0.19.1
+
+# OCR Engines
+paddleocr>=2.7.3
+paddlepaddle>=2.6.1
+easyocr>=1.7.0
+pytesseract>=0.3.10
+opencv-python-headless>=4.8.1.78
+scipy>=1.11.0
+scikit-image>=0.21.0
+python-bidi>=0.4.2
+
+# Document Processing
+pillow>=10.1.0
+pdf2image>=1.17.0
+PyMuPDF>=1.23.8
+pypdfium2>=4.24.0
+
+# Data Processing - Python 3.12 compatible
+numpy>=1.26.0
+pandas>=2.0.3
+rapidfuzz>=3.5.2
+
+# Utilities
+python-multipart>=0.0.6
+python-dateutil>=2.8.2
+pycountry>=23.12.11
+regex>=2023.10.3
+
+# Self-Learning & Training
+huggingface-hub>=0.24.0
+datasets>=2.20.0
+accelerate>=0.33.0
+peft>=0.12.0
+
+# Caching & Performance
+redis>=5.0.1
+diskcache>=5.6.3
+
+# Monitoring
+psutil>=5.9.6
+
+# Additional dependencies
+typing-extensions>=4.8.0
