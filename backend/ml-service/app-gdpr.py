@@ -166,8 +166,10 @@ def extract_invoice():
                 file_base64 = file_base64.split(',', 1)[1]
             file_bytes = base64.b64decode(file_base64)
         except Exception as e:
+            logger.error(f"Base64 decoding error: {str(e)}", exc_info=True)
+            # Don't expose stack trace to external users - security best practice
             return jsonify({
-                'error': f'Invalid base64: {str(e)}',
+                'error': 'Invalid file encoding. Please ensure the file is properly base64 encoded.',
                 'success': False
             }), 400
         
@@ -222,8 +224,9 @@ def extract_invoice():
         
     except Exception as e:
         logger.error(f"Extraction error: {str(e)}", exc_info=True)
+        # Don't expose stack trace to external users - security best practice
         return jsonify({
-            'error': str(e),
+            'error': 'An error occurred during extraction. Please check server logs for details.',
             'success': False
         }), 500
 
@@ -267,8 +270,9 @@ def validate_pii():
         
     except Exception as e:
         logger.error(f"Validation error: {str(e)}", exc_info=True)
+        # Don't expose stack trace to external users - security best practice
         return jsonify({
-            'error': str(e),
+            'error': 'An error occurred during validation. Please check server logs for details.',
             'success': False
         }), 500
 
