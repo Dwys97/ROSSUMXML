@@ -14,11 +14,19 @@ const originalConnect = pool.connect.bind(pool);
 pool.connect = async function() {
     const client = await originalConnect();
     
-    // Try to rollback any aborted transaction from previous use
+    // Check if there's an active transaction and rollback if aborted
     try {
-        await client.query('ROLLBACK');
+        const result = await Promise.race([
+            client.query("SELECT current_setting('transaction_isolation', true) as isolation"),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 100))
+        ]);
+        
+        // If query succeeded, there might be a transaction - try rollback
+        if (result && result.rows) {
+            await client.query('ROLLBACK').catch(() => {});
+        }
     } catch (err) {
-        // Ignore errors - no transaction may be active
+        // Timeout or error - skip rollback
     }
     
     return client;
