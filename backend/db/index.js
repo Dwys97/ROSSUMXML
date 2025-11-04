@@ -9,20 +9,17 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'rossumxml'
 });
 
-// Handle client errors to prevent aborted transactions
-pool.on('connect', (client) => {
-    const originalQuery = client.query.bind(client);
-    client.query = function(...args) {
-        return originalQuery(...args).catch(err => {
-            // On any query error, ensure we rollback
-            if (err.code === '25P02') {
-                // Transaction is aborted, rollback silently
-                originalQuery('ROLLBACK').catch(() => {});
-            }
-            throw err;
-        });
-    };
-});
+// Helper to safely release client even if transaction is aborted
+pool.safeRelease = async (client) => {
+    try {
+        // Try to rollback any active transaction
+        await client.query('ROLLBACK');
+    } catch (err) {
+        // Ignore rollback errors (transaction may not exist or already rolled back)
+    } finally {
+        client.release();
+    }
+};
 
 // Обработчик ошибок подключения
 pool.on('error', (err, client) => {
