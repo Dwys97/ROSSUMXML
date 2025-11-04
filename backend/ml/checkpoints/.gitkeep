@@ -1,0 +1,11 @@
+# ML Training Checkpoints
+
+This directory contains auto-generated LoRA adapter checkpoints from model training.
+
+**Files are NOT tracked in git** - they will be regenerated during training.
+
+To train a new adapter:
+```bash
+cd backend/ml
+python train_lora_cpu.py
+```

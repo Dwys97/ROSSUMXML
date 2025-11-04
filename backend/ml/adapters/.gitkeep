@@ -1,0 +1,10 @@
+# Vendor-Specific LoRA Adapters
+
+This directory contains vendor-specific fine-tuned model adapters.
+
+**Files are NOT tracked in git** - they will be regenerated during self-learning.
+
+Adapters are automatically created when:
+- Users correct invoice fields
+- ≥5 corrections accumulated for a vendor
+- Auto-training job runs (daily at 2 AM)
