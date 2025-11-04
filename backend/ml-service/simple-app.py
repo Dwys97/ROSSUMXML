@@ -9,6 +9,7 @@ from flask_cors import CORS
 import logging
 import base64
 import json
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ def extract():
         }), 500
 
 if __name__ == '__main__':
-    logger.info("Starting Mock ML Service on port 5001")
+    port = int(os.environ.get('PORT', 5001))
+    logger.info(f"Starting Mock ML Service on port {port}")
     logger.info("This is a development mock - install full dependencies for production")
-    app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

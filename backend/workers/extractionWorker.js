@@ -12,15 +12,19 @@ const io = require('socket.io-client');
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
 const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3001';
+const ML_HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
+const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
 
 // Track ML service health
 let mlServiceHealthy = false;
 let lastHealthCheck = 0;
-const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
 
 /**
  * Check ML service health
- * @returns {Promise<boolean>} True if service is healthy
+ * Performs a health check on the ML service with caching to avoid excessive requests.
+ * Health check results are cached for 30 seconds.
+ * 
+ * @returns {Promise<boolean>} True if service is healthy and responding, false otherwise
  */
 async function checkMLServiceHealth() {
     // Cache health check for 30 seconds to avoid excessive requests
@@ -31,7 +35,7 @@ async function checkMLServiceHealth() {
 
     try {
         const response = await axios.get(`${ML_SERVICE_URL}/health`, {
-            timeout: 5000
+            timeout: ML_HEALTH_CHECK_TIMEOUT
         });
         
         mlServiceHealthy = response.status === 200 && response.data.status === 'healthy';
