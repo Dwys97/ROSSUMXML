@@ -2,7 +2,21 @@
 ML Models Module for Invoice Extraction
 """
 
-from .ocr_engine import InvoiceOCR
-from .layoutlmv3_extractor import LayoutLMv3Extractor
+# PII Filter is standalone and doesn't require OCR dependencies
+try:
+    from .pii_filter import PIIFilter, get_pii_filter
+except ImportError:
+    PIIFilter = None
+    get_pii_filter = None
 
-__all__ = ['InvoiceOCR', 'LayoutLMv3Extractor']
+try:
+    from .ocr_engine import InvoiceOCR
+except ImportError:
+    InvoiceOCR = None
+
+try:
+    from .layoutlmv3_extractor import LayoutLMv3Extractor
+except ImportError:
+    LayoutLMv3Extractor = None
+
+__all__ = ['InvoiceOCR', 'LayoutLMv3Extractor', 'PIIFilter', 'get_pii_filter']
