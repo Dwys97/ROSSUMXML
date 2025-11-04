@@ -78,3 +78,17 @@ coverage/
 # Lock files (optional - uncomment if needed)
 # package-lock.json
 # yarn.lock
+
+# ML Training Artifacts (auto-generated during training)
+backend/ml/checkpoints/
+backend/ml/adapters/
+backend/ml-service/models/*.pt
+backend/ml-service/models/*.pth
+backend/ml-service/models/*.bin
+*.safetensors
+*.onnx
+
+# HuggingFace cache and tokenizers
+*.tokenizer.json
+merges.txt
+vocab.json
