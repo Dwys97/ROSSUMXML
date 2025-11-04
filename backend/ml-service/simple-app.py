@@ -67,7 +67,7 @@ def extract():
         logger.error(f"Mock extraction error: {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Internal server error during extraction'
         }), 500
 
 if __name__ == '__main__':
