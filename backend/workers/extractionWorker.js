@@ -84,8 +84,9 @@ async function processExtractionJob(job) {
         let base64File;
         let fileBuffer;
         
-        if (filePath) {
-            // Read from filesystem (if file path provided)
+        // Check if file is stored in database (path starts with 'db:') or filesystem
+        if (filePath && !filePath.startsWith('db:')) {
+            // Read from filesystem (if file path provided and not a database reference)
             fileBuffer = await fs.readFile(filePath);
             base64File = fileBuffer.toString('base64');
             logger.info(`File loaded from filesystem: ${filePath} (${fileBuffer.length} bytes)`);
@@ -100,9 +101,13 @@ async function processExtractionJob(job) {
                 throw new Error('Invoice not found in database');
             }
             
+            if (!invoiceResult.rows[0].file_data) {
+                throw new Error('Invoice file data not found in database');
+            }
+            
             base64File = invoiceResult.rows[0].file_data;
             fileBuffer = Buffer.from(base64File, 'base64');
-            logger.info(`File loaded from database: ${fileBuffer.length} bytes`);
+            logger.info(`File loaded from database (${filePath || 'no path'}): ${fileBuffer.length} bytes`);
         }
 
         // Get vendor profile if exists
