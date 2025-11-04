@@ -1,11 +1,13 @@
 """
 PaddleOCR Engine for Invoice Processing
 High-accuracy OCR with multilingual support, CPU-optimized
+Enhanced with advanced image preprocessing
 """
 
 from paddleocr import PaddleOCR
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import numpy as np
+import cv2
 from typing import List, Tuple
 import logging
 
@@ -16,18 +18,21 @@ class PaddleOCREngine:
     """
     PaddleOCR-based text extraction optimized for invoices.
     Much faster and more accurate than Tesseract on structured documents.
+    Includes advanced preprocessing for better OCR results.
     """
     
-    def __init__(self, languages: List[str] = ['en'], use_gpu: bool = False):
+    def __init__(self, languages: List[str] = ['en'], use_gpu: bool = False, preprocess: bool = True):
         """
         Initialize PaddleOCR engine.
         
         Args:
             languages: List of language codes (e.g., ['en', 'ch', 'fr'])
             use_gpu: Enable GPU acceleration (False for CPU-only)
+            preprocess: Enable advanced image preprocessing
         """
         self.languages = languages
         self.use_gpu = use_gpu
+        self.preprocess = preprocess
         
         logger.info(f"Initializing PaddleOCR for languages: {languages}")
         
@@ -48,6 +53,75 @@ class PaddleOCREngine:
             logger.error(f"PaddleOCR initialization failed: {str(e)}")
             raise
     
+    def preprocess_image(self, image: Image.Image) -> Image.Image:
+        """
+        Advanced preprocessing to improve OCR accuracy:
+        - Convert to grayscale
+        - Enhance contrast
+        - Sharpen edges
+        - Denoise
+        - Binarize (Otsu's thresholding)
+        - Deskew
+        
+        Args:
+            image: PIL Image
+            
+        Returns:
+            Preprocessed PIL Image
+        """
+        try:
+            # Convert to numpy array
+            img_array = np.array(image)
+            
+            # Convert to grayscale if not already
+            if len(img_array.shape) == 3:
+                gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+            else:
+                gray = img_array
+            
+            # 1. Denoise using Non-local Means Denoising
+            denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+            
+            # 2. Increase contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            contrast_enhanced = clahe.apply(denoised)
+            
+            # 3. Sharpen the image
+            kernel = np.array([[-1, -1, -1],
+                             [-1,  9, -1],
+                             [-1, -1, -1]])
+            sharpened = cv2.filter2D(contrast_enhanced, -1, kernel)
+            
+            # 4. Binarize using Otsu's thresholding
+            _, binary = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # 5. Deskew the image
+            coords = np.column_stack(np.where(binary > 0))
+            if len(coords) > 0:
+                angle = cv2.minAreaRect(coords)[-1]
+                if angle < -45:
+                    angle = -(90 + angle)
+                else:
+                    angle = -angle
+                
+                # Only deskew if angle is significant (> 0.5 degrees)
+                if abs(angle) > 0.5:
+                    (h, w) = binary.shape[:2]
+                    center = (w // 2, h // 2)
+                    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+                    binary = cv2.warpAffine(binary, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+                    logger.info(f"Image deskewed by {angle:.2f} degrees")
+            
+            # Convert back to PIL Image
+            preprocessed = Image.fromarray(binary)
+            
+            logger.info("Image preprocessing completed successfully")
+            return preprocessed
+            
+        except Exception as e:
+            logger.error(f"Image preprocessing failed: {str(e)}, using original image")
+            return image
+    
     def extract_text(self, image: Image.Image) -> Tuple[List[str], List[List[int]], List[float]]:
         """
         Extract text from image with bounding boxes and confidence scores.
@@ -59,6 +133,11 @@ class PaddleOCREngine:
             Tuple of (words, bounding_boxes, confidence_scores)
         """
         try:
+            # Apply preprocessing if enabled
+            if self.preprocess:
+                logger.info("Applying advanced image preprocessing...")
+                image = self.preprocess_image(image)
+            
             # Convert PIL Image to numpy array
             img_array = np.array(image)
             
