@@ -1,0 +1,88 @@
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.boundingBox {
+    position: absolute;
+    border: 2px solid rgba(0, 123, 255, 0.6);
+    background: rgba(0, 123, 255, 0.1);
+    pointer-events: auto;
+    cursor: move;
+    transition: border-color 0.2s, background 0.2s;
+    box-sizing: border-box;
+}
+
+.boundingBox:hover {
+    border-color: rgba(0, 123, 255, 0.9);
+    background: rgba(0, 123, 255, 0.15);
+}
+
+.boundingBox.selected {
+    border-color: rgba(40, 167, 69, 0.9);
+    background: rgba(40, 167, 69, 0.15);
+    border-width: 3px;
+}
+
+.label {
+    position: absolute;
+    top: -24px;
+    left: 0;
+    background: rgba(0, 123, 255, 0.9);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 11;
+}
+
+.selected .label {
+    background: rgba(40, 167, 69, 0.9);
+}
+
+.resizeHandle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 2px solid rgba(40, 167, 69, 0.9);
+    border-radius: 50%;
+    z-index: 12;
+    pointer-events: auto;
+}
+
+.resizeHandle:hover {
+    background: rgba(40, 167, 69, 0.3);
+}
+
+.resizeHandle.nw {
+    top: -5px;
+    left: -5px;
+    cursor: nw-resize;
+}
+
+.resizeHandle.ne {
+    top: -5px;
+    right: -5px;
+    cursor: ne-resize;
+}
+
+.resizeHandle.sw {
+    bottom: -5px;
+    left: -5px;
+    cursor: sw-resize;
+}
+
+.resizeHandle.se {
+    bottom: -5px;
+    right: -5px;
+    cursor: se-resize;
+}
