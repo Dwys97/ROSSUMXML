@@ -85,6 +85,11 @@ class LayoutLMv3Extractor:
         # Calculate number of labels from FIELD_LABELS
         num_labels = len(self.FIELD_LABELS)
         
+        # Load model with custom labels for transfer learning
+        # NOTE: ignore_mismatched_sizes=True allows us to override num_labels
+        # The classification head will be randomly initialized and should be
+        # fine-tuned on labeled invoice data for best performance.
+        # For now, the model leverages pre-trained document understanding features.
         self.model = LayoutLMv3ForTokenClassification.from_pretrained(
             model_name,
             num_labels=num_labels,  # Override with our custom labels

@@ -154,7 +154,8 @@ const BoundingBoxOverlay = ({
                 window.removeEventListener('mouseup', handleMouseUp);
             };
         }
-    }, [dragging, resizing, startPos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dragging, resizing]);
     
     if (!containerWidth || !containerHeight) return null;
     

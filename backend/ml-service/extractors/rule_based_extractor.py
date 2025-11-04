@@ -352,17 +352,21 @@ class RuleBasedExtractor:
         for pattern in self.weight_patterns:
             matches = pattern.finditer(text)
             for match in matches:
-                weight_text = match.group(0).lower()
-                weight_value = float(match.group(1))
-                
-                if 'net' in weight_text or 'n.w.' in weight_text:
-                    if 'net_weight' not in weights:
+                try:
+                    weight_text = match.group(0).lower()
+                    weight_value = float(match.group(1))
+                    
+                    if 'net' in weight_text or 'n.w.' in weight_text:
+                        if 'net_weight' not in weights:
+                            weights['net_weight'] = weight_value
+                    elif 'gross' in weight_text or 'g.w.' in weight_text:
+                        if 'gross_weight' not in weights:
+                            weights['gross_weight'] = weight_value
+                    elif 'weight' in weight_text and 'net_weight' not in weights:
+                        # Generic weight, assume net weight if not specified
                         weights['net_weight'] = weight_value
-                elif 'gross' in weight_text or 'g.w.' in weight_text:
-                    if 'gross_weight' not in weights:
-                        weights['gross_weight'] = weight_value
-                elif 'weight' in weight_text and 'net_weight' not in weights:
-                    # Generic weight, assume net weight if not specified
-                    weights['net_weight'] = weight_value
+                except (ValueError, IndexError):
+                    # Skip malformed weight values
+                    continue
         
         return weights
