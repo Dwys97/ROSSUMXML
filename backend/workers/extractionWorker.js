@@ -164,10 +164,12 @@ async function processExtractionJob(job) {
 
         // Prepare extraction payload
         const extractionPayload = {
-            file_data: base64File,
+            image: base64File,
             file_type: fileType,
             confidenceThreshold: confidenceThreshold || 0.7,
-            vendorId: vendorProfileId
+            vendorId: vendorProfileId,
+            callback_url: `${SOCKET_SERVER_URL}/field-update`,  // Progressive updates endpoint
+            invoice_id: invoiceId
         };
 
         // Call ML service
@@ -188,7 +190,7 @@ async function processExtractionJob(job) {
 
         const startTime = Date.now();
         const response = await axios.post(
-            `${ML_SERVICE_URL}/extract`,
+            `${ML_SERVICE_URL}/extract-advanced`,
             extractionPayload,
             {
                 timeout: 180000, // 3 minutes
@@ -286,6 +288,40 @@ async function updateInvoiceStatus(invoiceId, status, confidence, errorMessage =
 }
 
 /**
+ * Normalize date string to ISO format (YYYY-MM-DD)
+ * Handles various formats including "1st January 2024", "2024-01-01", "01/01/2024"
+ */
+function normalizeDate(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+
+    // If already in ISO format (YYYY-MM-DD), return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+    }
+
+    try {
+        // Remove ordinal suffixes (1st, 2nd, 3rd, 4th, etc.)
+        const cleanedDate = dateStr.replace(/(\d+)(st|nd|rd|th)/g, '$1');
+        
+        // Parse using Date constructor
+        const parsed = new Date(cleanedDate);
+        
+        // Check if valid date
+        if (isNaN(parsed.getTime())) return null;
+        
+        // Convert to ISO format (YYYY-MM-DD)
+        const year = parsed.getFullYear();
+        const month = String(parsed.getMonth() + 1).padStart(2, '0');
+        const day = String(parsed.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
+    } catch (error) {
+        logger.warn(`Failed to normalize date "${dateStr}":`, error.message);
+        return null;
+    }
+}
+
+/**
  * Save extraction results to database
  */
 async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) {
@@ -312,9 +348,12 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
             WHERE id = $11
         `;
 
+        // Normalize date to ISO format before saving
+        const normalizedDate = normalizeDate(extractedData.invoice?.date);
+
         await client.query(updateInvoiceQuery, [
             extractedData.invoice?.number || null,
-            extractedData.invoice?.date || null,
+            normalizedDate,
             extractedData.invoice?.currency || null,
             extractedData.totals?.total_amount || null,
             extractedData.totals?.vat || null,

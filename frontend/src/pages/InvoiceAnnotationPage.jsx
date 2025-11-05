@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import PDFViewer from '../components/invoice/PDFViewer';
 import FieldsPanel from '../components/invoice/FieldsPanel';
 import LineItemsTable from '../components/invoice/LineItemsTable';
@@ -10,6 +11,7 @@ import styles from './InvoiceAnnotationPage.module.css';
 const InvoiceAnnotationPage = () => {
     const { id } = useParams();
     const { getToken } = useAuth();
+    const { joinInvoice, leaveInvoice, onFieldUpdate, connected } = useSocket();
     const navigate = useNavigate();
     
     const [invoice, setInvoice] = useState(null);
@@ -21,6 +23,7 @@ const InvoiceAnnotationPage = () => {
     const [showQueryModal, setShowQueryModal] = useState(false);
     const [modalAction, setModalAction] = useState(null); // 'query' or 'reject'
     const [extracting, setExtracting] = useState(false);
+    const [extractedFields, setExtractedFields] = useState({}); // Progressive field updates
     
     // Fetch invoice details
     const fetchInvoiceDetails = async () => {
@@ -56,9 +59,44 @@ const InvoiceAnnotationPage = () => {
     useEffect(() => {
         if (id) {
             fetchInvoiceDetails();
+            
+            // Join invoice room for real-time updates
+            joinInvoice(id);
+            
+            // Cleanup: leave room on unmount
+            return () => {
+                leaveInvoice(id);
+            };
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
+    
+    // Listen for progressive field updates via Socket.IO
+    useEffect(() => {
+        if (!id || !connected) return;
+        
+        const unsubscribe = onFieldUpdate((data) => {
+            const { field, value, source } = data;
+            console.log(`[Real-time Update] ${field} = ${value} (from ${source})`);
+            
+            // Update extracted fields state
+            setExtractedFields(prev => ({
+                ...prev,
+                [field]: value
+            }));
+            
+            // Also update invoice state for immediate display
+            setInvoice(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    [field]: value
+                };
+            });
+        });
+        
+        return unsubscribe;
+    }, [id, connected, onFieldUpdate]);
     
     // Handle field acceptance
     const handleAcceptField = async (fieldPath, value) => {
@@ -283,6 +321,23 @@ const InvoiceAnnotationPage = () => {
                     </button>
                 </div>
             </div>
+            
+            {/* Progressive Extraction Indicator */}
+            {(extracting || invoice?.extraction_status === 'processing') && Object.keys(extractedFields).length > 0 && (
+                <div className={styles.progressBanner}>
+                    <div className={styles.progressHeader}>
+                        <span className={styles.progressIcon}>🔄</span>
+                        <span className={styles.progressText}>Extracting fields in real-time...</span>
+                    </div>
+                    <div className={styles.progressFields}>
+                        {Object.entries(extractedFields).map(([field, value]) => (
+                            <span key={field} className={styles.progressField}>
+                                ✅ {field}: {value}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
             
             {/* Main Content */}
             <div className={styles.content}>

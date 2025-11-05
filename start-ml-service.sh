@@ -22,7 +22,7 @@ else
 fi
 
 # Set environment variables
-export MODEL_NAME=microsoft/layoutlmv3-base
+export MODEL_NAME=rubentito/layoutlmv3-base-mpdocvqa
 export PYTHONUNBUFFERED=1
 export PORT=5001
 

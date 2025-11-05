@@ -15,13 +15,48 @@ const InvoiceQueue = ({ invoices, viewMode, onInvoiceClick, onDeleteInvoice, pag
         });
     };
     
-    // Format currency
+    // Format currency (robust: accept currency symbol or ISO code)
     const formatCurrency = (amount, currency = 'USD') => {
-        if (!amount) return '-';
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: currency
-        }).format(amount);
+        if (amount === null || amount === undefined || amount === '') return '-';
+
+        // Ensure numeric value
+        const num = Number(amount);
+        if (isNaN(num)) return String(amount);
+
+        // Map common symbols to ISO codes
+        const symbolMap = {
+            '£': 'GBP',
+            '€': 'EUR',
+            '$': 'USD',
+            '¥': 'JPY'
+        };
+
+        let iso = currency;
+        if (!iso) iso = 'USD';
+        // If currency looks like a symbol, map it
+        if (typeof iso === 'string' && iso.length === 1) {
+            iso = symbolMap[iso] || iso;
+        }
+
+        // If currency contains non-alpha characters (like whitespace or symbol), try to pick mapping
+        if (typeof iso === 'string' && /[^A-Za-z]/.test(iso)) {
+            // try first char mapping
+            const first = iso.trim()[0];
+            iso = symbolMap[first] || iso;
+        }
+
+        // If iso is still not 3 letters, fallback to USD
+        if (typeof iso !== 'string' || iso.length !== 3) iso = 'USD';
+
+        try {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: iso
+            }).format(num);
+        } catch {
+            // Fallback to simple formatting
+            return `${num.toFixed(2)} ${iso}`;
+        }
     };
     
     // Get status badge class

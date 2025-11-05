@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { DataPreloadProvider } from './contexts/DataPreloadContext';
+import { SocketProvider } from './contexts/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import EditorPage from './pages/EditorPage';
@@ -25,78 +26,80 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <DataPreloadProvider>
-          <Routes>
-            {/* Публичные маршруты */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/request-demo" element={<RequestDemoPage />} />
-            <Route path="/solutions" element={<SolutionsPage />} />
-            <Route path="/enterprise" element={<EnterprisePage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/api-docs" element={<ApiDocsPage />} />
-            
-            {/* Защищенные маршруты */}
-            <Route 
-              path="/transformer" 
-              element={
-                <ProtectedRoute>
-                  <TransformerPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/editor" 
-              element={
-                <ProtectedRoute>
-                  <EditorPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <UserProfile />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/analytics" 
-              element={
-                <ProtectedRoute>
-                  <AnalyticsDashboardPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/invoices" 
-              element={
-                <ProtectedRoute>
-                  <InvoiceWorkflowPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/invoices/:id" 
-              element={
-                <ProtectedRoute>
-                  <InvoiceAnnotationPage />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-        </DataPreloadProvider>
+        <SocketProvider>
+          <DataPreloadProvider>
+            <Routes>
+              {/* Публичные маршруты */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/request-demo" element={<RequestDemoPage />} />
+              <Route path="/solutions" element={<SolutionsPage />} />
+              <Route path="/enterprise" element={<EnterprisePage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/api-docs" element={<ApiDocsPage />} />
+              
+              {/* Защищенные маршруты */}
+              <Route 
+                path="/transformer" 
+                element={
+                  <ProtectedRoute>
+                    <TransformerPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/editor" 
+                element={
+                  <ProtectedRoute>
+                    <EditorPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <UserProfile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/analytics" 
+                element={
+                  <ProtectedRoute>
+                    <AnalyticsDashboardPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/invoices" 
+                element={
+                  <ProtectedRoute>
+                    <InvoiceWorkflowPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/invoices/:id" 
+                element={
+                  <ProtectedRoute>
+                    <InvoiceAnnotationPage />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </DataPreloadProvider>
+        </SocketProvider>
       </AuthProvider>
     </BrowserRouter>
   );

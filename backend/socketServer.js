@@ -10,6 +10,7 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
+app.use(express.json()); // Parse JSON request bodies
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -31,6 +32,34 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Progressive field update endpoint (called by ML service)
+app.post('/field-update', (req, res) => {
+  const { invoice_id, field, value, source, timestamp } = req.body;
+  
+  if (!invoice_id || !field) {
+    return res.status(400).json({ 
+      error: 'Missing required fields: invoice_id, field' 
+    });
+  }
+
+  console.log(`[Field Update] Invoice ${invoice_id}: ${field} = ${value} (from ${source})`);
+  
+  // Emit to all clients in the invoice room
+  io.to(`invoice:${invoice_id}`).emit('extraction:field-update', {
+    field,
+    value,
+    source,
+    timestamp: timestamp || new Date().toISOString()
+  });
+
+  res.json({ 
+    success: true, 
+    message: 'Field update broadcasted',
+    invoice_id,
+    field
+  });
+});
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('[Socket.io] Client connected:', socket.id);
@@ -43,6 +72,18 @@ io.on('connection', (socket) => {
   socket.on('join-job', (jobId) => {
     socket.join(`job:${jobId}`);
     console.log(`[Socket.io] Client ${socket.id} joined job room: ${jobId}`);
+  });
+
+  // Join room for specific invoice (for progressive field updates)
+  socket.on('join-invoice', (invoiceId) => {
+    socket.join(`invoice:${invoiceId}`);
+    console.log(`[Socket.io] Client ${socket.id} joined invoice room: ${invoiceId}`);
+  });
+
+  // Leave invoice room
+  socket.on('leave-invoice', (invoiceId) => {
+    socket.leave(`invoice:${invoiceId}`);
+    console.log(`[Socket.io] Client ${socket.id} left invoice room: ${invoiceId}`);
   });
 
   // Leave job room

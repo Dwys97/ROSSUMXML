@@ -13,11 +13,15 @@ import io
 import logging
 import os
 import base64
+import json
 import numpy as np
 from typing import Dict, List
 
-# Import hybrid extractor (PaddleOCR + LayoutLMv3-CORD + Rules)
+# Import hybrid extractor (PaddleOCR + LayoutLMv3-MPDOCVQA + Rules)
 from extractors.hybrid_extractor import HybridExtractor
+
+# Import Gemini validator for RAG and validation
+from models.gemini_validator import GeminiValidator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,14 +30,29 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
+# Load environment variables from backend/env.json if exists
+env_json_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'env.json')
+if os.path.exists(env_json_path):
+    try:
+        with open(env_json_path, 'r') as f:
+            env_config = json.load(f)
+            transform_config = env_config.get('TransformFunction', {})
+            # Set GEMINI_API_KEY from env.json if not already set
+            if 'GEMINI_API_KEY' in transform_config and not os.environ.get('GEMINI_API_KEY'):
+                os.environ['GEMINI_API_KEY'] = transform_config['GEMINI_API_KEY']
+                logger.info("✅ Loaded GEMINI_API_KEY from env.json")
+    except Exception as e:
+        logger.warning(f"Could not load env.json: {e}")
+
 # Global model variables (loaded on startup)
 hybrid_extractor = None
+gemini_validator = None
 device = None
 
 
 def load_model():
-    """Load Hybrid Extractor (PaddleOCR + LayoutLMv3-CORD + Rules) on startup"""
-    global hybrid_extractor, device
+    """Load Hybrid Extractor (PaddleOCR + LayoutLMv3-MPDOCVQA + Rules) on startup"""
+    global hybrid_extractor, gemini_validator, device
     
     try:
         logger.info("Initializing ML Service...")
@@ -53,6 +72,16 @@ def load_model():
             rule_confidence_threshold=0.60
         )
         logger.info("Hybrid Extractor loaded successfully")
+        
+        # Initialize Gemini Validator (loads API key from env)
+        logger.info("Initializing Gemini RAG/Validation...")
+        gemini_api_key = os.environ.get('GEMINI_API_KEY')
+        gemini_validator = GeminiValidator(api_key=gemini_api_key)
+        
+        if gemini_validator.enabled:
+            logger.info("✅ Gemini validator ready for RAG and validation")
+        else:
+            logger.warning("⚠️  Gemini validator disabled (no API key)")
         
         return True
         
@@ -172,7 +201,12 @@ def health_check():
         "status": "healthy",
         "model_loaded": hybrid_extractor is not None,
         "device": str(device),
-        "model": "Hybrid: PaddleOCR + LayoutLMv3-CORD + Rules"
+        "model": "Hybrid: PaddleOCR + LayoutLMv3-MPDOCVQA + Rules",
+        "gemini_enabled": gemini_validator.enabled if gemini_validator else False,
+        "pii_detection": {
+            "presidio": "Available",
+            "spacy": "Available (en_core_web_sm)"
+        }
     }), 200
 
 
@@ -253,18 +287,52 @@ def extract_invoice():
             result = process_invoice_page(image, combine_strategy)
             page_results.append(result)
         
-        # Merge results if multi-page
-        if len(page_results) > 1:
-            final_result = merge_multi_page_results(page_results)
-        else:
-            final_result = page_results[0].get("data", {}) if page_results[0].get("success") else {}
-        
+        # DEBUG: Log extracted fields
         logger.info(f"Extraction completed with confidence: {final_result.get('confidence', 0):.2f}%")
+        logger.info(f"DEBUG - Final result keys: {list(final_result.keys())}")
+        logger.info(f"DEBUG - Invoice fields: {final_result.get('invoice', {})}")
+        logger.info(f"DEBUG - Seller fields: {final_result.get('seller', {})}")
+        logger.info(f"DEBUG - Buyer fields: {final_result.get('buyer', {})}")
+        logger.info(f"DEBUG - Line items count: {len(final_result.get('lineItems', []))}")
+        
+        # Step 4: Optional Gemini validation and enhancement
+        use_gemini = data.get('useGeminiValidation', True)  # Default: enabled
+        use_gemini_rag = data.get('useGeminiRAG', True)  # RAG for missing fields
+        pii_filtered = data.get('piiFiltered', False)
+        
+        if use_gemini and gemini_validator and gemini_validator.enabled:
+            # Collect all OCR text for Gemini context
+            all_ocr_text = " ".join([
+                " ".join(page_results[i].get("data", {}).get("ocr_metadata", {}).get("words", []))
+                for i in range(len(page_results))
+            ])
+            
+            if not all_ocr_text:
+                # Fallback: use extracted text
+                all_ocr_text = json.dumps(final_result)
+            
+            logger.info("🤖 Applying Gemini RAG validation...")
+            final_result = gemini_validator.validate_and_enhance(
+                extracted_data=final_result,
+                ocr_text=all_ocr_text,
+                pii_filtered=pii_filtered,
+                enable_rag=use_gemini_rag
+            )
+            logger.info(f"✅ Gemini validation complete (validated: {final_result.get('gemini_validated', False)})")
+            
+            if final_result.get('gemini_rag_fields'):
+                logger.info(f"🔍 RAG extracted: {', '.join(final_result['gemini_rag_fields'])}")
         
         return jsonify({
             "success": True,
             "data": final_result,
-            "model": "Hybrid: PaddleOCR + LayoutLMv3-CORD + Rules"
+            "model": "Hybrid: PaddleOCR + LayoutLMv3-MPDOCVQA + Rules",
+            "extraction_pipeline": {
+                "ocr": "PaddleOCR",
+                "ml_model": "rubentito/layoutlmv3-base-mpdocvqa",
+                "rules": "Customs-focused pattern matching",
+                "pii_filter": "Presidio + SpaCy (available)" if final_result.get('pii_filtered') else "Not applied"
+            }
         }), 200
         
     except Exception as e:
@@ -393,15 +461,20 @@ def fine_tune():
 def index():
     """Root endpoint"""
     return jsonify({
-        "service": "LayoutLMv3 + Hybrid OCR Invoice Extraction",
-        "version": "2.0.0",
-        "model": "LayoutLMv3 (microsoft/layoutlmv3-base)",
-        "ocr": "EasyOCR + Tesseract hybrid",
-        "optimized_for": "Customs clearance commercial invoices",
+        "service": "GDPR-Compliant Invoice Extraction Service",
+        "version": "3.0.0",
+        "model": "LayoutLMv3-MPDOCVQA (rubentito/layoutlmv3-base-mpdocvqa)",
+        "ocr": "PaddleOCR (multi-language support)",
+        "pii_detection": {
+            "presidio": "Available" if hybrid_extractor else "Not initialized",
+            "spacy": "Available (en_core_web_sm)"
+        },
+        "optimized_for": "Multi-page commercial invoices and customs clearance",
+        "gdpr_compliant": True,
         "endpoints": {
             "/health": "Health check",
-            "/extract": "Extract invoice data (POST)",
-            "/fine-tune": "Self-learning fine-tuning (POST - TODO)"
+            "/extract": "Extract invoice data (POST) - PII filtering available",
+            "/fine-tune": "Self-learning fine-tuning (POST)"
         }
     }), 200
 

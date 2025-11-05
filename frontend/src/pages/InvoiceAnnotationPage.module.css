@@ -243,3 +243,76 @@
         width: 100%;
     }
 }
+
+/* Progressive Extraction Banner */
+.progressBanner {
+    background: linear-gradient(135deg, rgba(29, 114, 243, 0.15) 0%, rgba(46, 125, 50, 0.15) 100%);
+    border-bottom: 1px solid rgba(29, 114, 243, 0.3);
+    padding: 1rem 2rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.progressHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.progressIcon {
+    font-size: 1.2rem;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.progressText {
+    color: #81c784;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.progressFields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.progressField {
+    background: rgba(45, 55, 72, 0.6);
+    border: 1px solid rgba(129, 199, 132, 0.3);
+    border-radius: 4px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

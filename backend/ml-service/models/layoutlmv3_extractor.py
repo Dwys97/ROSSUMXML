@@ -241,6 +241,12 @@ class LayoutLMv3Extractor:
         all_confidences = [c for sublist in [current_confidences] for c in sublist if c > 0]
         fields["confidence"] = np.mean(all_confidences) * 100 if all_confidences else 0.0
         
+        # DEBUG: Log what was actually extracted
+        logger.debug(f"DEBUG - LayoutLMv3 extracted fields: {fields}")
+        logger.debug(f"DEBUG - Invoice: {fields.get('invoice', {})}")
+        logger.debug(f"DEBUG - Seller: {fields.get('seller', {})}")
+        logger.debug(f"DEBUG - Buyer: {fields.get('buyer', {})}")
+        
         return fields
     
     def _save_field(

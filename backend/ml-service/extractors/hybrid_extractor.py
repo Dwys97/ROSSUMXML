@@ -116,6 +116,11 @@ class HybridExtractor:
         
         # Step 4: Combine results based on strategy
         logger.info("Step 4/4: Combining ML and rule-based results...")
+        
+        # DEBUG: Log what we got from each method
+        logger.info(f"DEBUG - ML result sections: invoice={len(ml_result.get('invoice', {}))}, seller={len(ml_result.get('seller', {}))}, buyer={len(ml_result.get('buyer', {}))}")
+        logger.info(f"DEBUG - Rule result sections: invoice={len(rule_result.get('invoice', {}))}, seller={len(rule_result.get('seller', {}))}, buyer={len(rule_result.get('buyer', {}))}")
+        
         combined = self._combine_results(
             ml_result=ml_result,
             rule_result=rule_result,
