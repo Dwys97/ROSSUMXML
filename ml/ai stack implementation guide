@@ -1,0 +1,708 @@
+# SchemaXtract OCR/ML Stack - Implementation Guide
+
+## 📋 Overview
+
+SchemaXtract uses a **3-service microservices architecture** for intelligent document processing:
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
+│  React Frontend │───▶│  Lambda Backend  │───▶│  ML Service (Donut) │
+│   (Port 3000)   │    │   (Port 3001)    │    │    (Port 3002)      │
+│                 │    │                  │    │                     │
+│  - Upload UI    │    │  - PDF→Image     │    │  - LayoutLMv2       │
+│  - Annotations  │    │  - API Gateway   │    │  - Field Extraction │
+│  - Vite + React │    │  - Orchestration │    │  - PyTorch + HF     │
+└─────────────────┘    └──────────────────┘    └─────────────────────┘
+```
+
+---
+
+## 🏗️ Architecture Components
+
+### 1. Frontend Layer (React + Vite)
+**Location**: `frontend/`
+
+**Tech Stack**:
+- React 18 with Vite (fast HMR)
+- react-pdf for PDF rendering
+- react-konva for interactive bounding box annotations
+- Drag-and-drop document upload
+
+**Key Features**:
+- Document upload interface
+- PDF/image preview with zoom controls
+- Interactive bbox drawing and editing
+- Field review and correction
+- Export to JSON/CSV/XML
+
+**Dependencies** (`frontend/package.json`):
+```json
+{
+  "react": "^18.3.1",
+  "react-pdf": "^7.7.0",
+  "react-konva": "^18.2.10",
+  "konva": "^9.2.2"
+}
+```
+
+---
+
+### 2. Backend Layer (AWS Lambda)
+**Location**: `backend/`
+
+**Tech Stack**:
+- Python 3.12
+- AWS SAM (Serverless Application Model)
+- Lightweight, no ML dependencies
+- Runs locally with SAM Local
+
+**Purpose**:
+- PDF to image conversion (pdf2image + poppler)
+- Orchestrate calls to ML service
+- API Gateway integration
+- GDPR-compliant ephemeral storage (10GB)
+
+**Dependencies** (`backend/requirements.txt`):
+```
+boto3>=1.26.0           # AWS SDK
+Pillow>=10.0.0          # Image processing
+pdf2image>=1.16.3       # PDF to image (uses poppler-utils)
+requests>=2.28.0        # HTTP client to call Donut service
+```
+
+**Key Configuration** (`backend/template.yaml`):
+```yaml
+Resources:
+  OcrProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.12
+      Handler: app.lambda_handler
+      MemorySize: 2048         # 2GB RAM
+      Timeout: 300             # 5 min (for ML processing)
+      EphemeralStorage:
+        Size: 10240            # 10GB temporary storage
+      Environment:
+        Variables:
+          DONUT_SERVICE_URL: "http://172.17.0.1:3002"
+```
+
+**Why Separate Backend?**
+- ✅ Fast builds (~30 seconds vs 10+ minutes)
+- ✅ No compilation errors (no C++ dependencies)
+- ✅ Lightweight Lambda package
+- ✅ Easy to swap ML models without rebuilding
+
+---
+
+### 3. ML Service Layer (Donut/LayoutLM)
+**Location**: `donut_service/`
+
+**Tech Stack**:
+- Flask web server
+- Hugging Face Transformers
+- PyTorch (CPU-only by default, GPU-ready)
+- LayoutLMv2 for document understanding
+
+**Model**: `impira/layoutlm-invoices`
+- Pre-trained on invoice documents
+- Document Question-Answering approach
+- Spatial + textual understanding
+- Returns text + bounding boxes
+
+**Dependencies** (`donut_service/requirements.txt`):
+```
+Flask>=2.3.0
+flask-cors>=4.0.0
+transformers>=4.30.0                          # Hugging Face
+torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu
+Pillow>=10.0.0
+pdf2image>=1.16.3
+pytesseract>=0.3.10                           # Fallback OCR
+```
+
+**Key Features**:
+- **Lazy Loading**: Model loads on first request (30-60s)
+- **Question-Answering**: Ask natural language questions about documents
+- **Native OCR**: LayoutLM handles OCR internally
+- **Bbox Extraction**: Returns normalized coordinates [0-1000]
+- **Batch Processing**: Process multiple fields efficiently
+
+---
+
+## 🔧 ML Pipeline Details
+
+### How LayoutLM Works
+
+```python
+# 1. Load model (once, on first request)
+from transformers import pipeline
+
+doc_qa_pipeline = pipeline(
+    "document-question-answering", 
+    model="impira/layoutlm-invoices"
+)
+
+# 2. Ask questions about the document
+image = Image.open("invoice.pdf")
+result = doc_qa_pipeline(
+    image=image,
+    question="What is the invoice number?"
+)
+
+# Result format:
+{
+    'answer': 'INV-2024-001',
+    'score': 0.95,           # Confidence
+    'start': 10,             # Token position
+    'end': 12
+}
+```
+
+### Field Extraction Flow
+
+```
+Document (PDF/Image)
+    ↓
+1. PDF → Image conversion (backend)
+    ↓
+2. Send to Donut service with questions
+    ↓
+3. LayoutLM processes:
+   - Internal OCR (Tesseract)
+   - Spatial layout analysis
+   - Attention mechanism over text + positions
+   - Answer extraction
+    ↓
+4. Match answers to OCR bboxes
+    ↓
+5. Return normalized coordinates [0-1000]
+    ↓
+6. Frontend displays interactive bboxes
+```
+
+### Custom Field Definitions
+
+You can define custom fields with questions:
+
+```python
+custom_fields = [
+    {
+        "key": "invoice_number",
+        "question": "What is the invoice number?",
+        "type": "text",
+        "required": True,
+        "category": "invoice"
+    },
+    {
+        "key": "item_description",
+        "question": "What is the product description?",
+        "type": "text",
+        "category": "line_items"
+    }
+]
+```
+
+The service automatically:
+- Asks each question to LayoutLM
+- Extracts the answer with confidence score
+- Finds matching OCR bboxes
+- Groups line items by row (for tables)
+
+---
+
+## 🚀 Setup Instructions
+
+### Prerequisites
+
+```bash
+# System requirements
+- Docker (for SAM Local + containers)
+- Python 3.12+
+- Node.js 18+
+- 8GB RAM (for ML model)
+- Git
+
+# Optional for development
+- VS Code with Dev Containers extension
+- GitHub Codespaces account
+```
+
+### Option A: GitHub Codespaces (Recommended)
+
+```bash
+# 1. Create codespace from GitHub repo
+# 2. Wait for automatic setup (5-8 min)
+# 3. Services auto-start via postCreateCommand
+
+# The devcontainer handles:
+✅ Python 3.12 installation
+✅ Node.js 18 installation
+✅ Docker-in-Docker setup
+✅ AWS SAM CLI installation
+✅ All dependencies installed
+```
+
+**Configuration** (`.devcontainer/devcontainer.json`):
+```json
+{
+  "name": "SchemaXtract Dev Container",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {"version": "18"},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/aws-cli:1": {}
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "forwardPorts": [3000, 3001, 3002]
+}
+```
+
+### Option B: Local Development
+
+```bash
+# 1. Clone repository
+git clone https://github.com/yourusername/schemaxtract.git
+cd schemaxtract
+
+# 2. Install backend dependencies
+cd backend
+pip install -r requirements.txt
+sam build
+
+# 3. Install ML service dependencies
+cd ../donut_service
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 4. Install frontend dependencies
+cd ../frontend
+npm install
+
+# 5. Start all services (from root)
+./start.sh
+```
+
+---
+
+## 📦 Dependencies Breakdown
+
+### System Dependencies (Dockerfile)
+
+```dockerfile
+FROM python:3.12-slim
+
+# PDF processing
+RUN apt-get update && apt-get install -y \
+    poppler-utils \         # pdf2image backend
+    tesseract-ocr \         # OCR engine
+    libtesseract-dev \      # OCR headers
+    git \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+### Python ML Dependencies
+
+**Core ML Stack**:
+```
+transformers==4.30.0        # Hugging Face models
+torch==2.0.0               # PyTorch (CPU version)
+```
+
+**Size breakdown**:
+- PyTorch: ~200MB (CPU-only)
+- Transformers: ~400MB
+- LayoutLM model: ~400MB (downloaded on first run)
+- **Total first run**: ~3.6GB (includes all dependencies)
+
+**Why CPU-only PyTorch?**
+```
+--index-url https://download.pytorch.org/whl/cpu
+```
+- Smaller download (200MB vs 2GB+ for CUDA)
+- Works on any hardware
+- Sufficient for inference (model is optimized)
+- Can switch to GPU version for production
+
+### Document Processing
+
+```
+pdf2image==1.16.3          # PDF → Image conversion
+Pillow==10.0.0             # Image manipulation
+pytesseract==0.3.10        # OCR (fallback/standalone)
+```
+
+---
+
+## 🔥 Running the Stack
+
+### Quick Start (All Services)
+
+```bash
+# Using start script
+./start.sh
+
+# Or using Makefile
+make start-all
+
+# Or using VS Code Tasks
+# Ctrl+Shift+P → "Tasks: Run Task" → "Start All Services"
+```
+
+### Individual Services
+
+**Backend (SAM Local)**:
+```bash
+cd backend
+sam build                                    # Build Lambda package
+sam local start-api \
+  --port 3001 \
+  --host 0.0.0.0 \
+  --skip-pull-image                         # Use cached Docker images
+```
+
+**ML Service (Donut)**:
+```bash
+cd donut_service
+source venv/bin/activate
+python main.py
+
+# Output:
+# Loading Impira LayoutLM model... (30-60s on first run)
+# ✓ Model loaded successfully
+# Running on http://0.0.0.0:3002
+```
+
+**Frontend (Vite)**:
+```bash
+cd frontend
+npm run dev -- --host 0.0.0.0
+
+# Output:
+# VITE ready in 250ms
+# ➜  Local:   http://localhost:3000/
+# ➜  Network: http://0.0.0.0:3000/
+```
+
+---
+
+## 🧪 Testing the Stack
+
+### Health Checks
+
+```bash
+# Test ML service
+curl http://localhost:3002/health
+# {"status":"healthy","service":"layoutlm-invoice-qa","model_loaded":true}
+
+# Test backend
+curl -X POST http://localhost:3001/process-document \
+  -H "Content-Type: application/json" \
+  -d '{"document":"dGVzdA==","filename":"test.pdf"}'
+
+# Test frontend
+curl http://localhost:3000
+# Should return HTML
+```
+
+### End-to-End Test
+
+```bash
+# 1. Start all services
+./start.sh
+
+# 2. Open browser
+http://localhost:3000
+
+# 3. Upload a PDF invoice
+
+# 4. Watch the extraction flow:
+#    Frontend → Backend (PDF→Image) → Donut (ML) → Backend → Frontend
+```
+
+---
+
+## 📊 Performance Characteristics
+
+### First-Time Startup
+- **Donut service**: 5-10 minutes (downloads PyTorch + model ~3.6GB)
+- **Backend build**: 30 seconds (lightweight dependencies)
+- **Frontend build**: 10 seconds (npm install)
+
+### Subsequent Startups
+- **Donut service**: <5 seconds (cached dependencies)
+- **Backend**: Instant (SAM Local cached)
+- **Frontend**: <1 second (Vite HMR)
+
+### Inference Performance
+- **Model loading** (first request): 30-60 seconds
+- **Field extraction** (5 fields): 2-5 seconds on CPU
+- **Field extraction** (20 fields): 10-30 seconds on CPU
+- **With GPU**: 5-10x faster
+
+### Memory Usage
+- **Backend Lambda**: 2GB RAM configured, ~500MB used
+- **Donut service**: ~2-3GB RAM (model in memory)
+- **Frontend**: Minimal (~100MB browser)
+
+---
+
+## 🎯 Key Implementation Details
+
+### 1. GDPR Compliance
+
+The system never stores original documents permanently:
+
+```python
+# In Lambda (backend/src/process_document/app.py)
+with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_pdf:
+    tmp_pdf.write(pdf_data)
+    pdf_path = tmp_pdf.name
+
+try:
+    # Process document
+    result = process_pdf(pdf_path)
+finally:
+    # CRITICAL: Always delete original document
+    if os.path.exists(pdf_path):
+        os.unlink(pdf_path)
+        logger.info(f"[GDPR] Deleted original file: {pdf_path}")
+```
+
+**10GB Ephemeral Storage**:
+```yaml
+# In template.yaml
+EphemeralStorage:
+  Size: 10240  # 10GB - max allowed by Lambda
+```
+
+### 2. Bbox Coordinate Normalization
+
+All bboxes use **normalized coordinates [0-1000]** for consistency:
+
+```python
+def normalize_bbox(bbox, img_width, img_height):
+    """Convert pixel coords to normalized [0-1000] scale"""
+    x1, y1, x2, y2 = bbox  # Pixel coordinates
+    return [
+        int((x1 / img_width) * 1000),
+        int((y1 / img_height) * 1000),
+        int((x2 / img_width) * 1000),
+        int((y2 / img_height) * 1000),
+    ]
+```
+
+Benefits:
+- Resolution-independent
+- Works across different image sizes
+- Frontend can scale to any display size
+
+### 3. Line Item Detection
+
+Automatically groups table rows:
+
+```python
+# Extract line items with _row_X suffix
+line_item_fields = [
+    "item_description_row_1",
+    "item_quantity_row_1",
+    "item_price_row_1",
+    "item_description_row_2",
+    # ...
+]
+
+# Groups by row number
+{
+    "1": {
+        "description": "Widget A",
+        "quantity": "10",
+        "price": "$50.00"
+    },
+    "2": {
+        "description": "Widget B",
+        # ...
+    }
+}
+```
+
+### 4. Model Lazy Loading
+
+Model loads on first request to save memory:
+
+```python
+_doc_qa_pipeline = None  # Global variable
+
+def load_layoutlm_model():
+    global _doc_qa_pipeline
+    
+    if _doc_qa_pipeline is None:
+        logger.info("Loading model (30-60s)...")
+        _doc_qa_pipeline = pipeline(
+            "document-question-answering",
+            model="impira/layoutlm-invoices"
+        )
+    
+    return _doc_qa_pipeline
+```
+
+---
+
+## 🔄 Adapting to Your Project
+
+### Minimal Integration
+
+If you just need the ML extraction:
+
+```python
+# 1. Install dependencies
+pip install transformers torch pillow pdf2image
+
+# 2. Use the extraction function
+from transformers import pipeline
+from PIL import Image
+
+model = pipeline("document-question-answering", 
+                 model="impira/layoutlm-invoices")
+
+image = Image.open("invoice.pdf")
+result = model(image=image, question="What is the total amount?")
+print(result)  # {'answer': '$1,234.56', 'score': 0.95, ...}
+```
+
+### Full Stack Integration
+
+**Copy these components**:
+
+1. **ML Service** → Copy entire `donut_service/` folder
+2. **Backend proxy** → Adapt `backend/src/process_document/app.py`
+3. **Frontend UI** → Copy components from `frontend/src/components/`
+
+**Modify for your needs**:
+
+```python
+# In your backend (app.py)
+import requests
+
+DONUT_SERVICE_URL = "http://your-ml-service:3002"
+
+def extract_fields(document_base64, custom_fields):
+    response = requests.post(
+        f"{DONUT_SERVICE_URL}/extract",
+        json={
+            "image": document_base64,
+            "format": "pdf",
+            "custom_fields": custom_fields
+        }
+    )
+    return response.json()
+```
+
+### Production Deployment
+
+**Backend**:
+```bash
+# Deploy to AWS Lambda
+cd backend
+sam build --use-container
+sam deploy --guided
+```
+
+**ML Service Options**:
+1. **AWS EC2** with GPU (best performance)
+2. **AWS ECS/Fargate** (containerized, scalable)
+3. **AWS SageMaker** (managed ML inference)
+4. **Lambda** (if model <10GB unzipped)
+
+**Frontend**:
+```bash
+# Build and deploy to S3 + CloudFront
+cd frontend
+npm run build
+aws s3 sync dist/ s3://your-bucket/
+```
+
+---
+
+## 📚 Additional Resources
+
+### Documentation Files in Repo
+- `START_HERE.md` - Quick start guide
+- `QUICK_START.md` - Detailed setup
+- `DONUT_SERVICE_MIGRATION.md` - Architecture decisions
+- `EXTRACTION_EXPLAINED.md` - Field extraction details
+- `FIELD_MANAGER_GUIDE.md` - Custom fields
+- `TEMPLATE_TROUBLESHOOTING.md` - Common issues
+
+### External References
+- [LayoutLM Paper](https://arxiv.org/abs/1912.13318)
+- [Hugging Face Transformers](https://huggingface.co/docs/transformers)
+- [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
+- [Impira LayoutLM Model](https://huggingface.co/impira/layoutlm-invoices)
+
+---
+
+## ⚠️ Common Pitfalls
+
+### 1. Model Download Timeout
+**Problem**: First run times out downloading model  
+**Solution**: Increase timeout or pre-download model:
+```bash
+python -c "from transformers import pipeline; pipeline('document-question-answering', model='impira/layoutlm-invoices')"
+```
+
+### 2. Memory Issues
+**Problem**: Out of memory during inference  
+**Solution**: Increase Lambda/container memory to 4GB or use batch processing
+
+### 3. Bbox Misalignment
+**Problem**: Bboxes don't match text on screen  
+**Solution**: Ensure you're using extraction image dimensions, not PDF render dimensions:
+```python
+# Use metadata from extraction
+extraction_width = metadata['image_size']['width']
+extraction_height = metadata['image_size']['height']
+```
+
+### 4. CORS Errors in Frontend
+**Problem**: Cannot call backend from frontend  
+**Solution**: Enable CORS in SAM template and Flask:
+```yaml
+# template.yaml
+Api:
+  Cors:
+    AllowOrigin: "'*'"
+    AllowHeaders: "'*'"
+```
+
+---
+
+## 🎓 Summary
+
+**3-Service Architecture**:
+1. **Frontend** (React/Vite) → User interface
+2. **Backend** (Lambda/SAM) → PDF processing + orchestration
+3. **ML Service** (Flask/LayoutLM) → Field extraction
+
+**Key Technologies**:
+- LayoutLMv2 for document understanding
+- PyTorch for ML inference
+- Transformers for model loading
+- Tesseract for OCR
+- AWS SAM for serverless deployment
+
+**Benefits**:
+- ✅ Fast builds (30s backend)
+- ✅ Clean separation of concerns
+- ✅ Easy to swap ML models
+- ✅ Scalable architecture
+- ✅ GDPR compliant
+- ✅ Cost-effective (serverless)
+
+**Implementation Time**:
+- Minimal setup: 30 minutes
+- Full stack: 2-4 hours
+- Production deployment: 1 day
+
+---
+
+Ready to implement? Start with the **Minimal Integration** section and gradually add components as needed!

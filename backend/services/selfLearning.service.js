@@ -362,11 +362,79 @@ async function fileExists(filePath) {
     }
 }
 
+/**
+ * Get all corrections ready for general training (not vendor-specific)
+ * @param {Object} options - Query options
+ * @returns {Promise<Array>} Correction records with invoice data
+ */
+async function getGeneralTrainingData(options = {}) {
+    const {
+        limit = 100,
+        offset = 0,
+        unused_only = true,
+        correction_types = ['manual_edit', 'bounding_box', 'field_accept']
+    } = options;
+
+    try {
+        const result = await pool.query(
+            `SELECT 
+                c.id as correction_id,
+                c.invoice_id,
+                c.field_path,
+                c.original_value,
+                c.corrected_value,
+                c.ml_confidence,
+                c.correction_type,
+                c.created_at,
+                i.file_path,
+                i.extracted_data,
+                i.file_name
+            FROM invoice_corrections c
+            JOIN invoices i ON c.invoice_id = i.id
+            WHERE ($1 = false OR c.used_for_training = false)
+                AND c.correction_type = ANY($2::text[])
+            ORDER BY c.created_at DESC
+            LIMIT $3 OFFSET $4`,
+            [unused_only, correction_types, limit, offset]
+        );
+
+        return result.rows;
+    } catch (error) {
+        logger.error('Failed to get general training data:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get statistics on bounding box corrections for self-learning
+ * @returns {Promise<Object>} Bbox correction statistics
+ */
+async function getBboxCorrectionStats() {
+    try {
+        const result = await pool.query(
+            `SELECT 
+                COUNT(*) as total_bbox_corrections,
+                COUNT(DISTINCT invoice_id) as invoices_with_bbox_corrections,
+                SUM(CASE WHEN used_for_training THEN 1 ELSE 0 END) as trained_bbox_corrections,
+                SUM(CASE WHEN NOT used_for_training THEN 1 ELSE 0 END) as unused_bbox_corrections
+            FROM invoice_corrections
+            WHERE correction_type = 'bounding_box'`
+        );
+
+        return result.rows[0];
+    } catch (error) {
+        logger.error('Failed to get bbox correction stats:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     getVendorCorrections,
-    getVendorsReadyForTraining,
-    trainVendorAdapter,
-    autoTrainAllVendors,
-    getVendorTrainingStatus,
-    prepareTrainingData
+    trainVendorModel,
+    markCorrectionsAsUsed,
+    getCorrectionStats,
+    scheduleVendorTraining,
+    getTrainingHistory,
+    getGeneralTrainingData,
+    getBboxCorrectionStats
 };

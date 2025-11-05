@@ -6,6 +6,8 @@ import PDFViewer from '../components/invoice/PDFViewer';
 import FieldsPanel from '../components/invoice/FieldsPanel';
 import LineItemsTable from '../components/invoice/LineItemsTable';
 import QueryRejectModal from '../components/invoice/QueryRejectModal';
+import BoundingBoxOverlay from '../components/invoice/BoundingBoxOverlay';
+import * as correctionsApi from '../services/correctionsApi';
 import styles from './InvoiceAnnotationPage.module.css';
 
 const InvoiceAnnotationPage = () => {
@@ -24,6 +26,9 @@ const InvoiceAnnotationPage = () => {
     const [modalAction, setModalAction] = useState(null); // 'query' or 'reject'
     const [extracting, setExtracting] = useState(false);
     const [extractedFields, setExtractedFields] = useState({}); // Progressive field updates
+    const [boundingBoxes, setBoundingBoxes] = useState({}); // Field bounding boxes
+    const [corrections, setCorrections] = useState([]); // Pending corrections to submit
+    const [showFieldManager, setShowFieldManager] = useState(false); // Field manager modal
     
     // Fetch invoice details
     const fetchInvoiceDetails = async () => {
@@ -47,6 +52,26 @@ const InvoiceAnnotationPage = () => {
             setInvoice(data.invoice);
             setParties(data.parties || []);
             setLineItems(data.lineItems || []);
+            
+            // Parse extracted_data to populate bounding boxes
+            if (data.invoice?.extracted_data?.final_fields) {
+                const { final_fields } = data.invoice.extracted_data;
+                const bboxes = {};
+                
+                // Extract bboxes from final_fields
+                Object.entries(final_fields).forEach(([fieldPath, fieldData]) => {
+                    if (fieldData.bbox) {
+                        bboxes[fieldPath] = {
+                            ...fieldData.bbox,
+                            source: fieldData.source || 'ml_extraction',
+                            confidence: fieldData.confidence || 0
+                        };
+                    }
+                });
+                
+                setBoundingBoxes(bboxes);
+                console.log(`[Loaded Bboxes] ${Object.keys(bboxes).length} bounding boxes from extracted_data`);
+            }
             
         } catch (err) {
             console.error('Error fetching invoice:', err);
@@ -101,19 +126,12 @@ const InvoiceAnnotationPage = () => {
     // Handle field acceptance
     const handleAcceptField = async (fieldPath, value) => {
         try {
-            await fetch(`/api/invoices/${id}/correct`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    fieldPath,
-                    originalValue: value,
-                    correctedValue: value,
-                    mlConfidence: invoice?.extraction_confidence || 0
-                })
-            });
+            await correctionsApi.acceptFieldValue(
+                id, 
+                fieldPath, 
+                value, 
+                invoice?.extraction_confidence || 0
+            );
             
             // Refresh data
             fetchInvoiceDetails();
@@ -122,15 +140,70 @@ const InvoiceAnnotationPage = () => {
         }
     };
     
+    // Handle bounding box update (drag/resize)
+    const handleBoundingBoxUpdate = async (fieldPath, bbox) => {
+        try {
+            // Update local state immediately for smooth UX
+            setBoundingBoxes(prev => ({
+                ...prev,
+                [fieldPath]: {
+                    ...bbox,
+                    source: 'user_adjusted'
+                }
+            }));
+            
+            // Add to corrections queue
+            setCorrections(prev => [
+                ...prev.filter(c => c.field_path !== fieldPath),
+                {
+                    field_path: fieldPath,
+                    corrected_bbox: bbox,
+                    correction_type: 'bounding_box',
+                    comment: 'User adjusted bounding box'
+                }
+            ]);
+            
+            // Debounce the API call (wait for user to finish adjusting)
+            // For now, submit immediately
+            await correctionsApi.submitBboxCorrection(
+                id,
+                fieldPath,
+                bbox,
+                'User adjusted bounding box for better extraction'
+            );
+            
+        } catch (err) {
+            console.error('Error updating bounding box:', err);
+        }
+    };
+    
+    // Handle field correction (manual edit)
+    const handleFieldCorrection = async (fieldPath, originalValue, correctedValue, mlConfidence) => {
+        try {
+            await correctionsApi.submitFieldCorrection(id, {
+                fieldPath,
+                originalValue,
+                correctedValue,
+                correctionType: 'manual_edit',
+                mlConfidence
+            });
+            
+            // Refresh data
+            fetchInvoiceDetails();
+        } catch (err) {
+            console.error('Error submitting field correction:', err);
+        }
+    };
+    
     // Handle field query
-    const handleQueryField = (fieldPath, value) => {
+    const handleQueryField = async (fieldPath, value) => {
         setSelectedField({ fieldPath, value });
         setModalAction('query');
         setShowQueryModal(true);
     };
     
     // Handle field rejection
-    const handleRejectField = (fieldPath, value) => {
+    const handleRejectField = async (fieldPath, value) => {
         setSelectedField({ fieldPath, value });
         setModalAction('reject');
         setShowQueryModal(true);
@@ -139,7 +212,23 @@ const InvoiceAnnotationPage = () => {
     // Handle query/reject modal submit
     const handleModalSubmit = async (comment, recipientEmail) => {
         try {
-            // Update invoice status
+            if (modalAction === 'query') {
+                await correctionsApi.queryFieldValue(
+                    id,
+                    selectedField.fieldPath,
+                    selectedField.value,
+                    comment
+                );
+            } else if (modalAction === 'reject') {
+                await correctionsApi.rejectFieldValue(
+                    id,
+                    selectedField.fieldPath,
+                    selectedField.value,
+                    comment
+                );
+            }
+            
+            // Also update invoice status
             await fetch(`/api/invoices/${id}/status`, {
                 method: 'PUT',
                 headers: {
@@ -295,6 +384,13 @@ const InvoiceAnnotationPage = () => {
                 </div>
                 <div className={styles.headerRight}>
                     <button 
+                        onClick={() => setShowFieldManager(true)}
+                        className={styles.manageFieldsBtn}
+                        title="Manage customs fields (HS Code, Incoterms, Weights)"
+                    >
+                        📋 Manage Fields
+                    </button>
+                    <button 
                         onClick={handleExtract}
                         className={styles.extractBtn}
                         disabled={extracting || invoice?.extraction_status === 'processing'}
@@ -348,7 +444,14 @@ const InvoiceAnnotationPage = () => {
                         fileName={invoice.file_name}
                         fileType={invoice.file_type}
                         selectedField={selectedField}
-                    />
+                    >
+                        {/* Bounding Box Overlay */}
+                        <BoundingBoxOverlay
+                            boundingBoxes={boundingBoxes}
+                            selectedField={selectedField}
+                            onBoundingBoxUpdate={handleBoundingBoxUpdate}
+                        />
+                    </PDFViewer>
                 </div>
                 
                 {/* Right Panel - Fields */}
@@ -360,6 +463,7 @@ const InvoiceAnnotationPage = () => {
                         onAccept={handleAcceptField}
                         onQuery={handleQueryField}
                         onReject={handleRejectField}
+                        onCorrect={handleFieldCorrection}
                     />
                     
                     {/* Line Items Table */}
@@ -385,6 +489,82 @@ const InvoiceAnnotationPage = () => {
                         setSelectedField(null);
                     }}
                 />
+            )}
+            
+            {/* Field Manager Modal */}
+            {showFieldManager && (
+                <div className={styles.modalOverlay} onClick={() => setShowFieldManager(false)}>
+                    <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <h2>📋 Customs Field Manager</h2>
+                            <button onClick={() => setShowFieldManager(false)} className={styles.closeBtn}>
+                                ✕
+                            </button>
+                        </div>
+                        <div className={styles.modalBody}>
+                            <p className={styles.infoText}>
+                                Manage customs-specific fields with validation and bounding box adjustments.
+                            </p>
+                            
+                            <div className={styles.fieldManagerGrid}>
+                                {/* Required Fields */}
+                                <div className={styles.fieldCategory}>
+                                    <h3>Required Customs Fields</h3>
+                                    <div className={styles.fieldList}>
+                                        <div className={styles.fieldItem}>
+                                            <strong>HS Code</strong>
+                                            <span className={styles.fieldValue}>{invoice?.hs_code || 'Not extracted'}</span>
+                                            {boundingBoxes['hs_code'] && <span className={styles.hasBbox}>📍 Has bbox</span>}
+                                        </div>
+                                        <div className={styles.fieldItem}>
+                                            <strong>Currency</strong>
+                                            <span className={styles.fieldValue}>{invoice?.currency || 'Not extracted'}</span>
+                                            {boundingBoxes['currency'] && <span className={styles.hasBbox}>📍 Has bbox</span>}
+                                        </div>
+                                        <div className={styles.fieldItem}>
+                                            <strong>Item Description</strong>
+                                            <span className={styles.fieldValue}>{invoice?.item_description || 'Not extracted'}</span>
+                                            {boundingBoxes['item_description'] && <span className={styles.hasBbox}>📍 Has bbox</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Optional Fields */}
+                                <div className={styles.fieldCategory}>
+                                    <h3>Optional Customs Fields</h3>
+                                    <div className={styles.fieldList}>
+                                        <div className={styles.fieldItem}>
+                                            <strong>Incoterms</strong>
+                                            <span className={styles.fieldValue}>{invoice?.incoterms || 'Not extracted'}</span>
+                                            {boundingBoxes['incoterms'] && <span className={styles.hasBbox}>📍 Has bbox</span>}
+                                        </div>
+                                        <div className={styles.fieldItem}>
+                                            <strong>Net Weight</strong>
+                                            <span className={styles.fieldValue}>{invoice?.item_net_weight || 'Not extracted'}</span>
+                                            {boundingBoxes['item_net_weight'] && <span className={styles.hasBbox}>📍 Has bbox</span>}
+                                        </div>
+                                        <div className={styles.fieldItem}>
+                                            <strong>Gross Weight</strong>
+                                            <span className={styles.fieldValue}>{invoice?.item_gross_weight || 'Not extracted'}</span>
+                                            {boundingBoxes['item_gross_weight'] && <span className={styles.hasBbox}>📍 Has bbox</span>}
+                                        </div>
+                                        <div className={styles.fieldItem}>
+                                            <strong>Country of Origin</strong>
+                                            <span className={styles.fieldValue}>{invoice?.country_of_origin || 'Not extracted'}</span>
+                                            {boundingBoxes['country_of_origin'] && <span className={styles.hasBbox}>📍 Has bbox</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className={styles.fieldManagerFooter}>
+                                <p className={styles.helperText}>
+                                    💡 Click on fields in the right panel to edit values, or drag bounding boxes on the PDF to adjust positions.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

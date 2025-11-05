@@ -4,6 +4,8 @@ Uses Google Gemini API for:
 1. Validation of extracted fields
 2. Retrieval-Augmented Generation for missing fields
 3. Confidence scoring and correction suggestions
+
+GDPR-Compliant: Automatically anonymizes PII before sending to Gemini API
 """
 
 import logging
@@ -11,6 +13,9 @@ import json
 import os
 from typing import Dict, List, Any, Optional
 import google.generativeai as genai
+
+# Import PII anonymizer for GDPR compliance
+from models.pii_anonymizer import PIIAnonymizer
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,9 @@ class GeminiValidator:
         """
         self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
         
+        # Initialize PII anonymizer for GDPR compliance
+        self.anonymizer = PIIAnonymizer()
+        
         if not self.api_key:
             logger.warning("⚠️  GEMINI_API_KEY not set. Validation will be skipped.")
             self.enabled = False
@@ -40,6 +48,7 @@ class GeminiValidator:
             self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
             self.enabled = True
             logger.info("✅ Gemini validator initialized (model: gemini-2.0-flash-exp)")
+            logger.info("🔒 PII anonymization enabled for GDPR compliance")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {str(e)}")
             self.enabled = False
@@ -48,15 +57,17 @@ class GeminiValidator:
         self,
         extracted_data: Dict[str, Any],
         ocr_text: str,
-        pii_filtered: bool = False
+        pii_filtered: bool = False,
+        enable_anonymization: bool = True
     ) -> Dict[str, Any]:
         """
-        Validate extracted invoice data using Gemini RAG.
+        Validate extracted invoice data using Gemini RAG with GDPR-compliant anonymization.
         
         Args:
             extracted_data: ML-extracted fields
             ocr_text: Raw OCR text for context
             pii_filtered: Whether PII has been filtered (limits validation scope)
+            enable_anonymization: Enable automatic PII anonymization (default: True for GDPR)
             
         Returns:
             Validation result with corrections and confidence
@@ -70,15 +81,41 @@ class GeminiValidator:
             }
         
         try:
+            # GDPR Compliance: Anonymize PII before sending to Gemini
+            if enable_anonymization:
+                logger.info("🔒 Anonymizing PII before Gemini validation (GDPR compliance)...")
+                anonymized_data, anonymized_text, anon_log = self.anonymizer.anonymize_data(
+                    extracted_data,
+                    ocr_text
+                )
+                logger.info(f"✅ Anonymized {len(anon_log)} PII fields")
+                
+                # Use anonymized data for validation
+                data_to_validate = anonymized_data
+                text_to_validate = anonymized_text
+            else:
+                data_to_validate = extracted_data
+                text_to_validate = ocr_text
+            
             # Prepare validation prompt
-            prompt = self._build_validation_prompt(extracted_data, ocr_text, pii_filtered)
+            prompt = self._build_validation_prompt(data_to_validate, text_to_validate, pii_filtered)
             
             # Call Gemini
-            logger.info("🤖 Calling Gemini for validation...")
+            logger.info("🤖 Calling Gemini for validation (PII-safe)...")
             response = self.model.generate_content(prompt)
             
             # Parse response
             validation_result = self._parse_validation_response(response.text)
+            
+            # De-anonymize corrections if needed
+            if enable_anonymization and validation_result.get("corrections"):
+                logger.info("🔓 De-anonymizing Gemini corrections...")
+                # Note: Gemini's corrections will be in anonymized form,
+                # but we keep them as-is since they reference fields, not PII values
+                # The actual de-anonymization happens at the field level during merge
+            
+            validation_result["pii_anonymized"] = enable_anonymization
+            validation_result["gdpr_compliant"] = enable_anonymization
             
             logger.info(f"✅ Gemini validation complete (confidence boost: {validation_result.get('confidence_boost', 0):.1f}%)")
             

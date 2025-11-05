@@ -584,4 +584,248 @@ router.post('/:id/export', authenticate, requirePermission('invoice:export'), as
     }
 });
 
+// =====================================================
+// 8. SUBMIT USER CORRECTIONS (for self-learning)
+// =====================================================
+router.post('/:id/corrections', authenticate, requirePermission('invoice:update'), async (req, res) => {
+    const client = await db.getClient();
+    
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const { corrections } = req.body;
+        
+        if (!corrections || !Array.isArray(corrections) || corrections.length === 0) {
+            return res.status(400).json({ error: 'corrections array is required' });
+        }
+        
+        await client.query('BEGIN');
+        
+        // Verify invoice exists and user has access
+        const invoiceCheck = await client.query(
+            'SELECT id, organization_id, extracted_data FROM invoices WHERE id = $1',
+            [id]
+        );
+        
+        if (invoiceCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        
+        const invoice = invoiceCheck.rows[0];
+        let extractedData = invoice.extracted_data || {};
+        let correctionCount = 0;
+        
+        // Process each correction
+        for (const correction of corrections) {
+            const {
+                field_path,
+                original_value,
+                corrected_value,
+                correction_type,
+                ml_confidence,
+                comment,
+                corrected_bbox
+            } = correction;
+            
+            // Validate correction type
+            const validTypes = ['manual_edit', 'bounding_box', 'field_accept', 'field_query', 'field_reject'];
+            if (!validTypes.includes(correction_type)) {
+                continue; // Skip invalid correction types
+            }
+            
+            // Insert correction record
+            await client.query(
+                `INSERT INTO invoice_corrections (
+                    invoice_id, user_id, field_path, original_value, corrected_value,
+                    ml_confidence, correction_type, comment, used_for_training
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)`,
+                [
+                    id,
+                    userId,
+                    field_path,
+                    original_value,
+                    corrected_value,
+                    ml_confidence || null,
+                    correction_type,
+                    comment || null
+                ]
+            );
+            
+            // Update extracted_data with correction
+            if (correction_type === 'manual_edit' || correction_type === 'field_accept') {
+                // Parse field_path (e.g., "buyer.name" or "line_items[0].hs_code")
+                const pathParts = field_path.split('.');
+                let current = extractedData;
+                
+                // Handle array notation like line_items[0]
+                for (let i = 0; i < pathParts.length - 1; i++) {
+                    const part = pathParts[i];
+                    const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
+                    
+                    if (arrayMatch) {
+                        const [, arrayName, index] = arrayMatch;
+                        if (!current[arrayName]) current[arrayName] = [];
+                        if (!current[arrayName][index]) current[arrayName][index] = {};
+                        current = current[arrayName][index];
+                    } else {
+                        if (!current[part]) current[part] = {};
+                        current = current[part];
+                    }
+                }
+                
+                // Set the final value
+                const finalKey = pathParts[pathParts.length - 1];
+                current[finalKey] = corrected_value;
+            }
+            
+            // Update bounding box if provided
+            if (correction_type === 'bounding_box' && corrected_bbox) {
+                // Store bbox in extracted_data metadata
+                if (!extractedData._metadata) extractedData._metadata = {};
+                if (!extractedData._metadata.user_bboxes) extractedData._metadata.user_bboxes = {};
+                
+                extractedData._metadata.user_bboxes[field_path] = {
+                    ...corrected_bbox,
+                    source: 'user_adjusted',
+                    updated_at: new Date().toISOString(),
+                    updated_by: userId
+                };
+            }
+            
+            correctionCount++;
+        }
+        
+        // Update extracted_data in database
+        await client.query(
+            `UPDATE invoices 
+             SET extracted_data = $1, 
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [JSON.stringify(extractedData), id]
+        );
+        
+        // Log correction action
+        await client.query(
+            `INSERT INTO invoice_audit_log (
+                invoice_id, user_id, action, comment, ip_address, user_agent
+            ) VALUES ($1, $2, 'corrections_submitted', $3, $4, $5)`,
+            [
+                id,
+                userId,
+                `User submitted ${correctionCount} correction(s)`,
+                req.ip,
+                req.headers['user-agent']
+            ]
+        );
+        
+        await client.query('COMMIT');
+        
+        res.json({
+            success: true,
+            message: `${correctionCount} correction(s) saved successfully`,
+            correctionCount,
+            invoiceId: id,
+            canBeUsedForTraining: true
+        });
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Submit corrections error:', error);
+        res.status(500).json({
+            error: 'Failed to save corrections',
+            details: error.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// =====================================================
+// 9. GET CORRECTIONS FOR SELF-LEARNING
+// =====================================================
+router.get('/corrections/training-data', authenticate, requirePermission('admin:manage'), async (req, res) => {
+    try {
+        const { limit = 100, offset = 0, unused_only = true } = req.query;
+        
+        const result = await db.query(
+            `SELECT 
+                c.id,
+                c.invoice_id,
+                c.field_path,
+                c.original_value,
+                c.corrected_value,
+                c.ml_confidence,
+                c.correction_type,
+                c.created_at,
+                i.file_path,
+                i.extracted_data
+            FROM invoice_corrections c
+            JOIN invoices i ON c.invoice_id = i.id
+            WHERE ($1 = false OR c.used_for_training = false)
+                AND c.correction_type IN ('manual_edit', 'bounding_box', 'field_accept')
+            ORDER BY c.created_at DESC
+            LIMIT $2 OFFSET $3`,
+            [unused_only !== 'false', parseInt(limit), parseInt(offset)]
+        );
+        
+        res.json({
+            success: true,
+            corrections: result.rows,
+            count: result.rows.length,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
+        
+    } catch (error) {
+        console.error('Get training data error:', error);
+        res.status(500).json({
+            error: 'Failed to retrieve training data',
+            details: error.message
+        });
+    }
+});
+
+// =====================================================
+// 10. MARK CORRECTIONS AS USED FOR TRAINING
+// =====================================================
+router.post('/corrections/mark-trained', authenticate, requirePermission('admin:manage'), async (req, res) => {
+    const client = await db.getClient();
+    
+    try {
+        const { correction_ids } = req.body;
+        
+        if (!correction_ids || !Array.isArray(correction_ids)) {
+            return res.status(400).json({ error: 'correction_ids array is required' });
+        }
+        
+        await client.query('BEGIN');
+        
+        const result = await client.query(
+            `UPDATE invoice_corrections 
+             SET used_for_training = true 
+             WHERE id = ANY($1::uuid[])
+             RETURNING id`,
+            [correction_ids]
+        );
+        
+        await client.query('COMMIT');
+        
+        res.json({
+            success: true,
+            message: `${result.rows.length} correction(s) marked as used for training`,
+            markedCount: result.rows.length
+        });
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Mark trained error:', error);
+        res.status(500).json({
+            error: 'Failed to mark corrections as trained',
+            details: error.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
 module.exports = router;

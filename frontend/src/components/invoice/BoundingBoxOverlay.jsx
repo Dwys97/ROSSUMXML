@@ -17,28 +17,54 @@ const BoundingBoxOverlay = ({
     const [dragging, setDragging] = useState(null);
     const [resizing, setResizing] = useState(null);
     const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const overlayRef = React.useRef(null);
+    
+    // Measure the actual container dimensions
+    useEffect(() => {
+        const updateDimensions = () => {
+            if (overlayRef.current && overlayRef.current.parentElement) {
+                const parent = overlayRef.current.parentElement;
+                setDimensions({
+                    width: parent.clientWidth,
+                    height: parent.clientHeight
+                });
+            }
+        };
+        
+        updateDimensions();
+        window.addEventListener('resize', updateDimensions);
+        
+        return () => {
+            window.removeEventListener('resize', updateDimensions);
+        };
+    }, []);
+    
+    // Use measured dimensions if containerWidth/Height not provided
+    const actualWidth = containerWidth || dimensions.width;
+    const actualHeight = containerHeight || dimensions.height;
     
     // Convert normalized bounding box (0-1000) to actual pixel coordinates
     const denormalizeBBox = (bbox) => {
-        if (!bbox || !containerWidth || !containerHeight) return null;
+        if (!bbox || !actualWidth || !actualHeight) return null;
         
         return {
-            x: (bbox.x / 1000) * containerWidth,
-            y: (bbox.y / 1000) * containerHeight,
-            width: (bbox.width / 1000) * containerWidth,
-            height: (bbox.height / 1000) * containerHeight
+            x: (bbox.x / 1000) * actualWidth,
+            y: (bbox.y / 1000) * actualHeight,
+            width: (bbox.width / 1000) * actualWidth,
+            height: (bbox.height / 1000) * actualHeight
         };
     };
     
     // Convert pixel coordinates to normalized (0-1000)
     const normalizeBBox = (bbox) => {
-        if (!bbox || !containerWidth || !containerHeight) return null;
+        if (!bbox || !actualWidth || !actualHeight) return null;
         
         return {
-            x: Math.round((bbox.x / containerWidth) * 1000),
-            y: Math.round((bbox.y / containerHeight) * 1000),
-            width: Math.round((bbox.width / containerWidth) * 1000),
-            height: Math.round((bbox.height / containerHeight) * 1000)
+            x: Math.round((bbox.x / actualWidth) * 1000),
+            y: Math.round((bbox.y / actualHeight) * 1000),
+            width: Math.round((bbox.width / actualWidth) * 1000),
+            height: Math.round((bbox.height / actualHeight) * 1000)
         };
     };
     
@@ -78,8 +104,8 @@ const BoundingBoxOverlay = ({
             const newY = e.clientY - containerRect.top - startPos.y;
             
             // Constrain to container bounds
-            const constrainedX = Math.max(0, Math.min(newX, containerWidth - denormalized.width));
-            const constrainedY = Math.max(0, Math.min(newY, containerHeight - denormalized.height));
+            const constrainedX = Math.max(0, Math.min(newX, actualWidth - denormalized.width));
+            const constrainedY = Math.max(0, Math.min(newY, actualHeight - denormalized.height));
             
             const newBBox = {
                 ...denormalized,
@@ -127,8 +153,8 @@ const BoundingBoxOverlay = ({
             }
             
             // Constrain to container bounds
-            newBBox.x = Math.max(0, Math.min(newBBox.x, containerWidth - newBBox.width));
-            newBBox.y = Math.max(0, Math.min(newBBox.y, containerHeight - newBBox.height));
+            newBBox.x = Math.max(0, Math.min(newBBox.x, actualWidth - newBBox.width));
+            newBBox.y = Math.max(0, Math.min(newBBox.y, actualHeight - newBBox.height));
             
             const normalized = normalizeBBox(newBBox);
             if (normalized && onBoundingBoxUpdate) {
@@ -157,10 +183,11 @@ const BoundingBoxOverlay = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dragging, resizing]);
     
-    if (!containerWidth || !containerHeight) return null;
+    if (!actualWidth || !actualHeight) return null;
     
     return (
         <div 
+            ref={overlayRef}
             className={styles.overlay}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}

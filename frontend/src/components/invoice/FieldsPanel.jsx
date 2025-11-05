@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ConfidenceIndicator from './ConfidenceIndicator';
 import styles from './FieldsPanel.module.css';
 
-const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject }) => {
+const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject, onCorrect }) => {
+    const [editingField, setEditingField] = useState(null);
+    const [editValue, setEditValue] = useState('');
     
     // Helper to get confidence score
     const getConfidence = (scores, field) => {
@@ -15,41 +17,118 @@ const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject }) =>
         }
     };
     
+    // Start editing a field
+    const handleStartEdit = (fieldPath, currentValue, confidence) => {
+        setEditingField({ fieldPath, originalValue: currentValue, confidence });
+        setEditValue(currentValue || '');
+    };
+    
+    // Save correction
+    const handleSaveEdit = () => {
+        if (editingField && onCorrect) {
+            onCorrect(
+                editingField.fieldPath,
+                editingField.originalValue,
+                editValue,
+                editingField.confidence
+            );
+        }
+        setEditingField(null);
+        setEditValue('');
+    };
+    
+    // Cancel editing
+    const handleCancelEdit = () => {
+        setEditingField(null);
+        setEditValue('');
+    };
+    
     // Render field with actions
-    const FieldRow = ({ label, value, confidence, fieldPath }) => (
-        <div className={styles.fieldRow}>
-            <div className={styles.fieldHeader}>
-                <span className={styles.fieldLabel}>{label}</span>
-                <ConfidenceIndicator confidence={confidence} />
+    const FieldRow = ({ label, value, confidence, fieldPath }) => {
+        const isEditing = editingField?.fieldPath === fieldPath;
+        
+        return (
+            <div className={styles.fieldRow}>
+                <div className={styles.fieldHeader}>
+                    <span className={styles.fieldLabel}>{label}</span>
+                    <ConfidenceIndicator confidence={confidence} />
+                </div>
+                <div className={styles.fieldValue}>
+                    {isEditing ? (
+                        <div className={styles.editMode}>
+                            <input
+                                type="text"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className={styles.editInput}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveEdit();
+                                    if (e.key === 'Escape') handleCancelEdit();
+                                }}
+                            />
+                            <div className={styles.editActions}>
+                                <button
+                                    onClick={handleSaveEdit}
+                                    className={`${styles.editBtn} ${styles.saveBtn}`}
+                                    title="Save correction"
+                                >
+                                    ✓ Save
+                                </button>
+                                <button
+                                    onClick={handleCancelEdit}
+                                    className={`${styles.editBtn} ${styles.cancelBtn}`}
+                                    title="Cancel"
+                                >
+                                    ✗ Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div 
+                            className={styles.valueDisplay}
+                            onDoubleClick={() => handleStartEdit(fieldPath, value, confidence)}
+                            title="Double-click to edit"
+                        >
+                            {value || <span className={styles.emptyValue}>Not extracted</span>}
+                        </div>
+                    )}
+                </div>
+                {!isEditing && (
+                    <div className={styles.fieldActions}>
+                        <button
+                            onClick={() => handleStartEdit(fieldPath, value, confidence)}
+                            className={`${styles.actionBtn} ${styles.editIconBtn}`}
+                            title="Edit"
+                        >
+                            ✎
+                        </button>
+                        <button
+                            onClick={() => onAccept(fieldPath, value)}
+                            className={`${styles.actionBtn} ${styles.acceptBtn}`}
+                            title="Accept"
+                        >
+                            ✓
+                        </button>
+                        <button
+                            onClick={() => onQuery(fieldPath, value)}
+                            className={`${styles.actionBtn} ${styles.queryBtn}`}
+                            title="Query"
+                        >
+                            ⚠
+                        </button>
+                        <button
+                            onClick={() => onReject(fieldPath, value)}
+                            className={`${styles.actionBtn} ${styles.rejectBtn}`}
+                            title="Reject"
+                        >
+                            ✗
+                        </button>
+                    </div>
+                )}
             </div>
-            <div className={styles.fieldValue}>
-                {value || <span className={styles.emptyValue}>Not extracted</span>}
-            </div>
-            <div className={styles.fieldActions}>
-                <button
-                    onClick={() => onAccept(fieldPath, value)}
-                    className={`${styles.actionBtn} ${styles.acceptBtn}`}
-                    title="Accept"
-                >
-                    ✓
-                </button>
-                <button
-                    onClick={() => onQuery(fieldPath, value)}
-                    className={`${styles.actionBtn} ${styles.queryBtn}`}
-                    title="Query"
-                >
-                    ⚠
-                </button>
-                <button
-                    onClick={() => onReject(fieldPath, value)}
-                    className={`${styles.actionBtn} ${styles.rejectBtn}`}
-                    title="Reject"
-                >
-                    ✗
-                </button>
-            </div>
-        </div>
-    );
+        );
+    };
     
     return (
         <div className={styles.container}>

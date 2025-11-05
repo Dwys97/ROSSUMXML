@@ -62,24 +62,26 @@ class LayoutLMv3Extractor:
         38: "I-GROSS_WEIGHT",
     }
     
-    def __init__(self, model_name: str = "rubentito/layoutlmv3-base-mpdocvqa", device: str = "cpu"):
+    def __init__(self, model_name: str = "impira/layoutlm-invoices", device: str = "cpu"):
         """
         Initialize LayoutLMv3 model.
         
         Args:
-            model_name: HuggingFace model identifier (default: rubentito/layoutlmv3-base-mpdocvqa for better accuracy)
+            model_name: HuggingFace model identifier (default: impira/layoutlm-invoices - pre-trained on invoices)
             device: 'cpu' or 'cuda'
         """
         self.device = device
         self.model_name = model_name
         
         logger.info(f"Loading LayoutLMv3 model: {model_name} on {device}")
+        logger.info("Using impira/layoutlm-invoices - pre-trained specifically for invoice extraction")
         
         # Load processor and model
-        # rubentito/layoutlmv3-base-mpdocvqa has good performance on document VQA
+        # impira/layoutlm-invoices is pre-trained on invoice documents
+        # Uses LayoutLMv2 architecture optimized for invoice field extraction
         self.processor = LayoutLMv3Processor.from_pretrained(
             model_name,
-            apply_ocr=False  # We use PaddleOCR for better accuracy
+            apply_ocr=False  # We use PaddleOCR/Tesseract for better accuracy
         )
         
         # Calculate number of labels from FIELD_LABELS
@@ -99,8 +101,9 @@ class LayoutLMv3Extractor:
         self.model.to(self.device)
         self.model.eval()
         
-        logger.info(f"LayoutLMv3 model loaded successfully ({model_name})")
-        logger.info(f"Model configured with {num_labels} custom labels for invoice extraction")
+        logger.info(f"✅ LayoutLMv3 model loaded successfully ({model_name})")
+        logger.info(f"✅ Model configured with {num_labels} custom labels for invoice extraction")
+        logger.info(f"✅ Supports customs fields: HS Code, Description, Incoterms, Net/Gross Weight")
     
     def extract_fields(
         self,

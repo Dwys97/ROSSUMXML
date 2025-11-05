@@ -24,8 +24,14 @@ export const SocketProvider = ({ children }) => {
             return;
         }
 
+        // Use current origin (works in both localhost and Codespaces)
+        // Vite will proxy /socket.io to localhost:3001
+        const socketUrl = window.location.origin; // e.g., https://...app.github.dev or http://localhost:5173
+        console.log('[Socket.IO] Connecting to:', socketUrl);
+
         // Initialize socket connection. Prefer polling first in dev to avoid websocket transport issues.
-        const socketInstance = io('http://localhost:3001', {
+        const socketInstance = io(socketUrl, {
+            path: '/socket.io',
             transports: ['polling', 'websocket'],
             reconnection: true,
             // keep retrying during development

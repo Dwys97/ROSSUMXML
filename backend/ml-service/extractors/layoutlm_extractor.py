@@ -260,6 +260,7 @@ class LayoutLMExtractor:
         """
         Extract fields using LayoutLMv3
         Uses document-aware understanding for better accuracy
+        Includes intelligent line item extraction
         """
         try:
             # Lazy load LayoutLMv3 WITHOUT quantization (CPU doesn't support 4-bit properly)
@@ -313,6 +314,12 @@ class LayoutLMExtractor:
                 'currency': self._extract_field(full_text, ['eur', 'usd', 'gbp', '$', '€', '£']),
             }
             
+            # Extract line items if this is a commercial invoice
+            line_items = self._extract_line_items(image, ocr_result)
+            if line_items:
+                extracted['line_items'] = line_items
+                logger.info(f"✅ Extracted {len(line_items)} line items")
+            
             logger.info(f"✅ LayoutLMv3: Extracted {len([v for v in extracted.values() if v])} fields")
             self._free_memory("LayoutLMv3")
             
@@ -335,6 +342,128 @@ class LayoutLMExtractor:
                 if len(words) > 1:
                     return ' '.join(words[1:3])
         return ""
+    
+    def _extract_line_items(self, image: Image.Image, ocr_result: Dict) -> List[Dict]:
+        """
+        Extract line items from invoice table using intelligent table detection.
+        
+        Returns:
+            List of line item dicts with fields like hs_code, description, quantity, etc.
+        """
+        try:
+            # Import table extractor
+            from models.table_extractor import extract_table_rows_intelligent, perform_ocr_get_words
+            
+            # Define line item fields to extract (customs-relevant)
+            line_item_fields = [
+                {
+                    'key': 'item_hs_code',
+                    'question': 'What is the product code?',
+                    'category': 'line_items'
+                },
+                {
+                    'key': 'item_description',
+                    'question': 'What is the product description?',
+                    'category': 'line_items'
+                },
+                {
+                    'key': 'item_country_of_origin',
+                    'question': 'What is the country of origin?',
+                    'category': 'line_items'
+                },
+                {
+                    'key': 'item_quantity',
+                    'question': 'What is the quantity?',
+                    'category': 'line_items'
+                },
+                {
+                    'key': 'item_unit_price',
+                    'question': 'What is the unit price?',
+                    'category': 'line_items'
+                },
+                {
+                    'key': 'item_net_weight',
+                    'question': 'What is the net weight?',
+                    'category': 'line_items'
+                },
+                {
+                    'key': 'item_gross_weight',
+                    'question': 'What is the gross weight?',
+                    'category': 'line_items'
+                }
+            ]
+            
+            # Get image dimensions
+            img_width, img_height = image.size
+            
+            # Get OCR words with bboxes for table detection
+            # Reuse existing OCR data
+            ocr_words = []
+            words = ocr_result.get('words', [])
+            boxes = ocr_result.get('boxes', [])
+            
+            for i, (word, box) in enumerate(zip(words, boxes)):
+                # Denormalize box from 0-1000 to pixels
+                denorm_box = [
+                    int(box[0] * img_width / 1000),
+                    int(box[1] * img_height / 1000),
+                    int(box[2] * img_width / 1000),
+                    int(box[3] * img_height / 1000)
+                ]
+                
+                ocr_words.append({
+                    'text': word,
+                    'bbox': denorm_box,
+                    'confidence': 0.9  # Assume good confidence from Tesseract
+                })
+            
+            # Save image temporarily for table extraction
+            import tempfile
+            import os
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                image.save(tmp_file.name, 'PNG')
+                temp_image_path = tmp_file.name
+            
+            try:
+                # Extract table rows
+                table_rows = extract_table_rows_intelligent(
+                    image_path=temp_image_path,
+                    line_item_fields=line_item_fields,
+                    ocr_words=ocr_words,
+                    img_width=img_width,
+                    img_height=img_height,
+                    max_rows=50
+                )
+                
+                # Convert to line item format
+                line_items = []
+                for row_data in table_rows:
+                    item = {
+                        'row': row_data['row'],
+                        'fields': {}
+                    }
+                    
+                    for field_key, field_data in row_data['fields'].items():
+                        item['fields'][field_key] = {
+                            'value': field_data['value'],
+                            'bbox': field_data['bbox'],
+                            'confidence': field_data['confidence']
+                        }
+                    
+                    line_items.append(item)
+                
+                logger.info(f"Extracted {len(line_items)} line items from table")
+                return line_items
+                
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_image_path):
+                    os.unlink(temp_image_path)
+        
+        except Exception as e:
+            logger.warning(f"Line item extraction failed (non-critical): {e}")
+            return []
     
     def _anonymize_for_gemini(self, layoutlm_result: Dict) -> Dict:
         """Anonymize PII before Gemini (GDPR compliance)"""

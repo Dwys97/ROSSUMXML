@@ -5,7 +5,7 @@ import styles from './PDFViewer.module.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-const PDFViewer = ({ invoiceId, fileName, fileType, selectedField }) => {
+const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) => {
     const { getToken } = useAuth();
     const [pdfDoc, setPdfDoc] = useState(null);
     const [pageNum, setPageNum] = useState(1);
@@ -232,6 +232,7 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField }) => {
                             <span className={styles.boundingBoxLabel}>{selectedField.fieldPath}</span>
                         </div>
                     )}
+                    {children}
                 </div>
             </div>
         </div>

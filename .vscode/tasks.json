@@ -63,32 +63,20 @@
         {
             "label": "Start ML Service (LayoutLMv3)",
             "type": "shell",
-            "command": "bash start-ml-service.sh",
+            "command": "source /opt/conda/etc/profile.d/conda.sh && conda activate base && cd backend/ml-service && python app-advanced.py",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
                 "group": "dev"
-            }
-        },
-        {
-            "label": "Start ML Advanced (Tesseract + LayoutLMv3 + Gemini)",
-            "type": "shell",
-            "command": "bash start-ml-layoutlm-gemini.sh && tail -f /tmp/ml-layoutlm.log",
-            "problemMatcher": [],
-            "isBackground": false,
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "group": "dev",
-                "focus": true
             },
             "options": {
                 "env": {
                     "ML_LAYOUTLM_ENABLED": "true",
                     "ML_LAYOUTLM_LAZY": "true",
-                    "PORT": "5001"
+                    "PORT": "5001",
+                    "FLASK_ENV": "development"
                 }
             }
         },
