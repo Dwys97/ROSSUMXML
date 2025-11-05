@@ -163,6 +163,40 @@ def extract_advanced():
         
         # Transform flat fields to nested structure expected by worker
         final_fields = results.get('final_fields', {})
+        layoutlm_extraction = results.get('layoutlm_extraction', {})
+        
+        # Extract line items if present - PRESERVE NESTED FORMAT with bboxes
+        # Frontend handles both flat and nested formats, but only nested has bboxes
+        line_items_raw = layoutlm_extraction.get('line_items', []) or final_fields.get('line_items', [])
+        
+        logger.info(f"📊 Line items raw count: {len(line_items_raw)}")
+        logger.info(f"📊 Layout LM extraction keys: {list(layoutlm_extraction.keys())}")
+        logger.info(f"📊 Line items sample: {line_items_raw[:1] if line_items_raw else 'None'}")
+        
+        # Keep line items in original nested format to preserve bboxes
+        # Filter out invalid rows (header text, empty rows)
+        line_items_filtered = []
+        if line_items_raw:
+            for idx, item in enumerate(line_items_raw):
+                fields = item.get('fields', {})
+                
+                # Check if quantity field exists and has valid numeric value
+                quantity_field = fields.get('item_quantity', {})
+                quantity_val = quantity_field.get('value', '') if isinstance(quantity_field, dict) else str(quantity_field)
+                
+                # Skip rows with invalid numeric data (e.g., header text like "Despatch")
+                if quantity_val:
+                    try:
+                        if not quantity_val.replace('.', '').replace(',', '').isdigit():
+                            logger.warning(f"Skipping line item {idx} - invalid quantity: {quantity_val}")
+                            continue
+                    except:
+                        pass
+                
+                # Keep valid row with full nested structure (including bboxes)
+                line_items_filtered.append(item)
+        
+        logger.info(f"✅ Kept {len(line_items_filtered)} valid line items (nested format with bboxes)")
         
         # Convert to worker-expected format
         transformed_data = {
@@ -182,6 +216,7 @@ def extract_advanced():
             'buyer': {
                 'name': final_fields.get('buyer_name', final_fields.get('customer_name', ''))
             },
+            'lineItems': line_items_filtered,  # Nested format with bboxes preserved
             'confidence': 0.85,  # Default confidence
             'raw_fields': final_fields  # Keep original for debugging
         }
@@ -193,7 +228,8 @@ def extract_advanced():
                 'tesseract_word_count': results.get('tesseract_ocr', {}).get('word_count', 0),
                 'layoutlm_fields_extracted': len([v for v in results.get('layoutlm_extraction', {}).values() if v]),
                 'gemini_corrections': final_fields.get('_gemini_corrections', 0),
-                'extraction_method': final_fields.get('_extraction_method', 'layoutlmv3_gemini')
+                'extraction_method': final_fields.get('_extraction_method', 'layoutlmv3_gemini'),
+                'image_dimensions': results.get('image_dimensions', {})  # Add extraction image dimensions
             },
             'debug': {
                 'tesseract_ocr': results.get('tesseract_ocr', {}),

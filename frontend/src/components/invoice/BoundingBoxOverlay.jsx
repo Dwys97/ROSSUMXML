@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './BoundingBoxOverlay.module.css';
 
 /**
@@ -9,42 +9,76 @@ import styles from './BoundingBoxOverlay.module.css';
  */
 const BoundingBoxOverlay = ({ 
     boundingBoxes = {}, 
-    selectedField, 
-    containerWidth, 
-    containerHeight,
-    onBoundingBoxUpdate 
+    selectedField = null, 
+    onBoundingBoxUpdate = null,
+    containerWidth = null,  // Passed from PDFViewer
+    containerHeight = null  // Passed from PDFViewer
 }) => {
+    const overlayRef = useRef(null);
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [drawStart, setDrawStart] = useState(null);
+    const [currentBox, setCurrentBox] = useState(null);
     const [dragging, setDragging] = useState(null);
     const [resizing, setResizing] = useState(null);
-    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-    const overlayRef = React.useRef(null);
-    
-    // Measure the actual container dimensions
+    const [startPos, setStartPos] = useState(null);
+
+    // Use props dimensions if available, otherwise use measured dimensions
+    const actualWidth = containerWidth || dimensions.width;
+    const actualHeight = containerHeight || dimensions.height;
+
     useEffect(() => {
+        console.log('[BoundingBoxOverlay] Dimensions update:', {
+            propsWidth: containerWidth,
+            propsHeight: containerHeight,
+            measuredWidth: dimensions.width,
+            measuredHeight: dimensions.height,
+            actualWidth,
+            actualHeight,
+            bboxCount: Object.keys(boundingBoxes).length
+        });
+    }, [containerWidth, containerHeight, dimensions, actualWidth, actualHeight, boundingBoxes]);
+
+    // Fallback: Measure parent if props dimensions not provided
+    useEffect(() => {
+        if (containerWidth && containerHeight) {
+            // Using props dimensions, no need to measure
+            return;
+        }
+
         const updateDimensions = () => {
             if (overlayRef.current && overlayRef.current.parentElement) {
                 const parent = overlayRef.current.parentElement;
-                setDimensions({
-                    width: parent.clientWidth,
-                    height: parent.clientHeight
+                const newWidth = parent.clientWidth;
+                const newHeight = parent.clientHeight;
+                
+                console.log('[BoundingBoxOverlay] Measuring parent container:', {
+                    parent: parent.className,
+                    width: newWidth,
+                    height: newHeight,
+                    scrollWidth: parent.scrollWidth,
+                    scrollHeight: parent.scrollHeight
                 });
+                
+                setDimensions({
+                    width: newWidth,
+                    height: newHeight
+                });
+            } else {
+                console.warn('[BoundingBoxOverlay] No parent element found for overlay');
             }
         };
         
+        // Initial measurement with a small delay to ensure DOM is ready
+        setTimeout(updateDimensions, 100);
         updateDimensions();
+        
         window.addEventListener('resize', updateDimensions);
         
         return () => {
             window.removeEventListener('resize', updateDimensions);
         };
-    }, []);
-    
-    // Use measured dimensions if containerWidth/Height not provided
-    const actualWidth = containerWidth || dimensions.width;
-    const actualHeight = containerHeight || dimensions.height;
-    
-    // Convert normalized bounding box (0-1000) to actual pixel coordinates
+    }, [containerWidth, containerHeight]);    // Convert normalized bounding box (0-1000) to actual pixel coordinates
     const denormalizeBBox = (bbox) => {
         if (!bbox || !actualWidth || !actualHeight) return null;
         
@@ -196,7 +230,19 @@ const BoundingBoxOverlay = ({
                 if (!bbox) return null;
                 
                 const denormalized = denormalizeBBox(bbox);
-                if (!denormalized) return null;
+                if (!denormalized) {
+                    console.warn(`[BoundingBoxOverlay] Failed to denormalize bbox for ${fieldPath}:`, bbox, 'Container:', actualWidth, 'x', actualHeight);
+                    return null;
+                }
+                
+                // Log first 3 bboxes for debugging
+                if (Object.keys(boundingBoxes).indexOf(fieldPath) < 3) {
+                    console.log(`[BoundingBoxOverlay] ${fieldPath}:`, {
+                        normalized: bbox,
+                        denormalized,
+                        containerSize: `${actualWidth}x${actualHeight}`
+                    });
+                }
                 
                 const isSelected = selectedField === fieldPath;
                 

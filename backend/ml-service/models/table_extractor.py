@@ -190,36 +190,94 @@ def extract_table_rows_intelligent(
             
             column_variants[field_key] = [v.lower() for v in variants]
         
-        # Find column headers in OCR words (typically in top 20% of document)
-        header_y_threshold = img_height * 0.3
+        logger.info(f"Looking for column headers with variants: {column_variants}")
+        
+        # Find column headers in OCR words (typically in top 50% of document for invoices with tables)
+        # Increased from 0.3 to 0.5 because invoice metadata (company name, etc.) occupies top 20-30%
+        header_y_threshold = img_height * 0.5
         column_headers = {}
+        potential_matches = defaultdict(list)  # Track all potential matches per field
+        
+        # First, log all words in the header area for debugging
+        header_words = [w for w in ocr_words if w['bbox'][1] <= header_y_threshold]
+        logger.info(f"Found {len(header_words)} words in header area (Y <= {header_y_threshold})")
+        logger.info(f"Header words sample: {[w['text'] for w in header_words[:20]]}")
         
         for word in ocr_words:
             if word['bbox'][1] > header_y_threshold:
                 continue  # Skip words below header area
             
-            word_text = word['text'].lower()
+            word_text = word['text'].lower().strip()
+            
+            # Skip very short words to avoid false matches
+            if len(word_text) < 2:
+                continue
             
             for field_key, variants in column_variants.items():
                 for variant in variants:
-                    if variant in word_text or word_text in variant:
-                        if field_key not in column_headers:
-                            column_headers[field_key] = word['bbox']
-                            logger.info(f"Found column header for {field_key}: '{word['text']}' at x={word['bbox'][0]}")
+                    # More lenient matching - check if variant words appear in the text
+                    # Split both into words and check for overlap
+                    variant_words = variant.split()
+                    word_words = word_text.split()
+                    
+                    # Match if:
+                    # 1. Exact match
+                    # 2. Variant is a single word and appears in word_text
+                    # 3. Any variant word matches any word in word_text
+                    match = False
+                    if word_text == variant:
+                        match = True
+                    elif len(variant_words) == 1 and variant in word_text:
+                        match = True
+                    elif any(vw in word_words for vw in variant_words if len(vw) >= 3):
+                        match = True
+                    
+                    if match:
+                        potential_matches[field_key].append({
+                            'word': word['text'],
+                            'bbox': word['bbox'],
+                            'variant': variant
+                        })
+                        logger.info(f"Potential match for {field_key}: '{word['text']}' (variant: '{variant}') at x={word['bbox'][0]}")
                         break
+        
+        # For each field, pick the best match (prefer exact matches, then by X position)
+        for field_key, matches in potential_matches.items():
+            if matches:
+                # Prefer exact or longer matches
+                best_match = max(matches, key=lambda m: len(m['variant']))
+                column_headers[field_key] = best_match['bbox']
+                logger.info(f"✓ Selected column header for {field_key}: '{best_match['word']}' at x={best_match['bbox'][0]}")
         
         if not column_headers:
             logger.warning("No column headers found, falling back to position-based extraction")
             return []
+        
+        logger.info(f"Final column headers detected: {list(column_headers.keys())}")
+        
+        # Find the lowest Y position of all column headers
+        # Data rows should be BELOW all column headers
+        header_bottom_y = max(bbox[3] for bbox in column_headers.values())
+        data_start_y = header_bottom_y + 20  # Add 20px buffer below headers
+        
+        logger.info(f"Column headers end at Y={header_bottom_y}, data starts at Y={data_start_y}")
         
         # Group OCR words by Y position (rows)
         # Words within 10 pixels vertically are considered same row
         y_tolerance = 10
         rows_by_y = defaultdict(list)
         
+        # Define header keywords to filter out
+        header_keywords = {
+            'despatch', 'delivery', 'invoice', 'date', 'number', 'item', 'material',
+            'description', 'comm.', 'code', 'origin', 'ctry', 'qnty', 'qty', 'unit',
+            'price', 'net', 'gross', 'wt', 'kg', 'total', 'eur', 'inco', 'terms',
+            'dap', 'sto/po', 'req.', 'delivered'
+        }
+        
         for word in ocr_words:
-            # Skip header area
-            if word['bbox'][1] < header_y_threshold:
+            # Skip header area AND words right after headers (likely column names)
+            if word['bbox'][1] < data_start_y:
                 continue
             
             y_pos = word['bbox'][1]
@@ -244,6 +302,14 @@ def extract_table_rows_intelligent(
         extracted_rows = []
         
         for row_num, (y_pos, row_words) in enumerate(sorted_rows[:max_rows], start=1):
+            # Check if this row contains header keywords (likely a header row, not data)
+            row_text_lower = ' '.join([w['text'].lower() for w in row_words])
+            is_header_row = any(keyword in row_text_lower for keyword in header_keywords)
+            
+            if is_header_row:
+                logger.debug(f"Skipping header row: {row_text_lower[:50]}")
+                continue
+            
             row_data = {
                 "row": row_num,
                 "fields": {}
@@ -251,14 +317,21 @@ def extract_table_rows_intelligent(
             
             # For each field, find words in corresponding column
             for field_key, header_bbox in column_headers.items():
-                column_x = header_bbox[0]
-                x_tolerance = 50  # Words within 50 pixels horizontally
+                column_x_start = header_bbox[0]
+                column_x_end = header_bbox[2]  # Right edge of header
                 
-                # Find words in this column
+                # Increase tolerance for better column matching
+                # Use header width + 30% padding on each side
+                header_width = column_x_end - column_x_start
+                x_tolerance = max(100, header_width * 0.3)  # At least 100px or 30% of header width
+                
+                # Find words in this column (check if word center is near column center)
                 column_words = []
                 for word in row_words:
-                    word_x = word['bbox'][0]
-                    if abs(word_x - column_x) <= x_tolerance:
+                    word_x_center = (word['bbox'][0] + word['bbox'][2]) / 2
+                    column_center = (column_x_start + column_x_end) / 2
+                    
+                    if abs(word_x_center - column_center) <= x_tolerance:
                         column_words.append(word)
                 
                 if column_words:
@@ -290,9 +363,21 @@ def extract_table_rows_intelligent(
             # Only add row if it has at least one field
             if row_data["fields"]:
                 extracted_rows.append(row_data)
-                logger.debug(f"Row {row_num}: extracted {len(row_data['fields'])} fields")
+                # Log first 3 rows with detailed field info
+                if len(extracted_rows) <= 3:
+                    fields_summary = {k: v.get('value', '')[:30] for k, v in row_data['fields'].items()}
+                    logger.info(f"Row {row_num}: {len(row_data['fields'])} fields → {fields_summary}")
         
-        logger.info(f"Successfully extracted {len(extracted_rows)} table rows with line item data")
+        logger.info(f"✅ Extracted {len(extracted_rows)} valid data rows from table")
+        
+        # Log summary of field coverage
+        if extracted_rows:
+            field_counts = {}
+            for row in extracted_rows:
+                for field_key in row['fields'].keys():
+                    field_counts[field_key] = field_counts.get(field_key, 0) + 1
+            logger.info(f"Field coverage: {field_counts}")
+        
         return extracted_rows
         
     except Exception as e:

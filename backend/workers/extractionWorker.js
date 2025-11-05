@@ -372,7 +372,11 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
 
         // Save line items
         if (extractedData.lineItems && extractedData.lineItems.length > 0) {
+            logger.info(`📊 Saving ${extractedData.lineItems.length} line items to database`);
+            logger.info(`📊 First line item: ${JSON.stringify(extractedData.lineItems[0])}`);
             await saveLineItems(client, invoiceId, extractedData.lineItems);
+        } else {
+            logger.warn(`⚠️ No line items in extractedData. Keys: ${Object.keys(extractedData)}`);
         }
 
         await client.query('COMMIT');
@@ -453,29 +457,83 @@ async function saveLineItems(client, invoiceId, lineItems) {
     const insertQuery = `
         INSERT INTO invoice_line_items (
             invoice_id, line_number, description, quantity, unit_price, 
-            total_value, hs_code, country_of_origin, confidence_scores
+            total_value, hs_code, country_of_origin, net_weight, gross_weight, confidence_scores
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
     `;
 
     for (let i = 0; i < lineItems.length; i++) {
         const item = lineItems[i];
+        
+        // Helper to extract value from both flat and nested formats
+        const getValue = (field) => {
+            if (!field) return null;
+            if (typeof field === 'string' || typeof field === 'number') return String(field);
+            if (field.value !== undefined) return field.value;
+            return null;
+        };
+        
+        const getConfidence = (field) => {
+            if (!field) return 0;
+            if (field.confidence !== undefined) return field.confidence;
+            return 0;
+        };
+        
+        // Handle both flat format {description: "x", quantity: "y"} 
+        // and nested format {fields: {item_description: {value: "x", bbox: [...], confidence: 0.9}}}
+        let description, quantity, unit_price, amount, hs_code, country_of_origin, net_weight, gross_weight;
+        let descConf, qtyConf, priceConf, amountConf;
+        
+        if (item.fields) {
+            // Nested format from ML service
+            description = getValue(item.fields.item_description);
+            quantity = getValue(item.fields.item_quantity);
+            unit_price = getValue(item.fields.item_unit_price);
+            amount = getValue(item.fields.item_total_value);
+            hs_code = getValue(item.fields.item_hs_code);
+            country_of_origin = getValue(item.fields.item_country_of_origin);
+            net_weight = getValue(item.fields.item_net_weight);
+            gross_weight = getValue(item.fields.item_gross_weight);
+            
+            descConf = getConfidence(item.fields.item_description);
+            qtyConf = getConfidence(item.fields.item_quantity);
+            priceConf = getConfidence(item.fields.item_unit_price);
+            amountConf = getConfidence(item.fields.item_total_value);
+        } else {
+            // Flat format (legacy or manually entered)
+            description = item.description || null;
+            quantity = item.quantity || null;
+            unit_price = item.unit_price || null;
+            amount = item.amount || null;
+            hs_code = item.hs_code || null;
+            country_of_origin = item.country_of_origin || null;
+            net_weight = item.net_weight || null;
+            gross_weight = item.gross_weight || null;
+            
+            descConf = item.descriptionConfidence || 0;
+            qtyConf = item.quantityConfidence || 0;
+            priceConf = item.unitPriceConfidence || 0;
+            amountConf = item.amountConfidence || 0;
+        }
+        
         const itemConfidence = JSON.stringify({
-            description: item.descriptionConfidence || 0,
-            quantity: item.quantityConfidence || 0,
-            unit_price: item.unitPriceConfidence || 0,
-            amount: item.amountConfidence || 0
+            description: descConf,
+            quantity: qtyConf,
+            unit_price: priceConf,
+            amount: amountConf
         });
         
         await client.query(insertQuery, [
             invoiceId,
             i + 1,
-            item.description || null,
-            item.quantity || null,
-            item.unit_price || null,
-            item.amount || null,
-            item.hs_code || null,
-            item.country_of_origin || null,
+            description,
+            quantity,
+            unit_price,
+            amount,
+            hs_code,
+            country_of_origin,
+            net_weight,
+            gross_weight,
             itemConfidence
         ]);
     }

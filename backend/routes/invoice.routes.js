@@ -235,11 +235,17 @@ router.get('/:id', authenticate, requirePermission('invoice:review'), async (req
             [id]
         );
         
-        // Get line items
+        // Get line items from database table (flat format)
         const lineItemsResult = await db.query(
             'SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY line_number',
             [id]
         );
+        
+        // Also get line items with bboxes from extracted_data if available
+        let lineItemsWithBboxes = [];
+        if (invoice.extracted_data && invoice.extracted_data.lineItems) {
+            lineItemsWithBboxes = invoice.extracted_data.lineItems;
+        }
         
         // Get corrections/audit trail
         const correctionsResult = await db.query(
@@ -257,6 +263,7 @@ router.get('/:id', authenticate, requirePermission('invoice:review'), async (req
             invoice: invoice,
             parties: partiesResult.rows,
             lineItems: lineItemsResult.rows,
+            lineItemsWithBboxes: lineItemsWithBboxes,  // Nested format with bboxes from ML extraction
             corrections: correctionsResult.rows
         });
         

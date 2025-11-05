@@ -15,6 +15,7 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
     const [error, setError] = useState(null);
     const canvasRef = useRef(null);
     const renderTaskRef = useRef(null);
+    const documentRef = useRef(null);
 
     useEffect(() => {
         if (!invoiceId) {
@@ -225,14 +226,19 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
                 </div>
             </div>
             <div className={styles.viewer}>
-                <div className={styles.document}>
+                <div className={styles.document} ref={documentRef}>
                     <canvas ref={canvasRef} />
                     {selectedField && (
                         <div className={styles.boundingBox}>
                             <span className={styles.boundingBoxLabel}>{selectedField.fieldPath}</span>
                         </div>
                     )}
-                    {children}
+                    {React.Children.map(children, child => 
+                        child ? React.cloneElement(child, {
+                            containerWidth: canvasRef.current?.width,
+                            containerHeight: canvasRef.current?.height
+                        }) : null
+                    )}
                 </div>
             </div>
         </div>

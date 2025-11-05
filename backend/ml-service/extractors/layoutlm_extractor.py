@@ -104,8 +104,8 @@ class LayoutLMExtractor:
         
         logger.info("✅ LayoutLM Extractor initialized (Tesseract + LayoutLMv3 + Gemini)")
     
-    def _send_field_update(self, field_name: str, field_value: str, source: str = "extraction"):
-        """Send progressive field update via callback"""
+    def _send_field_update(self, field_name: str, field_value, source: str = "extraction"):
+        """Send progressive field update via callback (handles strings, numbers, lists, dicts)"""
         if not self.callback_url or not self.invoice_id:
             return
         
@@ -113,7 +113,7 @@ class LayoutLMExtractor:
             requests.post(self.callback_url, json={
                 'invoice_id': self.invoice_id,
                 'field': field_name,
-                'value': field_value,
+                'value': field_value,  # requests will JSON-serialize this properly
                 'source': source,
                 'timestamp': time.time()
             }, timeout=2)
@@ -178,7 +178,11 @@ class LayoutLMExtractor:
             'tesseract_ocr': {},
             'layoutlm_extraction': {},
             'gemini_validation': {},
-            'final_fields': {}
+            'final_fields': {},
+            'image_dimensions': {
+                'width': image.size[0],
+                'height': image.size[1]
+            }
         }
         
         # Step 1: Tesseract OCR
@@ -319,6 +323,9 @@ class LayoutLMExtractor:
             if line_items:
                 extracted['line_items'] = line_items
                 logger.info(f"✅ Extracted {len(line_items)} line items")
+                # Send progressive update for line items as a structured object (not JSON string)
+                # Socket.IO will handle JSON serialization automatically
+                self._send_field_update('line_items', line_items, source='table_extraction')
             
             logger.info(f"✅ LayoutLMv3: Extracted {len([v for v in extracted.values() if v])} fields")
             self._free_memory("LayoutLMv3")
@@ -560,8 +567,8 @@ Return ONLY JSON:
             if value and value != merged.get(key):
                 logger.info(f"Gemini correction: {key} = {value}")
                 merged[key] = value
-                # Send progressive update
-                self._send_field_update(key, str(value), source='gemini')
+                # Send progressive update (keep objects as-is, don't convert to string)
+                self._send_field_update(key, value, source='gemini')
         
         # Add metadata
         merged['_extraction_method'] = 'layoutlmv3_gemini_validated'

@@ -95,12 +95,21 @@ export const SocketProvider = ({ children }) => {
         return () => {};
     };
 
+    const onExtractionComplete = (callback) => {
+        if (socket) {
+            socket.on('extraction:completed', callback);
+            return () => socket.off('extraction:completed', callback);
+        }
+        return () => {};
+    };
+
     const value = {
         socket,
         connected,
         joinInvoice,
         leaveInvoice,
-        onFieldUpdate
+        onFieldUpdate,
+        onExtractionComplete
     };
 
     return (

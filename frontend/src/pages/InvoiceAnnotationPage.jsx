@@ -13,7 +13,7 @@ import styles from './InvoiceAnnotationPage.module.css';
 const InvoiceAnnotationPage = () => {
     const { id } = useParams();
     const { getToken } = useAuth();
-    const { joinInvoice, leaveInvoice, onFieldUpdate, connected } = useSocket();
+    const { joinInvoice, leaveInvoice, onFieldUpdate, onExtractionComplete, connected } = useSocket();
     const navigate = useNavigate();
     
     const [invoice, setInvoice] = useState(null);
@@ -51,9 +51,87 @@ const InvoiceAnnotationPage = () => {
             
             setInvoice(data.invoice);
             setParties(data.parties || []);
-            setLineItems(data.lineItems || []);
             
-            // Parse extracted_data to populate bounding boxes
+            // Use lineItemsWithBboxes if available (has nested format with bboxes),
+            // otherwise fall back to flat lineItems from database table
+            const lineItemsData = data.lineItemsWithBboxes && data.lineItemsWithBboxes.length > 0
+                ? data.lineItemsWithBboxes
+                : data.lineItems || [];
+            
+            console.log('[Invoice Load] Line items format:', lineItemsData[0]);
+            
+            // Transform line items to UI format
+            if (lineItemsData.length > 0 && lineItemsData[0].fields) {
+                // Nested format with bboxes - transform to flat for table display
+                const transformedItems = [];
+                const lineItemBboxes = {};
+                
+                lineItemsData.forEach((item, index) => {
+                    const fields = item.fields || {};
+                    const rowId = `line_${index}`;
+                    
+                    const getValue = (field) => {
+                        if (!field) return '';
+                        if (typeof field === 'string' || typeof field === 'number') return String(field);
+                        return field.value || '';
+                    };
+                    
+                    const getBbox = (field) => {
+                        if (field && field.bbox) return field.bbox;
+                        return null;
+                    };
+                    
+                    transformedItems.push({
+                        id: item.id || `temp-${Date.now()}-${index}`,
+                        line_number: item.row || index + 1,
+                        description: getValue(fields.item_description),
+                        hs_code: getValue(fields.item_hs_code),
+                        country_of_origin: getValue(fields.item_country_of_origin),
+                        quantity: getValue(fields.item_quantity),
+                        unit_price: getValue(fields.item_unit_price),
+                        total_value: getValue(fields.item_total_value),
+                        net_weight: getValue(fields.item_net_weight),
+                        gross_weight: getValue(fields.item_gross_weight)
+                    });
+                    
+                    // Extract bboxes
+                    const bboxFields = [
+                        'item_description', 'item_hs_code', 'item_country_of_origin',
+                        'item_quantity', 'item_unit_price', 'item_net_weight', 'item_gross_weight'
+                    ];
+                    
+                    bboxFields.forEach(fieldKey => {
+                        const bbox = getBbox(fields[fieldKey]);
+                        if (bbox && Array.isArray(bbox) && bbox.length === 4) {
+                            const fieldName = fieldKey.replace('item_', '');
+                            console.log(`[Line Item] ${rowId}.${fieldName} bbox:`, bbox);
+                            lineItemBboxes[`${rowId}.${fieldName}`] = {
+                                x: bbox[0],
+                                y: bbox[1],
+                                width: bbox[2] - bbox[0],
+                                height: bbox[3] - bbox[1],
+                                confidence: fields[fieldKey]?.confidence || 0
+                            };
+                        }
+                    });
+                });
+                
+                setLineItems(transformedItems);
+                
+                // Add line item bboxes to state
+                if (Object.keys(lineItemBboxes).length > 0) {
+                    console.log(`[Invoice Load] Extracted ${Object.keys(lineItemBboxes).length} line item bboxes`);
+                    setBoundingBoxes(prev => ({
+                        ...prev,
+                        ...lineItemBboxes
+                    }));
+                }
+            } else {
+                // Flat format from database - use as-is
+                setLineItems(lineItemsData);
+            }
+            
+            // Parse extracted_data to populate bounding boxes for regular fields
             if (data.invoice?.extracted_data?.final_fields) {
                 const { final_fields } = data.invoice.extracted_data;
                 const bboxes = {};
@@ -101,8 +179,159 @@ const InvoiceAnnotationPage = () => {
         if (!id || !connected) return;
         
         const unsubscribe = onFieldUpdate((data) => {
+            console.log('[DEBUG] onFieldUpdate triggered:', data);
             const { field, value, source } = data;
-            console.log(`[Real-time Update] ${field} = ${value} (from ${source})`);
+            console.log(`[Real-time Update] ${field} = `, value, ` (from ${source})`);
+            
+            // Handle line items specially - parse the JSON array
+            if (field === 'line_items') {
+                console.log('[Real-time] Detected line_items field update');
+                try {
+                    let parsedLineItems = value;
+                    
+                    // Parse if it's a string (handle Python dict syntax)
+                    if (typeof value === 'string') {
+                        // Replace Python single quotes with double quotes for valid JSON
+                        const jsonString = value.replace(/'/g, '"');
+                        parsedLineItems = JSON.parse(jsonString);
+                    }
+                    
+                    if (Array.isArray(parsedLineItems)) {
+                        console.log(`[Real-time] Parsing ${parsedLineItems.length} line items`);
+                        console.log(`[Real-time] First item structure:`, parsedLineItems[0]);
+                        console.log(`[Real-time] First item fields:`, parsedLineItems[0]?.fields);
+                        
+                        // Log all items with their data to debug blank fields
+                        parsedLineItems.forEach((item, idx) => {
+                            if (idx < 3) { // Log first 3 items
+                                console.log(`[Item ${idx}] Full structure:`, JSON.stringify(item, null, 2));
+                            }
+                        });
+                        
+                        // Transform to UI format - handle both nested and flat formats
+                        const formattedItems = [];
+                        const lineItemBboxes = {};
+                        
+                        parsedLineItems.forEach((item, index) => {
+                            const rowId = `line_${index}`;
+                            
+                            // Check if it's already in flat format (from app-advanced.py)
+                            if (item.description !== undefined || item.quantity !== undefined) {
+                                formattedItems.push({
+                                    id: `temp-${Date.now()}-${index}`,
+                                    line_number: index + 1,
+                                    description: item.description || '',
+                                    hs_code: item.hs_code || '',
+                                    country_of_origin: item.country_of_origin || '',
+                                    quantity: item.quantity || '',
+                                    unit_price: item.unit_price || '',
+                                    total_value: item.amount || '',
+                                    net_weight: item.net_weight || '',
+                                    gross_weight: item.gross_weight || ''
+                                });
+                            } else {
+                                // Handle nested format (from raw extraction)
+                                const fields = item.fields || {};
+                                
+                                // Check if fields are simple strings or objects with value/bbox/confidence
+                                const getValue = (field) => {
+                                    if (!field) return '';
+                                    if (typeof field === 'string' || typeof field === 'number') return String(field);
+                                    return field.value || '';
+                                };
+                                
+                                const getBbox = (field) => {
+                                    if (field && field.bbox) return field.bbox;
+                                    return null;
+                                };
+                                
+                                formattedItems.push({
+                                    id: `temp-${Date.now()}-${index}`,
+                                    line_number: item.row || index + 1,
+                                    description: getValue(fields.item_description),
+                                    hs_code: getValue(fields.item_hs_code),
+                                    country_of_origin: getValue(fields.item_country_of_origin),
+                                    quantity: getValue(fields.item_quantity),
+                                    unit_price: getValue(fields.item_unit_price),
+                                    total_value: getValue(fields.item_total_value),
+                                    net_weight: getValue(fields.item_net_weight),
+                                    gross_weight: getValue(fields.item_gross_weight)
+                                });
+                                
+                                // Extract bboxes for each field (if they exist)
+                                const bboxFields = [
+                                    'item_description', 'item_hs_code', 'item_country_of_origin',
+                                    'item_quantity', 'item_unit_price', 'item_net_weight', 'item_gross_weight'
+                                ];
+                                
+                                bboxFields.forEach(fieldKey => {
+                                    const bbox = getBbox(fields[fieldKey]);
+                                    if (bbox && Array.isArray(bbox) && bbox.length === 4) {
+                                        const fieldName = fieldKey.replace('item_', '');
+                                        lineItemBboxes[`${rowId}.${fieldName}`] = {
+                                            x: bbox[0],
+                                            y: bbox[1],
+                                            width: bbox[2] - bbox[0],
+                                            height: bbox[3] - bbox[1],
+                                            confidence: fields[fieldKey]?.confidence || 0
+                                        };
+                                    }
+                                });
+                            }
+                        });
+                        
+                        console.log(`[Real-time] ✅ Adding ${formattedItems.length} line items to UI`);
+                        console.log(`[Real-time] ✅ Extracted ${Object.keys(lineItemBboxes).length} bounding boxes`);
+                        
+                        // Update bounding boxes state with line item bboxes
+                        setBoundingBoxes(prev => ({
+                            ...prev,
+                            ...lineItemBboxes
+                        }));
+                        
+                        // Merge with existing line items instead of replacing
+                        setLineItems(prevItems => {
+                            if (prevItems.length === 0) {
+                                return formattedItems;
+                            }
+                            
+                            // Merge by line_number or row
+                            const merged = [...prevItems];
+                            formattedItems.forEach(newItem => {
+                                const existingIndex = merged.findIndex(
+                                    item => item.line_number === newItem.line_number
+                                );
+                                
+                                if (existingIndex >= 0) {
+                                    // Merge fields, keeping non-empty values from both
+                                    merged[existingIndex] = {
+                                        ...merged[existingIndex],
+                                        ...newItem,
+                                        // Keep existing non-empty values
+                                        description: newItem.description || merged[existingIndex].description,
+                                        hs_code: newItem.hs_code || merged[existingIndex].hs_code,
+                                        country_of_origin: newItem.country_of_origin || merged[existingIndex].country_of_origin,
+                                        quantity: newItem.quantity || merged[existingIndex].quantity,
+                                        unit_price: newItem.unit_price || merged[existingIndex].unit_price,
+                                        net_weight: newItem.net_weight || merged[existingIndex].net_weight,
+                                        gross_weight: newItem.gross_weight || merged[existingIndex].gross_weight
+                                    };
+                                } else {
+                                    merged.push(newItem);
+                                }
+                            });
+                            
+                            return merged.sort((a, b) => a.line_number - b.line_number);
+                        });
+                        return; // Don't add to extractedFields
+                    } else {
+                        console.warn('[Real-time] line_items is not an array:', parsedLineItems);
+                    }
+                } catch (e) {
+                    console.error('[Real-time] Failed to parse line_items:', e, value);
+                }
+                return;
+            }
             
             // Update extracted fields state
             setExtractedFields(prev => ({
@@ -122,6 +351,24 @@ const InvoiceAnnotationPage = () => {
         
         return unsubscribe;
     }, [id, connected, onFieldUpdate]);
+    
+    // Listen for extraction completion
+    useEffect(() => {
+        if (!id || !connected) return;
+        
+        const unsubscribe = onExtractionComplete((data) => {
+            console.log('[Extraction Complete]', data);
+            setExtracting(false);
+            setExtractedFields({});
+            
+            // Refresh invoice data to get final results
+            if (data.invoiceId === id) {
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        });
+        
+        return unsubscribe;
+    }, [id, connected, onExtractionComplete]);
     
     // Handle field acceptance
     const handleAcceptField = async (fieldPath, value) => {
@@ -426,11 +673,14 @@ const InvoiceAnnotationPage = () => {
                         <span className={styles.progressText}>Extracting fields in real-time...</span>
                     </div>
                     <div className={styles.progressFields}>
-                        {Object.entries(extractedFields).map(([field, value]) => (
-                            <span key={field} className={styles.progressField}>
-                                ✅ {field}: {value}
-                            </span>
-                        ))}
+                        {Object.entries(extractedFields)
+                            .filter(([, value]) => typeof value === 'string' || typeof value === 'number')
+                            .map(([field, value]) => (
+                                <span key={field} className={styles.progressField}>
+                                    ✅ {field}: {value}
+                                </span>
+                            ))
+                        }
                     </div>
                 </div>
             )}
@@ -469,10 +719,12 @@ const InvoiceAnnotationPage = () => {
                     {/* Line Items Table */}
                     <div className={styles.lineItemsSection}>
                         <h3>Line Items</h3>
+                        {console.log('[Render] lineItems state:', lineItems)}
                         <LineItemsTable
                             lineItems={lineItems}
                             invoiceId={id}
                             onUpdate={fetchInvoiceDetails}
+                            onFieldClick={setSelectedField}
                         />
                     </div>
                 </div>
