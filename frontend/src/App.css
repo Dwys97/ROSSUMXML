@@ -2,4 +2,12 @@
    Global Styles
    ========================================================================== */
 
+@import url("https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap");
 @import "tailwindcss";
+
+:root {
+	--font-roboto: "Quicksand", sans-serif;
+}
+body {
+	font-family: var(--font-roboto);
+}

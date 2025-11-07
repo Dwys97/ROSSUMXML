@@ -74,7 +74,7 @@ function LandingPage() {
 			<section className="">
 				<section className="flex justify-between items-center bg-gradient-to-r from-blue-950 to-violet-900 px-48 py-12">
 					<div className="flex flex-col gap-12">
-						<h1 className="text-6xl font-bold text-white">Effortless XML Integration</h1>
+						<h1 className="text-5xl font-semibold text-white">Effortless XML Integration</h1>
 						<p className="text-lg text-white">
 							Eliminate weeks of manual XML integration work. Our platform automatically maps, validates and transforms
 							complex data structures in seconds, saving your team thousands of hours on every integration project.
