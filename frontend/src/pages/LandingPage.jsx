@@ -71,17 +71,19 @@ function LandingPage() {
 	return (
 		<>
 			<TopNav />
-			<section className="mx-24">
-				<section className="flex justify-between items-center">
+			<section className="">
+				<section className="flex justify-between items-center bg-gradient-to-r from-blue-950 to-violet-900 px-48 py-12">
 					<div className="flex flex-col gap-12">
-						<h1 className="text-6xl font-bold">Effortless XML Integration</h1>
-						<p>
+						<h1 className="text-5xl font-semibold text-white">Effortless XML Integration</h1>
+						<p className="text-lg text-white">
 							Eliminate weeks of manual XML integration work. Our platform automatically maps, validates and transforms
 							complex data structures in seconds, saving your team thousands of hours on every integration project.
 						</p>
-						<button className="w-fit font-bold text-white bg-blue-600 px-6 py-3 rounded-xl shadow-xl">Get started</button>
+						<button className="w-fit font-bold text-indigo-700 bg-white px-6 py-3 rounded-2xl hover:shadow-2xl ">
+							<Link to="/register">Get started now</Link>
+						</button>
 					</div>
-					<img src={editorImg} alt="Image of the editor" className="w-auto" />;
+					<img src={editorImg} alt="Image of the editor" className="w-1/2 rounded-4xl shadow-2xl" />;
 				</section>
 				<section className="mt-24">
 					<h1 className="text-4xl font-bold text-center">How it works</h1>
@@ -139,6 +141,15 @@ function LandingPage() {
 								Deploy to production with enterprise-grade monitoring, automatic scaling, and 24/7 support for
 								mission-critical operations.
 							</p>
+						</div>
+					</div>
+				</section>
+				<section className="mt-24">
+					<h1 className="text-4xl font-bold text-center">Why?</h1>
+					<div className="flex flex-row gap-6 mt-12">
+						<div className="w-1/4 border-2 p-5 rounded-md">
+							<h1 className="text-3xl font-bold">Why us?</h1>
+							<p>BOX</p>
 						</div>
 					</div>
 				</section>
