@@ -1,3 +1,87 @@
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { DataPreloadProvider } from "./contexts/DataPreloadContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import LandingPage from "./pages/LandingPage";
+import EditorPage from "./pages/EditorPage";
+import TransformerPage from "./pages/TransformerPage";
+import LoginPage from "./pages/LoginPage.jsx";
+import RegisterPage from "./pages/RegisterPage.jsx";
+import RequestDemoPage from "./pages/RequestDemoPage";
+import SolutionsPage from "./pages/SolutionsPage";
+import EnterprisePage from "./pages/EnterprisePage";
+import AboutPage from "./pages/AboutPage";
+import ContactPage from "./pages/ContactPage";
+import ApiDocsPage from "./pages/ApiDocsPage";
+import UserProfile from "./components/profile/UserProfile";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
+import "./App.css";
+
+function App() {
+	return (
+		<BrowserRouter>
+			<AuthProvider>
+				<DataPreloadProvider>
+					<Routes>
+						{/* Публичные маршруты */}
+						<Route path="/" element={<LandingPage />} />
+						<Route path="/login" element={<LoginPage />} />
+						<Route path="/register" element={<RegisterPage />} />
+						<Route path="/request-demo" element={<RequestDemoPage />} />
+						<Route path="/solutions" element={<SolutionsPage />} />
+						<Route path="/enterprise" element={<EnterprisePage />} />
+						<Route path="/about" element={<AboutPage />} />
+						<Route path="/contact" element={<ContactPage />} />
+						<Route path="/api-docs" element={<ApiDocsPage />} />
+
+						{/* Защищенные маршруты */}
+						<Route
+							path="/transformer"
+							element={
+								<ProtectedRoute>
+									<TransformerPage />
+								</ProtectedRoute>
+							}
+						/>
+						<Route
+							path="/editor"
+							element={
+								<ProtectedRoute>
+									<EditorPage />
+								</ProtectedRoute>
+							}
+						/>
+						<Route
+							path="/profile"
+							element={
+								<ProtectedRoute>
+									<UserProfile />
+								</ProtectedRoute>
+							}
+						/>
+						<Route
+							path="/analytics"
+							element={
+								<ProtectedRoute>
+									<AnalyticsDashboardPage />
+								</ProtectedRoute>
+							}
+						/>
+						<Route
+							path="/admin"
+							element={
+								<ProtectedRoute>
+									<AdminDashboard />
+								</ProtectedRoute>
+							}
+						/>
+					</Routes>
+				</DataPreloadProvider>
+			</AuthProvider>
+		</BrowserRouter>
+	);
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
