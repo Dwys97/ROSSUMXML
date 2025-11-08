@@ -1529,7 +1529,7 @@ exports.handler = async (event) => {
         }
 
         // API Settings - Get Output Delivery Settings
-        if (path.endsWith('/api-settings/output-delivery') && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+        if ((path.endsWith('/api-settings/output-delivery') || path.endsWith('/api-settings/delivery')) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
             try {
                 const user = await verifyJWT(event);
                 const client = await pool.connect();
@@ -1564,7 +1564,7 @@ exports.handler = async (event) => {
         }
 
         // API Settings - Update Output Delivery Settings
-        if (path.endsWith('/api-settings/output-delivery') && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+        if ((path.endsWith('/api-settings/output-delivery') || path.endsWith('/api-settings/delivery')) && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
             try {
                 const user = await verifyJWT(event);
                 const {
@@ -5428,6 +5428,811 @@ exports.handler = async (event) => {
 
         // ============================================================================
         // END OF USER ANALYTICS DASHBOARD ENDPOINTS
+        // ============================================================================
+
+        // ============================================================================
+        // INVOICE EXTRACTION ENDPOINTS
+        // ============================================================================
+        
+        // Upload invoice (POST /api/invoices/upload)
+        // Accepts base64-encoded file data
+        if (path === '/api/invoices/upload' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const body = JSON.parse(event.body || '{}');
+                const { fileName, fileType, fileSize, fileData, organizationId } = body;
+                
+                if (!fileName || !fileData) {
+                    return createResponse(400, JSON.stringify({
+                        error: 'Missing required fields: fileName, fileData'
+                    }));
+                }
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // Get or create organization
+                    let orgId = organizationId;
+                    if (!orgId) {
+                        // Try to find default organization
+                        const orgResult = await client.query(
+                            `SELECT id FROM organizations WHERE slug = 'default-org' LIMIT 1`
+                        );
+                        
+                        if (orgResult.rows.length > 0) {
+                            orgId = orgResult.rows[0].id;
+                        } else {
+                            // Create default organization
+                            const newOrgResult = await client.query(
+                                `INSERT INTO organizations (name, slug, description, country) 
+                                 VALUES ('Default Organization', 'default-org', 'Default organization for invoices', 'GB')
+                                 RETURNING id`
+                            );
+                            orgId = newOrgResult.rows[0].id;
+                        }
+                    }
+                    
+                    // Decode base64 and save file
+                    const buffer = Buffer.from(fileData, 'base64');
+                    
+                    console.log('[UPLOAD] File received, size:', buffer.length, 'bytes');
+                    console.log('[UPLOAD] Storing file in database as base64');
+                    
+                    // Store file as base64 in database (no filesystem needed)
+                    const fileBase64 = buffer.toString('base64');
+                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                    const fileExtension = fileName.split('.').pop().toLowerCase(); // Normalize to lowercase
+                    const filePath = `db:${uniqueSuffix}.${fileExtension}`; // Virtual path for reference
+                    
+                    console.log('[UPLOAD] File will be stored in DB with reference:', filePath);
+                    
+                    // Create invoice record with file data
+                    const invoiceResult = await client.query(
+                        `INSERT INTO invoices (
+                            organization_id, user_id, file_name, file_path, 
+                            file_type, file_size, status, extraction_status, file_data
+                        ) VALUES ($1, $2, $3, $4, $5, $6, 'to_review', 'pending', $7)
+                        RETURNING id, organization_id, user_id, file_name, file_path, file_type, file_size, status, extraction_status, created_at`,
+                        [
+                            orgId,
+                            user.id,
+                            fileName,
+                            filePath,
+                            fileExtension,
+                            buffer.length,
+                            fileBase64
+                        ]
+                    );
+                    
+                    const invoice = invoiceResult.rows[0];
+                    
+                    console.log('[UPLOAD] Invoice created with ID:', invoice.id);
+                    
+                    // Log upload action
+                    const sourceIp = event.requestContext?.http?.sourceIp || null;
+                    const userAgent = event.headers?.['user-agent'] || null;
+                    
+                    await client.query(
+                        `INSERT INTO invoice_audit_log (
+                            invoice_id, user_id, action, status_to, ip_address, user_agent
+                        ) VALUES ($1, $2, 'upload', 'to_review', $3, $4)`,
+                        [invoice.id, user.id, sourceIp, userAgent]
+                    );
+                    
+                    await client.query('COMMIT');
+                    
+                    return createResponse(201, JSON.stringify({
+                        message: 'Invoice uploaded successfully',
+                        invoice: invoice
+                    }));
+                    
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    console.error('Upload error:', err);
+                    return createResponse(500, JSON.stringify({
+                        error: 'Failed to upload invoice',
+                        details: err.message
+                    }));
+                } finally {
+                    client.release();
+                }
+                
+            } catch (err) {
+                console.error('Upload error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Upload failed',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Get invoices list
+        if (path === '/api/invoices' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                
+                // Parse query parameters
+                const params = event.queryStringParameters || {};
+                const page = parseInt(params.page) || 1;
+                const limit = parseInt(params.limit) || 20;
+                const offset = (page - 1) * limit;
+                const status = params.status || null;
+                const organizationId = params.organizationId || null;
+                
+                const client = await pool.connect();
+                try {
+                    // Build query
+                    let query = `
+                        SELECT i.*, COUNT(*) OVER() as total_count
+                        FROM invoices i
+                        WHERE i.user_id = $1
+                    `;
+                    const queryParams = [user.id];
+                    let paramIndex = 2;
+                    
+                    if (organizationId) {
+                        query += ` AND i.organization_id = $${paramIndex}`;
+                        queryParams.push(organizationId);
+                        paramIndex++;
+                    }
+                    
+                    if (status && status !== 'all') {
+                        query += ` AND i.status = $${paramIndex}`;
+                        queryParams.push(status);
+                        paramIndex++;
+                    }
+                    
+                    query += ` ORDER BY i.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+                    queryParams.push(limit, offset);
+                    
+                    const result = await client.query(query, queryParams);
+                    
+                    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
+                    const totalPages = Math.ceil(totalCount / limit);
+                    
+                    return createResponse(200, JSON.stringify({
+                        invoices: result.rows,
+                        pagination: {
+                            page,
+                            limit,
+                            total: totalCount,
+                            pages: totalPages
+                        }
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Get invoices error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({
+                        error: 'Unauthorized',
+                        details: err.message
+                    }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch invoices',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Get invoice details by ID
+        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]+$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const id = path.split('/')[3];
+                
+                const client = await pool.connect();
+                try {
+                    // Get invoice details
+                    const invoiceResult = await client.query(
+                        `SELECT 
+                            i.*,
+                            u.full_name as uploader_name,
+                            u.email as uploader_email,
+                            r.full_name as reviewer_name,
+                            r.email as reviewer_email
+                        FROM invoices i
+                        LEFT JOIN users u ON i.user_id = u.id
+                        LEFT JOIN users r ON i.reviewed_by = r.id
+                        WHERE i.id = $1`,
+                        [id]
+                    );
+                    
+                    if (invoiceResult.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'Invoice not found' }));
+                    }
+                    
+                    const invoice = invoiceResult.rows[0];
+                    
+                    // Get parties (buyer/seller)
+                    const partiesResult = await client.query(
+                        'SELECT * FROM invoice_parties WHERE invoice_id = $1',
+                        [id]
+                    );
+                    
+                    // Get line items
+                    const lineItemsResult = await client.query(
+                        'SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY line_number',
+                        [id]
+                    );
+                    
+                    // Get corrections/audit trail
+                    const correctionsResult = await client.query(
+                        `SELECT 
+                            c.*,
+                            u.full_name as corrected_by_name
+                        FROM invoice_corrections c
+                        LEFT JOIN users u ON c.user_id = u.id
+                        WHERE c.invoice_id = $1
+                        ORDER BY c.created_at DESC`,
+                        [id]
+                    );
+                    
+                    return createResponse(200, JSON.stringify({
+                        invoice: invoice,
+                        parties: partiesResult.rows,
+                        lineItems: lineItemsResult.rows,
+                        corrections: correctionsResult.rows
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Get invoice details error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch invoice details',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Get invoice file (PDF/Image download)
+        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]{36}\/file$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const id = path.split('/')[3];
+                
+                console.log('[FILE DOWNLOAD] Invoice ID:', id, 'User:', user.id);
+                
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        'SELECT file_data, file_type, file_name FROM invoices WHERE id = $1',
+                        [id]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        console.error('[FILE DOWNLOAD] Invoice not found in database:', id);
+                        return createResponse(404, JSON.stringify({ error: 'Invoice not found' }));
+                    }
+                    
+                    const { file_data, file_type, file_name } = result.rows[0];
+                    console.log('[FILE DOWNLOAD] File type:', file_type);
+                    console.log('[FILE DOWNLOAD] File name:', file_name);
+                    console.log('[FILE DOWNLOAD] File data length:', file_data ? file_data.length : 0, 'chars');
+                    
+                    if (!file_data) {
+                        console.error('[FILE DOWNLOAD] No file data stored in database');
+                        return createResponse(404, JSON.stringify({ 
+                            error: 'File data not found in database'
+                        }));
+                    }
+                    
+                    console.log('[FILE DOWNLOAD] Returning file from database');
+                    
+                    return {
+                        statusCode: 200,
+                        headers: {
+                            'Content-Type': file_type || 'application/pdf',
+                            'Content-Disposition': `inline; filename="${file_name}"`,
+                            'Access-Control-Allow-Origin': '*',
+                            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                            'Access-Control-Allow-Headers': '*'
+                        },
+                        body: file_data,
+                        isBase64Encoded: true
+                    };
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Get invoice file error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to fetch invoice file',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Update invoice status
+        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]+\/status$/) && (event.httpMethod === 'PUT' || event.requestContext?.http?.method === 'PUT')) {
+            try {
+                const user = await verifyJWT(event);
+                const id = path.split('/')[3];
+                const body = JSON.parse(event.body || '{}');
+                const { status, comment, recipientEmail } = body;
+                
+                const validStatuses = ['to_review', 'reviewing', 'queried', 'postponed', 'rejected', 'exported'];
+                if (!validStatuses.includes(status)) {
+                    return createResponse(400, JSON.stringify({ error: 'Invalid status' }));
+                }
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // Get current status
+                    const currentResult = await client.query(
+                        'SELECT status FROM invoices WHERE id = $1',
+                        [id]
+                    );
+                    
+                    if (currentResult.rows.length === 0) {
+                        await client.query('ROLLBACK');
+                        return createResponse(404, JSON.stringify({ error: 'Invoice not found' }));
+                    }
+                    
+                    const oldStatus = currentResult.rows[0].status;
+                    
+                    // Update invoice status
+                    await client.query(
+                        'UPDATE invoices SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                        [status, id]
+                    );
+                    
+                    // Log status change
+                    await client.query(
+                        `INSERT INTO invoice_audit_log (
+                            invoice_id, user_id, action, status_from, status_to, 
+                            comment, ip_address, user_agent
+                        ) VALUES ($1, $2, 'status_change', $3, $4, $5, $6, $7)`,
+                        [id, user.id, oldStatus, status, comment, event.requestContext?.http?.sourceIp || '', event.headers?.['user-agent'] || '']
+                    );
+                    
+                    // If queried or rejected, create correction record
+                    if ((status === 'queried' || status === 'rejected') && comment) {
+                        await client.query(
+                            `INSERT INTO invoice_corrections (
+                                invoice_id, user_id, field_path, correction_type, 
+                                comment, recipient_email
+                            ) VALUES ($1, $2, 'status', $3, $4, $5)`,
+                            [id, user.id, status === 'queried' ? 'field_query' : 'field_reject', comment, recipientEmail]
+                        );
+                    }
+                    
+                    await client.query('COMMIT');
+                    
+                    return createResponse(200, JSON.stringify({
+                        message: 'Invoice status updated successfully',
+                        oldStatus,
+                        newStatus: status
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Update status error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to update invoice status',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Trigger ML extraction
+        if (path && path.match(/^\/api\/invoices\/[^\/]+\/extract$/) && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const pathParts = path.split('/');
+                const id = pathParts[3]; // UUID from path
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // Get invoice file path
+                    const invoiceResult = await client.query(
+                        'SELECT file_path, file_type FROM invoices WHERE id = $1',
+                        [id]
+                    );
+                    
+                    if (invoiceResult.rows.length === 0) {
+                        await client.query('ROLLBACK');
+                        return createResponse(404, JSON.stringify({ error: 'Invoice not found' }));
+                    }
+                    
+                    const invoice = invoiceResult.rows[0];
+                    
+                    // Update extraction status to processing
+                    await client.query(
+                        'UPDATE invoices SET extraction_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                        ['processing', id]
+                    );
+                    
+                    // Log extraction trigger
+                    const sourceIp = event.requestContext?.http?.sourceIp || null;
+                    const userAgent = event.headers?.['user-agent'] || null;
+                    
+                    await client.query(
+                        `INSERT INTO invoice_audit_log (
+                            invoice_id, user_id, action, ip_address, user_agent
+                        ) VALUES ($1, $2, 'extract', $3, $4)`,
+                        [id, user.id, sourceIp, userAgent]
+                    );
+                    
+                    await client.query('COMMIT');
+                    
+                    // Trigger async ML extraction (don't await - run in background)
+                    // For now, we'll use simple pattern-based extraction as POC
+                    setImmediate(async () => {
+                        try {
+                            const extractionService = require('./services/invoiceExtraction.service');
+                            await extractionService.extractInvoiceData(id);
+                        } catch (extractError) {
+                            console.error('[ML Extraction] Background extraction failed:', extractError);
+                        }
+                    });
+                    
+                    return createResponse(200, JSON.stringify({
+                        message: 'ML extraction triggered successfully',
+                        status: 'processing',
+                        invoiceId: id
+                    }));
+                } catch (dbError) {
+                    await client.query('ROLLBACK');
+                    throw dbError;
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Trigger extraction error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to trigger ML extraction',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Submit correction
+        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]+\/correct$/) && (event.httpMethod === 'PUT' || event.requestContext?.http?.method === 'PUT')) {
+            try {
+                const user = await verifyJWT(event);
+                const id = path.split('/')[3];
+                const body = JSON.parse(event.body || '{}');
+                const { fieldPath, originalValue, correctedValue, mlConfidence, boundingBox } = body;
+                
+                if (!fieldPath || correctedValue === undefined) {
+                    return createResponse(400, JSON.stringify({ error: 'Field path and corrected value are required' }));
+                }
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // Create correction record
+                    await client.query(
+                        `INSERT INTO invoice_corrections (
+                            invoice_id, user_id, field_path, original_value, 
+                            corrected_value, ml_confidence, correction_type
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                        [id, user.id, fieldPath, originalValue, correctedValue, mlConfidence, 
+                         boundingBox ? 'bounding_box' : 'manual_edit']
+                    );
+                    
+                    // Log correction action
+                    await client.query(
+                        `INSERT INTO invoice_audit_log (
+                            invoice_id, user_id, action, field_changed, 
+                            value_before, value_after, ip_address, user_agent
+                        ) VALUES ($1, $2, 'correct', $3, $4, $5, $6, $7)`,
+                        [id, user.id, fieldPath, originalValue, correctedValue, 
+                         event.requestContext?.http?.sourceIp || null, 
+                         event.headers?.['user-agent'] || null]
+                    );
+                    
+                    await client.query('COMMIT');
+                    
+                    return createResponse(200, JSON.stringify({
+                        message: 'Correction submitted successfully'
+                    }));
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    throw err;
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Submit correction error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to submit correction',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Delete invoice
+        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]+$/) && (event.httpMethod === 'DELETE' || event.requestContext?.http?.method === 'DELETE')) {
+            try {
+                const user = await verifyJWT(event);
+                const id = path.split('/')[3];
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // Get invoice details before deletion (for logging and file cleanup)
+                    const invoiceResult = await client.query(
+                        'SELECT file_path, file_name, organization_id, user_id FROM invoices WHERE id = $1',
+                        [id]
+                    );
+                    
+                    if (invoiceResult.rows.length === 0) {
+                        await client.query('ROLLBACK');
+                        return createResponse(404, JSON.stringify({ error: 'Invoice not found' }));
+                    }
+                    
+                    const invoice = invoiceResult.rows[0];
+                    
+                    // Check permissions - only allow deletion by invoice owner or admin
+                    if (invoice.user_id !== user.id && user.role !== 'admin') {
+                        await client.query('ROLLBACK');
+                        return createResponse(403, JSON.stringify({ 
+                            error: 'Forbidden', 
+                            message: 'You do not have permission to delete this invoice' 
+                        }));
+                    }
+                    
+                    // Log deletion action before actually deleting
+                    await client.query(
+                        `INSERT INTO invoice_audit_log (
+                            invoice_id, user_id, action, comment, 
+                            ip_address, user_agent
+                        ) VALUES ($1, $2, 'delete', $3, $4, $5)`,
+                        [
+                            id, 
+                            user.id, 
+                            `Invoice ${invoice.file_name} deleted by user`,
+                            event.requestContext?.http?.sourceIp || null,
+                            event.headers?.['user-agent'] || null
+                        ]
+                    );
+                    
+                    // Delete related records (cascade should handle this, but being explicit)
+                    await client.query('DELETE FROM invoice_corrections WHERE invoice_id = $1', [id]);
+                    await client.query('DELETE FROM invoice_line_items WHERE invoice_id = $1', [id]);
+                    await client.query('DELETE FROM invoice_parties WHERE invoice_id = $1', [id]);
+                    
+                    // Delete the invoice record
+                    await client.query('DELETE FROM invoices WHERE id = $1', [id]);
+                    
+                    await client.query('COMMIT');
+                    
+                    // Try to delete the file from disk (non-critical - don't fail if it doesn't exist)
+                    if (invoice.file_path) {
+                        try {
+                            const fs = require('fs').promises;
+                            await fs.unlink(invoice.file_path);
+                            console.log('[DELETE] File deleted successfully:', invoice.file_path);
+                        } catch (fileErr) {
+                            console.warn('[DELETE] Failed to delete file (non-critical):', invoice.file_path, fileErr.message);
+                        }
+                    }
+                    
+                    return createResponse(200, JSON.stringify({
+                        message: 'Invoice deleted successfully',
+                        id: id
+                    }));
+                    
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Delete invoice error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to delete invoice',
+                    details: err.message
+                }));
+            }
+        }
+        
+        // Export invoice
+        if (path && path.match(/^\/api\/invoices\/[0-9a-fA-F-]+\/export$/) && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const id = path.split('/')[3];
+                const body = JSON.parse(event.body || '{}');
+                const { format } = body;
+                
+                const validFormats = ['xml', 'csv', 'xls'];
+                if (!validFormats.includes(format)) {
+                    return createResponse(400, JSON.stringify({ error: 'Invalid export format' }));
+                }
+                
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    
+                    // Update invoice status to exported
+                    await client.query(
+                        `UPDATE invoices 
+                        SET status = 'exported', 
+                            export_format = $1, 
+                            exported_at = CURRENT_TIMESTAMP,
+                            reviewed_by = $2,
+                            reviewed_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP 
+                        WHERE id = $3`,
+                        [format, user.id, id]
+                    );
+                    
+                    // Log export action
+                    await client.query(
+                        `INSERT INTO invoice_audit_log (
+                            invoice_id, user_id, action, status_to, 
+                            comment, ip_address, user_agent
+                        ) VALUES ($1, $2, 'export', 'exported', $3, $4, $5)`,
+                        [id, user.id, `Exported as ${format.toUpperCase()}`, event.requestContext?.http?.sourceIp || '', event.headers?.['user-agent'] || '']
+                    );
+                    
+                    await client.query('COMMIT');
+                    
+                    // For now, return success - actual export generation will be added later
+                    return createResponse(200, JSON.stringify({
+                        message: `Invoice exported as ${format.toUpperCase()} successfully`,
+                        format: format
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('Export invoice error:', err);
+                if (err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to export invoice',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ============================================================================
+        // ML EXTRACTION ENDPOINTS
+        // ============================================================================
+
+        // ML Service Health Check (GET /api/ml/health) - No auth required for testing
+        if (path === '/api/ml/health' && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const axios = require('axios');
+                // Use 10.0.0.18 (host IP) to access ML service from Docker
+                const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://10.0.0.18:5001';
+                const mlHealth = await axios.get(`${mlServiceUrl}/health`, { timeout: 3000 }).catch(() => ({ data: { status: 'offline' } }));
+                
+                return createResponse(200, JSON.stringify({
+                    ml_service: mlHealth.data,
+                    ml_service_url: mlServiceUrl,
+                    backend: 'healthy',
+                    timestamp: new Date().toISOString()
+                }));
+            } catch (err) {
+                return createResponse(500, JSON.stringify({ error: err.message }));
+            }
+        }
+
+        // Trigger ML extraction (POST /api/ml/extract)
+        if (path === '/api/ml/extract' && (event.httpMethod === 'POST' || event.requestContext?.http?.method === 'POST')) {
+            try {
+                const user = await verifyJWT(event);
+                const body = JSON.parse(event.body || '{}');
+                const { invoiceId, vendorId } = body;
+                
+                if (!invoiceId) {
+                    return createResponse(400, JSON.stringify({ error: 'invoiceId is required' }));
+                }
+                
+                // Get invoice details from database
+                const client = await pool.connect();
+                try {
+                    const result = await client.query(
+                        'SELECT id, file_name, file_type, user_id, file_data FROM invoices WHERE id = $1',
+                        [invoiceId]
+                    );
+                    
+                    if (result.rows.length === 0) {
+                        return createResponse(404, JSON.stringify({ error: 'Invoice not found' }));
+                    }
+                    
+                    const invoice = result.rows[0];
+                    
+                    // Import extraction queue service
+                    const { addExtractionJob } = require('./services/extractionQueue.service');
+                    
+                    // Create extraction job
+                    // NOTE: Worker will read file_data directly from database
+                    // Don't pass filePath as it's only accessible within Lambda container
+                    const job = await addExtractionJob({
+                        invoiceId: invoice.id,
+                        fileType: invoice.file_type || 'application/pdf',
+                        userId: user.id,
+                        organizationId: user.organization_id,
+                        vendorId: vendorId || null
+                    });
+                    
+                    // Update invoice status
+                    await client.query(
+                        'UPDATE invoices SET extraction_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                        ['processing', invoiceId]
+                    );
+                    
+                    return createResponse(200, JSON.stringify({
+                        success: true,
+                        jobId: job.jobId,
+                        message: 'Extraction job created successfully'
+                    }));
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                console.error('ML extract error:', err);
+                if (err.message && err.message.includes('token')) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized', details: err.message }));
+                }
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to create extraction job',
+                    details: err.message
+                }));
+            }
+        }
+
+        // Get job status (GET /api/jobs/:id)
+        if (path.match(/^\/api\/jobs\/[^/]+$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
+            try {
+                const user = await verifyJWT(event);
+                const jobId = path.split('/').pop();
+                
+                const { getJobStatus } = require('./services/extractionQueue.service');
+                const status = await getJobStatus(jobId);
+                
+                if (!status) {
+                    return createResponse(404, JSON.stringify({ error: 'Job not found' }));
+                }
+                
+                return createResponse(200, JSON.stringify(status));
+            } catch (err) {
+                console.error('Get job status error:', err);
+                return createResponse(500, JSON.stringify({
+                    error: 'Failed to get job status',
+                    details: err.message
+                }));
+            }
+        }
+
+        // ============================================================================
+        // END OF INVOICE EXTRACTION ENDPOINTS
         // ============================================================================
 
         // Log unauthorized API access attempt (404 on API endpoints)

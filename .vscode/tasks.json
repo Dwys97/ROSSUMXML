@@ -61,6 +61,50 @@
             }
         },
         {
+            "label": "Start ML Service (LayoutLMv3)",
+            "type": "shell",
+            "command": "source /opt/conda/etc/profile.d/conda.sh && conda activate base && cd backend/ml-service && python app-advanced.py",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            },
+            "options": {
+                "env": {
+                    "ML_LAYOUTLM_ENABLED": "true",
+                    "ML_LAYOUTLM_LAZY": "true",
+                    "PORT": "5001",
+                    "FLASK_ENV": "development"
+                }
+            }
+        },
+        {
+            "label": "Start Socket Server",
+            "type": "shell",
+            "command": "bash start-socket-server.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            }
+        },
+        {
+            "label": "Start Worker",
+            "type": "shell",
+            "command": "bash start-worker.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            }
+        },
+        {
             "label": "Start NGROK",
             "type": "shell",
             "command": "bash start-ngrok.sh",

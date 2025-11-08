@@ -40,10 +40,14 @@ Resources:
           POSTGRES_USER: "postgres"
           POSTGRES_PASSWORD: "postgres"
           POSTGRES_DB: "rossumxml"
-          POSTGRES_HOST: "172.18.0.2"
+          POSTGRES_HOST: "rossumxml-db-1"
           POSTGRES_PORT: "5432"
           JWT_SECRET: "a_secure_secret_key_for_jwt"
           GEMINI_API_KEY: "AIzaSyDGoYZ0PkpEAtW2G7Y6YkobU3jGR8XKo28"
+          REDIS_HOST: "rossumxml-redis-1"
+          REDIS_PORT: "6379"
+          SOCKET_SERVER_URL: "http://host.docker.internal:3001"
+          ML_SERVICE_URL: "http://host.docker.internal:5001"
       # --- END BLOCK ---
       Events:
         # Define a specific, public endpoint for user registration

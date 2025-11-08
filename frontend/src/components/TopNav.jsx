@@ -67,6 +67,88 @@ const TopNav = memo(function TopNav() {
 		document.addEventListener("keydown", handleKeyDown);
 		return () => document.removeEventListener("keydown", handleKeyDown);
 	}, [isMobileMenuOpen]);
+                    {/* Desktop Navigation */}
+                    <div className={styles.navLinks}>
+                        {isPublicPage ? (
+                            <>
+                                <NavLink to="/solutions" className={styles.navLink}>Solutions</NavLink>
+                                <NavLink to="/enterprise" className={styles.navLink}>Enterprise</NavLink>
+                                <NavLink to="/api-docs" className={styles.navLink}>API Docs</NavLink>
+                                <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
+                                <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
+                                {user ? (
+                                    <NavLink 
+                                        to="/transformer" 
+                                        className={`${styles.navLink} ${styles.transformerButton}`}
+                                        onClick={handleNavLinkClick}
+                                    >
+                                        Dashboard
+                                    </NavLink>
+                                ) : (
+                                    <>
+                                        <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
+                                        <NavLink to="/register" className={styles.loginButton}>Register</NavLink>
+                                    </>
+                                )}
+                            </>
+                        ) : user ? (
+                            <>
+                                {!isAdminPage && (
+                                    <>
+                                        <NavLink to="/" className={styles.navLink} onClick={handleNavLinkClick}>
+                                            🏠 Home
+                                        </NavLink>
+                                        <NavLink to="/invoices" className={styles.navLink} onClick={handleNavLinkClick}>
+                                            📄 Invoice Extractor
+                                        </NavLink>
+                                        {user?.isAdmin && (
+                                            <NavLink to="/admin" className={styles.navLink} onClick={handleNavLinkClick}>
+                                                👨‍💼 Admin
+                                            </NavLink>
+                                        )}
+                                        <button 
+                                            onClick={() => {
+                                                setIsAnalyticsOpen(true);
+                                                setIsMobileMenuOpen(false);
+                                            }} 
+                                            className={styles.navLink}
+                                            aria-label="Analytics Dashboard"
+                                        >
+                                            📊 Analytics
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowApiSettings(true)} 
+                                            className={styles.navLink}
+                                            aria-label="API Settings"
+                                        >
+                                            ⚙️ API Settings
+                                        </button>
+                                    </>
+                                )}
+                                {isAdminPage && (
+                                    <>
+                                        <NavLink to="/transformer" className={styles.navLink} onClick={handleNavLinkClick}>
+                                            🔄 Transformer
+                                        </NavLink>
+                                    </>
+                                )}
+                                <button 
+                                    onClick={handleProfileClick} 
+                                    className={styles.userButton}
+                                    aria-label="User profile"
+                                >
+                                    <div className={styles.userAvatar}>
+                                        {user?.username?.[0]?.toUpperCase() || 'U'}
+                                    </div>
+                                    <span className={styles.userName}>
+                                        {user?.username || 'Profile'}
+                                    </span>
+                                </button>
+                            </>
+                        ) : (
+                            <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
+                        )}
+                    </div>
 
 	return (
 		<>
@@ -273,6 +355,126 @@ const TopNav = memo(function TopNav() {
 			{isAnalyticsOpen && user && <AnalyticsDashboardModal isOpen={isAnalyticsOpen} onClose={() => setIsAnalyticsOpen(false)} />}
 		</>
 	);
+                {/* Mobile Menu */}
+                {isMobileMenuOpen && (
+                    <div className={styles.mobileMenu}>
+                        {isPublicPage ? (
+                            <>
+                                <NavLink to="/solutions" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    Solutions
+                                </NavLink>
+                                <NavLink to="/enterprise" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    Enterprise
+                                </NavLink>
+                                <NavLink to="/api-docs" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    API Docs
+                                </NavLink>
+                                <NavLink to="/about" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    About Us
+                                </NavLink>
+                                <NavLink to="/contact" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                    Contact Us
+                                </NavLink>
+                                {user ? (
+                                    <NavLink 
+                                        to="/transformer" 
+                                        className={styles.mobileNavLink}
+                                        onClick={handleNavLinkClick}
+                                    >
+                                        Dashboard
+                                    </NavLink>
+                                ) : (
+                                    <>
+                                        <NavLink to="/login" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            Login
+                                        </NavLink>
+                                        <NavLink to="/register" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            Register
+                                        </NavLink>
+                                    </>
+                                )}
+                            </>
+                        ) : user ? (
+                            <>
+                                {!isAdminPage && (
+                                    <>
+                                        <NavLink to="/" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            🏠 Home
+                                        </NavLink>
+                                        <NavLink to="/invoices" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            📄 Invoice Extractor
+                                        </NavLink>
+                                        {user?.isAdmin && (
+                                            <NavLink to="/admin" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                                👨‍💼 Admin
+                                            </NavLink>
+                                        )}
+                                        <button 
+                                            onClick={() => {
+                                                setIsAnalyticsOpen(true);
+                                                setIsMobileMenuOpen(false);
+                                            }} 
+                                            className={styles.mobileNavLink}
+                                        >
+                                            📊 Analytics
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setShowApiSettings(true);
+                                                setIsMobileMenuOpen(false);
+                                            }} 
+                                            className={styles.mobileNavLink}
+                                        >
+                                            ⚙️ API Settings
+                                        </button>
+                                    </>
+                                )}
+                                {isAdminPage && (
+                                    <>
+                                        <NavLink to="/transformer" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                            🔄 Transformer
+                                        </NavLink>
+                                    </>
+                                )}
+                                <button 
+                                    onClick={handleProfileClick} 
+                                    className={styles.mobileUserButton}
+                                >
+                                    <div className={styles.userAvatar}>
+                                        {user?.username?.[0]?.toUpperCase() || 'U'}
+                                    </div>
+                                    <span>{user?.username || 'Profile'}</span>
+                                </button>
+                            </>
+                        ) : (
+                            <NavLink to="/login" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                Login
+                            </NavLink>
+                        )}
+                    </div>
+                )}
+            </nav>
+            {isProfileOpen && user && (
+                <UserProfile 
+                    isOpen={isProfileOpen} 
+                    onClose={() => setIsProfileOpen(false)}
+                    onLogout={handleLogout}
+                />
+            )}
+            {showApiSettings && (
+                <ApiSettingsModal 
+                    isOpen={showApiSettings} 
+                    onClose={() => setShowApiSettings(false)}
+                />
+            )}
+            {isAnalyticsOpen && user && (
+                <AnalyticsDashboardModal
+                    isOpen={isAnalyticsOpen}
+                    onClose={() => setIsAnalyticsOpen(false)}
+                />
+            )}
+        </>
+    );
 });
 
 export default TopNav;

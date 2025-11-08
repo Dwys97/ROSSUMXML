@@ -9,15 +9,43 @@
   },
   "features": {
     "ghcr.io/devcontainers/features/aws-cli:1": {},
-    "ghcr.io/devcontainers/features/python:1": {},
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
     "ghcr.io/devcontainers/features/git-lfs:1": {},
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
-  "forwardPorts": [
-    3000,
-    5173,
-    8080
-  ],
+  "forwardPorts": [3000, 3001, 5001, 5173, 5432, 6379, 8080],
+  "portsAttributes": {
+    "3000": {
+      "label": "Backend API (SAM Lambda)",
+      "protocol": "http"
+    },
+    "3001": {
+      "label": "Socket.io Server (WebSocket)",
+      "protocol": "http"
+    },
+    "5001": {
+      "label": "ML Service (LayoutLMv3)",
+      "protocol": "http"
+    },
+    "5173": {
+      "label": "Frontend (Vite)",
+      "protocol": "http"
+    },
+    "5432": {
+      "label": "PostgreSQL Database",
+      "protocol": "https"
+    },
+    "6379": {
+      "label": "Redis Queue",
+      "protocol": "https"
+    },
+    "8080": {
+      "label": "Lambda Runtime",
+      "protocol": "http"
+    }
+  },
   "postCreateCommand": "pip install aws-sam-cli requests && npm install && npm install --prefix backend && npm install --prefix frontend",
   "postStartCommand": "npm run dev",
   "customizations": {

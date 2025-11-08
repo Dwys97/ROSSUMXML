@@ -1,10 +1,10 @@
 const { Pool } = require('pg');
 
-// Создаем пул соединений с явными параметрами
+// Database connection pool
 const pool = new Pool({
     user: process.env.POSTGRES_USER || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'postgres',
-    host: process.env.POSTGRES_HOST || '172.18.0.2',  // IP-адрес контейнера БД
+    host: process.env.POSTGRES_HOST || 'localhost',  // Use localhost (port is exposed in docker-compose)
     port: process.env.POSTGRES_PORT || 5432,
     database: process.env.POSTGRES_DB || 'rossumxml'
 });

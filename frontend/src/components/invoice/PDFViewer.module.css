@@ -1,0 +1,165 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+}
+
+/* Toolbar */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(26, 32, 44, 0.8);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.toolbarLeft,
+.toolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.toolBtn {
+    padding: 0.5rem 0.75rem;
+    background: rgba(45, 55, 72, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    color: #e2e8f0;
+}
+
+.toolBtn:hover:not(:disabled) {
+    background: rgba(45, 55, 72, 0.8);
+    border-color: rgba(29, 114, 243, 0.5);
+}
+
+.toolBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pageInfo,
+.zoomLevel {
+    font-size: 0.9rem;
+    color: #a0aec0;
+    padding: 0 0.5rem;
+}
+
+/* Viewer */
+.viewer {
+    flex: 1;
+    overflow: auto;
+    background: rgba(16, 20, 30, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+}
+
+.document {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s;
+    position: relative;
+    min-width: 400px;
+    min-height: 500px;
+}
+
+/* Placeholders */
+.pdfPlaceholder,
+.imagePlaceholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    text-align: center;
+}
+
+.placeholderIcon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.placeholderText {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.placeholderHint {
+    margin: 0 0 1rem 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.placeholderDetails {
+    margin: 0;
+    color: #999;
+    font-size: 0.8rem;
+    word-break: break-all;
+    max-width: 400px;
+}
+
+/* Bounding Box */
+.boundingBox {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px dashed #1d72f3;
+    background: rgba(29, 114, 243, 0.15);
+    padding: 2rem;
+    border-radius: 4px;
+}
+
+.boundingBoxLabel {
+    background: #1d72f3;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Info Note */
+.infoNote {
+    background: rgba(245, 124, 0, 0.2);
+    border-top: 1px solid rgba(245, 124, 0, 0.5);
+    padding: 0.75rem 1rem;
+}
+
+.infoNote p {
+    margin: 0;
+    color: #ffb74d;
+    font-size: 0.85rem;
+}
+
+.infoNote strong {
+    font-weight: 600;
+    color: #ffa726;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .toolbar {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .viewer {
+        padding: 1rem;
+    }
+    
+    .document {
+        min-width: 300px;
+        min-height: 400px;
+    }
+}

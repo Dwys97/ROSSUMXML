@@ -1,16 +1,104 @@
+# Dependencies
 node_modules/
+venv/
+env/
+.venv/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment files
 .env
+.env.local
+.env.*.local
+*.env
+env.json
+
+# OS files
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Build artifacts
 frontend/build/
+frontend/dist/
 backend/*.zip
+*.zip
 
 # AWS SAM build artifacts
 backend/.aws-sam/
 .aws-sam/
+samconfig.toml
 
-# Database dumps
+# Database files
 *.dump
+*.sql.backup
+*.db
+*.sqlite
+*.sqlite3
 
-# Webhook XML files (runtime-generated)
+# Log files
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary and test files
+*.tmp
+*.temp
+temp/
+tmp/
+*.test.xml
+*temp*.xml
+transformed-output.xml
+test-results.log
+admin-test-results.log
+
+# Uploads and runtime-generated files
+backend/uploads/*
+!backend/uploads/.gitkeep
 webhook-xmls/source/
 webhook-xmls/transformed/
+
+# IDE and editor files
+.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Coverage and test reports
+coverage/
+.nyc_output/
+.pytest_cache/
+
+# Lock files (optional - uncomment if needed)
+# package-lock.json
+# yarn.lock
+
+# ML Training Artifacts (auto-generated during training)
+# ML Models and Training Artifacts
+backend/ml-service/venv/
+backend/ml-service/layoutlmv3_model/
+backend/ml-service/checkpoints/
+backend/ml-service/adapters/
+backend/ml-service/model_cache/
+backend/ml-service/**/__pycache__/
+backend/ml-service/**/*.pyc
+
+# Node modules
+node_modules/
+frontend-old/
+backend/ml-service/models/*.pt
+backend/ml-service/models/*.pth
+backend/ml-service/models/*.bin
+*.safetensors
+*.onnx
+
+# HuggingFace cache and tokenizers
+*.tokenizer.json
+merges.txt
+vocab.json
