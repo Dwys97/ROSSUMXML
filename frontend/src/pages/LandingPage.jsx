@@ -72,7 +72,7 @@ function LandingPage() {
 		<>
 			<TopNav />
 			<section className="">
-				<section className="flex justify-between items-center bg-gradient-to-r from-blue-950 to-violet-900 px-48 py-12">
+				<section className="flex justify-between items-center bg-linear-to-r from-blue-950 to-violet-900 px-48 py-12">
 					<div className="flex flex-col gap-12">
 						<h1 className="text-5xl font-semibold text-white">Effortless XML Integration</h1>
 						<p className="text-lg text-white">
