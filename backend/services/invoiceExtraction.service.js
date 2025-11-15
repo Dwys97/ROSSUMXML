@@ -8,46 +8,123 @@ const db = require('../db');
 const axios = require('axios');
 const { addExtractionJob, getJobStatus } = require('./extractionQueue.service');
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
+// Route to new microservices API Gateway
+const INVOICE_EXTRACTION_URL = process.env.INVOICE_EXTRACTION_URL || 'http://api-gateway:8000';
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
 
 /**
- * Extract customs data using Donut ML service
+ * Extract customs data using new microservices architecture
+ * Routes to: OCR Service → Extractor Service → HITL (if needed)
  * @param {string} fileData - Base64 encoded file content
  * @param {string} fileType - File type (pdf, png, jpg)
  * @returns {Promise<object>} - Extracted data with confidence scores
  */
 async function extractWithDonutService(fileData, fileType) {
     try {
-        console.log('[InvoiceExtraction] Calling Donut ML service at:', ML_SERVICE_URL);
+        console.log('[InvoiceExtraction] Calling Microservices API Gateway at:', API_GATEWAY_URL);
         console.log('[InvoiceExtraction] File type:', fileType, 'Data length:', fileData.length);
         
-        const response = await axios.post(`${ML_SERVICE_URL}/extract`, {
+        // Call new microservices architecture
+        const response = await axios.post(`${API_GATEWAY_URL}/api/v1/invoice/upload`, {
             file_data: fileData,
             file_type: fileType
         }, {
-            timeout: 120000, // 2 minutes timeout for ML processing
+            timeout: 180000, // 3 minutes (includes OCR + extraction + HITL routing)
             headers: {
                 'Content-Type': 'application/json'
             }
         });
         
         if (!response.data || !response.data.success) {
-            throw new Error('ML service returned unsuccessful response');
+            throw new Error('Microservices API Gateway returned unsuccessful response');
         }
         
-        console.log('[InvoiceExtraction] ML extraction successful, confidence:', response.data.data.confidence);
+        console.log('[InvoiceExtraction] Extraction successful, confidence:', response.data.confidence_score);
         
-        return response.data.data;
+        // Convert microservices response format to legacy format for compatibility
+        return convertMicroservicesResponse(response.data);
         
     } catch (error) {
         if (error.code === 'ECONNREFUSED') {
-            console.error('[InvoiceExtraction] ML service not available - is it running?');
-            throw new Error('ML service unavailable - please ensure ml-service container is running');
+            console.error('[InvoiceExtraction] API Gateway not available - is it running?');
+            throw new Error('Invoice extraction service unavailable - please ensure microservices are running');
         }
         
-        console.error('[InvoiceExtraction] ML service error:', error.message);
+        console.error('[InvoiceExtraction] API Gateway error:', error.message);
         throw error;
     }
+}
+
+/**
+ * Convert microservices response format to legacy format
+ */
+function convertMicroservicesResponse(microservicesData) {
+    const fields = microservicesData.fields || {};
+    
+    return {
+        // Convert GLiNER fields to legacy structure
+        invoice_number: fields.invoice_number?.value || null,
+        invoice_date: fields.invoice_date?.value || null,
+        vendor_name: fields.vendor_name?.value || null,
+        vendor_address: fields.vendor_address?.value || null,
+        vat_number: fields.vat_number?.value || null,
+        buyer_name: fields.buyer_name?.value || null,
+        buyer_address: fields.buyer_address?.value || null,
+        total_amount: fields.total_amount?.value || null,
+        currency: fields.currency?.value || null,
+        confidence: microservicesData.confidence_score || 0,
+        
+        // Include line items if present
+        line_items: extractLineItems(fields),
+        
+        // Metadata
+        extraction_method: 'microservices_gliner',
+        hitl_required: microservicesData.hitl_required || false,
+        label_studio_task_id: microservicesData.label_studio_task_id || null
+    };
+}
+
+/**
+ * Extract line items from GLiNER fields
+ */
+function extractLineItems(fields) {
+    const items = [];
+    
+    // Group related item fields
+    const descriptions = findFieldsByPrefix(fields, 'item_description');
+    const quantities = findFieldsByPrefix(fields, 'item_quantity');
+    const unitPrices = findFieldsByPrefix(fields, 'item_unit_price');
+    const totals = findFieldsByPrefix(fields, 'item_total');
+    
+    const maxItems = Math.max(
+        descriptions.length,
+        quantities.length,
+        unitPrices.length,
+        totals.length
+    );
+    
+    for (let i = 0; i < maxItems; i++) {
+        items.push({
+            description: descriptions[i]?.value || null,
+            quantity: parseFloat(quantities[i]?.value) || 0,
+            unit_price: parseFloat(unitPrices[i]?.value) || 0,
+            total: parseFloat(totals[i]?.value) || 0,
+            confidence: Math.min(
+                descriptions[i]?.confidence || 0,
+                quantities[i]?.confidence || 0,
+                unitPrices[i]?.confidence || 0,
+                totals[i]?.confidence || 0
+            )
+        });
+    }
+    
+    return items;
+}
+
+function findFieldsByPrefix(fields, prefix) {
+    return Object.entries(fields)
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([_, value]) => value);
 }
 
 /**
@@ -183,46 +260,6 @@ async function extractInvoiceData(invoiceId) {
     }
     
     throw new Error('Extraction timeout');
-}
-
-/**
- * Extract data with ML service (legacy method for direct calls)
- * @param {string} fileData - Base64 encoded file content
- * @param {string} fileType - File type (pdf, png, jpg)
- * @returns {Promise<object>} - Extracted data with confidence scores
- */
-async function extractWithDonutService(fileData, fileType) {
-    try {
-        console.log('[InvoiceExtraction] Calling ML service at:', ML_SERVICE_URL);
-        console.log('[InvoiceExtraction] File type:', fileType, 'Data length:', fileData.length);
-        
-        const response = await axios.post(`${ML_SERVICE_URL}/extract`, {
-            file_data: fileData,
-            file_type: fileType
-        }, {
-            timeout: 120000, // 2 minutes timeout for ML processing
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.data || !response.data.success) {
-            throw new Error('ML service returned unsuccessful response');
-        }
-        
-        console.log('[InvoiceExtraction] ML extraction successful, confidence:', response.data.data.confidence);
-        
-        return response.data.data;
-        
-    } catch (error) {
-        if (error.code === 'ECONNREFUSED') {
-            console.error('[InvoiceExtraction] ML service not available - is it running?');
-            throw new Error('ML service unavailable - please ensure ml-service container is running');
-        }
-        
-        console.error('[InvoiceExtraction] ML service error:', error.message);
-        throw error;
-    }
 }
 
 /**

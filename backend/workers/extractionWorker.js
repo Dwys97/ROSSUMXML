@@ -10,7 +10,8 @@ const fs = require('fs').promises;
 const logger = require('../utils/logger');
 const io = require('socket.io-client');
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
+// Route to new microservices API Gateway
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://localhost:8000';
 const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3001';
 const ML_HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
 const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
@@ -20,8 +21,8 @@ let mlServiceHealthy = false;
 let lastHealthCheck = 0;
 
 /**
- * Check ML service health
- * Performs a health check on the ML service with caching to avoid excessive requests.
+ * Check API Gateway health
+ * Performs a health check on the microservices API Gateway with caching.
  * Health check results are cached for 30 seconds.
  * 
  * @returns {Promise<boolean>} True if service is healthy and responding, false otherwise
@@ -34,17 +35,15 @@ async function checkMLServiceHealth() {
     }
 
     try {
-        const response = await axios.get(`${ML_SERVICE_URL}/health`, {
+        const response = await axios.get(`${API_GATEWAY_URL}/health`, {
             timeout: ML_HEALTH_CHECK_TIMEOUT
         });
         
-        mlServiceHealthy = response.status === 200 && response.data.status === 'healthy';
+        mlServiceHealthy = response.status === 200;
         lastHealthCheck = now;
         
         if (mlServiceHealthy) {
-            const mode = response.data.mode || 'production';
-            const modelLoaded = response.data.model_loaded;
-            logger.info(`ML service health check passed (mode: ${mode}, model loaded: ${modelLoaded})`);
+            logger.info('Microservices API Gateway health check passed');
         }
         
         return mlServiceHealthy;
@@ -53,6 +52,50 @@ async function checkMLServiceHealth() {
         logger.error(`ML service health check failed: ${error.message}`);
         return false;
     }
+}
+
+/**
+ * Convert microservices response format to legacy format
+ */
+function convertMicroservicesResponse(microservicesData) {
+    const fields = microservicesData.fields || {};
+    
+    return {
+        invoice_number: fields.invoice_number?.value || null,
+        invoice_date: fields.invoice_date?.value || null,
+        vendor_name: fields.vendor_name?.value || null,
+        vendor_address: fields.vendor_address?.value || null,
+        vat_number: fields.vat_number?.value || null,
+        buyer_name: fields.buyer_name?.value || null,
+        buyer_address: fields.buyer_address?.value || null,
+        total_amount: fields.total_amount?.value || null,
+        currency: fields.currency?.value || null,
+        confidence: microservicesData.confidence_score || 0,
+        line_items: extractLineItems(fields),
+        extraction_method: 'microservices_gliner',
+        hitl_required: microservicesData.hitl_required || false,
+        label_studio_task_id: microservicesData.label_studio_task_id || null
+    };
+}
+
+/**
+ * Extract line items from GLiNER fields
+ */
+function extractLineItems(fields) {
+    const items = [];
+    const descriptions = Object.keys(fields).filter(k => k.startsWith('item_description_'));
+    
+    descriptions.forEach(key => {
+        const index = key.split('_').pop();
+        items.push({
+            description: fields[`item_description_${index}`]?.value || null,
+            quantity: fields[`item_quantity_${index}`]?.value || null,
+            unit_price: fields[`item_unit_price_${index}`]?.value || null,
+            total: fields[`item_total_${index}`]?.value || null
+        });
+    });
+    
+    return items;
 }
 
 // Socket.io client for emitting events to Socket.io server
@@ -176,22 +219,25 @@ async function processExtractionJob(job) {
         await job.progress(40);
         socketEvents.emitExtractionProgress(invoiceId, 40, 'Running AI extraction');
         
-        // Check ML service health before making request
+        // Check API Gateway health before making request
         const isHealthy = await checkMLServiceHealth();
         if (!isHealthy) {
             throw new Error(
-                `ML service is not available at ${ML_SERVICE_URL}. ` +
-                `Please ensure the ML service is running. ` +
-                `Start it with: ./start-ml-mock.sh (development) or ./start-ml-service.sh (production)`
+                `Microservices API Gateway is not available at ${API_GATEWAY_URL}. ` +
+                `Please ensure microservices are running. ` +
+                `Start with: docker-compose up ocr-service extractor-service api-gateway`
             );
         }
         
-        logger.info(`Calling ML service for invoice ${invoiceId}`);
+        logger.info(`Calling Microservices API Gateway for invoice ${invoiceId}`);
 
         const startTime = Date.now();
         const response = await axios.post(
-            `${ML_SERVICE_URL}/extract-advanced`,
-            extractionPayload,
+            `${API_GATEWAY_URL}/api/v1/invoice/upload`,
+            {
+                file_data: base64File,
+                file_type: fileType
+            },
             {
                 timeout: 180000, // 3 minutes
                 maxContentLength: 50 * 1024 * 1024, // 50MB
@@ -206,10 +252,11 @@ async function processExtractionJob(job) {
         socketEvents.emitExtractionProgress(invoiceId, 70, 'Processing extraction results');
 
         if (!response.data.success) {
-            throw new Error(response.data.error || 'ML service extraction failed');
+            throw new Error(response.data.error || 'Microservices extraction failed');
         }
 
-        const extractedData = response.data.data;
+        // Convert microservices response format
+        const extractedData = convertMicroservicesResponse(response.data);
 
         // Save extraction results to database
         await job.progress(80);
@@ -575,18 +622,18 @@ extractionQueue.on('failed', (job, error) => {
     logger.error(`Worker failed job ${job.id}:`, error.message);
 });
 
-// Perform initial ML service health check
+// Perform initial API Gateway health check
 (async () => {
     logger.info('Extraction worker started');
-    logger.info(`ML service URL: ${ML_SERVICE_URL}`);
+    logger.info(`Microservices API Gateway URL: ${API_GATEWAY_URL}`);
     
     const isHealthy = await checkMLServiceHealth();
     if (isHealthy) {
-        logger.info('✅ ML service is healthy and ready');
+        logger.info('✅ Microservices API Gateway is healthy and ready');
     } else {
-        logger.warn('⚠️  ML service health check failed');
-        logger.warn('   Extraction jobs will fail until ML service is available');
-        logger.warn('   Start ML service with: ./start-ml-mock.sh');
+        logger.warn('⚠️  API Gateway health check failed');
+        logger.warn('   Extraction jobs will fail until microservices are available');
+        logger.warn('   Start with: docker-compose up ocr-service extractor-service api-gateway');
     }
     
     logger.info('Worker is ready to process extraction jobs');
