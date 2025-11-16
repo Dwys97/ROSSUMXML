@@ -90,16 +90,38 @@ def process_document():
         # Handle file upload
         if 'file' in request.files:
             file = request.files['file']
+            logger.info(f"Received file: {file.filename}, content_type: {file.content_type}")
             image_bytes = file.read()
+            logger.info(f"File size: {len(image_bytes)} bytes")
         elif request.json and 'file_data' in request.json:
             import base64
             file_data = request.json['file_data']
             image_bytes = base64.b64decode(file_data)
+            logger.info(f"Decoded base64 file size: {len(image_bytes)} bytes")
         else:
             return jsonify({'error': 'No file provided'}), 400
         
+        # Check if image_bytes is empty
+        if not image_bytes or len(image_bytes) == 0:
+            return jsonify({'error': 'Empty file received'}), 400
+        
+        # Check if PDF and convert to image
+        if image_bytes.startswith(b'%PDF'):
+            logger.info("Detected PDF file, converting to image...")
+            import fitz  # PyMuPDF
+            pdf_doc = fitz.open(stream=image_bytes, filetype="pdf")
+            page = pdf_doc[0]  # First page
+            pix = page.get_pixmap(dpi=300)  # High DPI for OCR
+            image_bytes = pix.tobytes("png")
+            pdf_doc.close()
+            logger.info(f"PDF converted to PNG: {len(image_bytes)} bytes")
+        
         # Convert to PIL Image
-        image = Image.open(io.BytesIO(image_bytes))
+        try:
+            image = Image.open(io.BytesIO(image_bytes))
+        except Exception as e:
+            logger.error(f"Failed to open image. First 100 bytes: {image_bytes[:100]}")
+            raise
         image_np = np.array(image)
         
         # Step 1: OCR with bounding boxes
