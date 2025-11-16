@@ -276,19 +276,21 @@ cd ROSSUMXML
 # 2. Start database
 bash start-db.sh
 
-# 3. Start backend (AWS SAM Local)
+# 3. Start backend (Express + docker-compose)
 bash start-backend.sh
 
 # 4. Start frontend (React + Vite)
 bash start-frontend.sh
 
-# OR start everything at once
+# OR start everything at once (recommended)
 bash start-dev.sh
 ```
 
 **Access Points:**
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3000
+- Socket.io Server: http://localhost:3001
+- API Gateway (Microservices): http://localhost:8000
 - Database: localhost:5432 (postgres/postgres)
 
 ---

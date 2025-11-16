@@ -220,5 +220,14 @@ def extract_table_structure(table_item):
     return {'rows': [], 'html': html}
 
 if __name__ == '__main__':
+    # Initialize models at startup to avoid race conditions
+    logger.info("Pre-loading PaddleOCR models at startup...")
+    try:
+        initialize_models()
+        logger.info("✓ All models loaded successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize models: {e}")
+        raise
+    
     port = int(os.getenv('PORT', 5002))
     app.run(host='0.0.0.0', port=port, debug=False)

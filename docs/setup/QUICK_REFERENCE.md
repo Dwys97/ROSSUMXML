@@ -31,7 +31,7 @@ bash start-dev.sh
 ### Start Individual Services
 ```bash
 bash start-db.sh          # PostgreSQL database
-bash start-backend.sh     # AWS SAM Local API
+bash start-backend.sh     # Express via docker-compose
 bash start-frontend.sh    # Vite dev server
 bash start-ngrok.sh       # ngrok tunnel
 bash auto-export-xmls.sh  # DB watcher
@@ -97,11 +97,11 @@ cd backend
 # Install dependencies
 npm install
 
-# Build Lambda
-sam build
-
 # Run tests
 npm test
+
+# Restart backend
+docker-compose restart backend
 ```
 
 ### Frontend
@@ -151,7 +151,8 @@ docker logs rossumxml-db-1
 **"column r.id does not exist"**
 ```bash
 bash fix-database-schema.sh
-cd backend && sam build
+cd backend && npm install
+docker-compose restart backend
 ```
 
 **"relation role_permissions does not exist"**

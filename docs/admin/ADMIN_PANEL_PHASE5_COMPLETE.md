@@ -334,7 +334,7 @@ if (path.match(/^\/api\/admin\/subscriptions\/[a-f0-9-]+$/) && method === 'PUT')
 ## 👥 Credits
 
 **Implementation:** GitHub Copilot AI Agent  
-**Testing Environment:** AWS SAM Local (Lambda Node.js 18.x)  
+**Testing Environment:** Express server (Node.js 18.x) with Lambda handler wrapper  
 **Database:** PostgreSQL 13  
 **Testing Date:** October 10, 2025  
 **Admin Test User:** d.radionovs@gmail.com

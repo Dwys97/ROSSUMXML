@@ -97,6 +97,17 @@
             }
         },
         {
+            "label": "ML: Start All Microservices",
+            "type": "shell",
+            "command": "docker-compose up -d ocr-service extractor-service api-gateway redis",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false
+            }
+        },
+        {
             "label": "ML: Start Socket Server",
             "type": "shell",
             "command": "bash start-socket-server.sh",

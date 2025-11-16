@@ -231,14 +231,28 @@ async function processExtractionJob(job) {
         
         logger.info(`Calling Microservices API Gateway for invoice ${invoiceId}`);
 
+        // Convert base64 to buffer and create FormData
+        const FormData = require('form-data');
+        const formData = new FormData();
+        
+        // Determine filename with extension
+        const fileExtension = fileType.replace('application/', '.').replace('image/', '.');
+        const fileName = `${invoiceId}${fileExtension}`;
+        
+        // Add file to form data
+        formData.append('file', fileBuffer, {
+            filename: fileName,
+            contentType: fileType === 'pdf' ? 'application/pdf' : `image/${fileType}`
+        });
+
         const startTime = Date.now();
         const response = await axios.post(
             `${API_GATEWAY_URL}/api/v1/invoice/upload`,
+            formData,
             {
-                file_data: base64File,
-                file_type: fileType
-            },
-            {
+                headers: {
+                    ...formData.getHeaders()
+                },
                 timeout: 180000, // 3 minutes
                 maxContentLength: 50 * 1024 * 1024, // 50MB
                 maxBodyLength: 50 * 1024 * 1024
