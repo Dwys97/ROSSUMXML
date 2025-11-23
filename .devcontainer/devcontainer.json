@@ -1,6 +1,9 @@
 {
   "name": "AWS Serverless App",
   "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "hostRequirements": {
+    "storage": "64gb"
+  },
   "containerEnv": {
     "AWS_ACCESS_KEY_ID": "testing",
     "AWS_SECRET_ACCESS_KEY": "testing",

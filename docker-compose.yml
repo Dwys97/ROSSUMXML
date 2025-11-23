@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ==========================================
   # P1: OCR & Layout Processor (PaddleOCR + PP-Structure)
