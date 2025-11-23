@@ -5719,6 +5719,8 @@ exports.handler = async (event) => {
                     console.log('[FILE DOWNLOAD] File type:', file_type);
                     console.log('[FILE DOWNLOAD] File name:', file_name);
                     console.log('[FILE DOWNLOAD] File data length:', file_data ? file_data.length : 0, 'chars');
+                    console.log('[FILE DOWNLOAD] File data first 100 chars:', file_data ? file_data.substring(0, 100) : 'null');
+                    console.log('[FILE DOWNLOAD] File data type:', typeof file_data);
                     
                     if (!file_data) {
                         console.error('[FILE DOWNLOAD] No file data stored in database');
@@ -5728,11 +5730,13 @@ exports.handler = async (event) => {
                     }
                     
                     console.log('[FILE DOWNLOAD] Returning file from database');
+                    console.log('[FILE DOWNLOAD] Response isBase64Encoded: true (Express will decode to binary)');
                     
+                    // Return base64 data - Express wrapper will decode to binary PDF
                     return {
                         statusCode: 200,
                         headers: {
-                            'Content-Type': file_type || 'application/pdf',
+                            'Content-Type': 'application/pdf',
                             'Content-Disposition': `inline; filename="${file_name}"`,
                             'Access-Control-Allow-Origin': '*',
                             'Access-Control-Allow-Methods': 'GET, OPTIONS',

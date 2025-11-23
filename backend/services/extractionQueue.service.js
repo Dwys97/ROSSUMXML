@@ -9,9 +9,10 @@ const logger = require('../utils/logger');
 
 // Redis connection configuration
 const redisConfig = {
-    host: process.env.REDIS_HOST || 'localhost',
+    host: process.env.REDIS_HOST || 'redis',  // Use 'redis' service name in Docker, or localhost for dev
     port: process.env.REDIS_PORT || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
+    family: 4,  // Force IPv4
     maxRetriesPerRequest: null,
     enableReadyCheck: false
 };

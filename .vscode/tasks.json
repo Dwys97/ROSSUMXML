@@ -15,13 +15,14 @@
         {
             "label": "2. Start Backend",
             "type": "shell",
-            "command": "bash start-backend.sh",
+            "command": "docker-compose up -d backend && echo '✅ Backend started. Showing logs...' && docker-compose logs -f backend",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "focus": false
+                "focus": false,
+                "showReuseMessage": false
             }
         },
         {
