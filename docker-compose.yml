@@ -9,6 +9,8 @@ services:
     environment:
       PORT: 5002
       PYTHONUNBUFFERED: 1
+      FLAGS_use_mkldnn: 0
+      FLAGS_enable_mkldnn: 0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
       interval: 30s

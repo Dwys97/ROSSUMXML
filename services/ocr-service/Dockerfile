@@ -18,6 +18,10 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Disable MKLDNN to prevent "could not create a primitive descriptor" error
+ENV FLAGS_use_mkldnn=0
+ENV FLAGS_enable_mkldnn=0
+
 # Copy application
 COPY app.py .
 
