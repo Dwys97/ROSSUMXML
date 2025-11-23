@@ -18,9 +18,14 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Disable MKLDNN to prevent "could not create a primitive descriptor" error
+# Disable MKLDNN/oneDNN to prevent "could not create a primitive descriptor" error
 ENV FLAGS_use_mkldnn=0
 ENV FLAGS_enable_mkldnn=0
+ENV CPU_NUM=1
+ENV MKL_NUM_THREADS=1
+ENV OMP_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV FLAGS_cpu_deterministic=true
 
 # Copy application
 COPY app.py .

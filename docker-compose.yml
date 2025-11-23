@@ -11,6 +11,11 @@ services:
       PYTHONUNBUFFERED: 1
       FLAGS_use_mkldnn: 0
       FLAGS_enable_mkldnn: 0
+      CPU_NUM: 1
+      MKL_NUM_THREADS: 1
+      OMP_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      FLAGS_cpu_deterministic: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
       interval: 30s

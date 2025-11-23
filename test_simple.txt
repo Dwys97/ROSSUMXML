@@ -1,0 +1,21 @@
+COMMERCIAL INVOICE
+
+Invoice Number: INV-2025-001
+Date: 2025-01-15
+Currency: USD
+Incoterm: FOB
+
+Seller: ABC Company Ltd.
+123 Business St
+New York, NY 10001
+VAT: US12345678
+
+Buyer: XYZ Corporation
+456 Trade Ave
+Los Angeles, CA 90001
+
+LINE ITEMS:
+1. Widget Type A - HS: 8418.10 - Origin: USA - Qty: 100 - Price: $50.00
+2. Component B - HS: 8536.50 - Origin: CHN - Qty: 200 - Price: $25.00
+
+TOTAL: $10,000.00

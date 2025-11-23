@@ -279,8 +279,22 @@ async def process_invoice(
             if not ocr_data.get('success'):
                 raise Exception("OCR processing failed")
             
-            text_blocks = ocr_data['document']['text_blocks']
-            logger.info(f"[{job_id}] OCR complete: {len(text_blocks)} text blocks")
+            # Extract text blocks from new OCR format (layout blocks)
+            layout_blocks = ocr_data.get('layout', [])
+            text_with_context = ocr_data.get('text_with_context', '')
+            raw_text = ocr_data.get('raw_text', '')
+            
+            # Convert layout blocks to text_blocks format for extractor
+            text_blocks = []
+            for block in layout_blocks:
+                text_blocks.append({
+                    'text': block.get('content', ''),
+                    'bbox': block.get('bbox', []),
+                    'type': block.get('type', 'text'),
+                    'confidence': block.get('confidence', 1.0)
+                })
+            
+            logger.info(f"[{job_id}] OCR complete: {len(text_blocks)} text blocks, {len(raw_text)} chars")
             
             # Step 2: Call Service B (Extraction)
             logger.info(f"[{job_id}] Calling Service B (Extraction)")

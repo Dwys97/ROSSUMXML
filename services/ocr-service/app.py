@@ -11,9 +11,29 @@ import json
 import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from paddleocr import PaddleOCR, PPStructure
+
+# ⭐ CRITICAL: Disable MKL-DNN BEFORE importing PaddlePaddle
+os.environ['FLAGS_use_mkldnn'] = '0'
+os.environ['FLAGS_enable_mkldnn'] = '0'
+os.environ['CPU_NUM'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+
+# Now import PaddlePaddle-dependent libraries
+from paddleocr import PaddleOCR
+# PPStructure disabled due to MKL-DNN crashes in layout analysis
+# from paddleocr import PPStructure
 from PIL import Image
 import numpy as np
+
+# Try to import paddle to set flags programmatically
+try:
+    import paddle
+    paddle.set_flags({'FLAGS_use_mkldnn': False})
+    paddle.set_flags({'FLAGS_enable_mkldnn': False})
+except Exception as e:
+    logging.warning(f"Could not set paddle flags programmatically: {e}")
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +55,8 @@ def initialize_models():
     
     if ocr_engine is None:
         logger.info("Initializing PaddleOCR (lightweight model)...")
+        logger.info(f"MKL-DNN flags: use_mkldnn={os.getenv('FLAGS_use_mkldnn')}, CPU_NUM={os.getenv('CPU_NUM')}")
+        
         ocr_engine = PaddleOCR(
             use_angle_cls=True,
             lang='en',
@@ -46,15 +68,11 @@ def initialize_models():
         )
         logger.info("✓ PaddleOCR initialized")
     
+    # PP-Structure disabled due to MKL-DNN crashes
+    # Using OCR-only mode for stability
     if layout_analyzer is None:
-        logger.info("Initializing PP-Structure...")
-        layout_analyzer = PPStructure(
-            use_gpu=False,
-            show_log=False,
-            layout_model_dir=None,  # Use default layout model
-            table_model_dir=None    # Use default table model
-        )
-        logger.info("✓ PP-Structure initialized")
+        logger.info("PP-Structure disabled (using OCR-only mode for stability)")
+        layout_analyzer = None
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -124,13 +142,38 @@ def process_document():
             raise
         image_np = np.array(image)
         
-        # Step 1: OCR with bounding boxes
+        # Step 1: OCR with bounding boxes (with retry on MKL-DNN errors)
         logger.info("Running OCR...")
-        ocr_result = ocr_engine.ocr(image_np, cls=True)
+        ocr_result = None
+        max_retries = 3
         
-        # Step 2: Layout analysis
-        logger.info("Analyzing layout...")
-        layout_result = layout_analyzer(image_np)
+        for attempt in range(max_retries):
+            try:
+                ocr_result = ocr_engine.ocr(image_np, cls=True)
+                break  # Success
+            except RuntimeError as e:
+                error_msg = str(e)
+                if 'primitive' in error_msg.lower() and attempt < max_retries - 1:
+                    logger.warning(f"MKL-DNN error on attempt {attempt+1}/{max_retries}, retrying...")
+                    # Try without angle classifier on retry
+                    try:
+                        ocr_result = ocr_engine.ocr(image_np, cls=False)
+                        break
+                    except Exception as retry_error:
+                        logger.error(f"Retry failed: {retry_error}")
+                        if attempt == max_retries - 1:
+                            raise
+                else:
+                    raise
+        
+        if ocr_result is None:
+            raise RuntimeError("OCR failed after all retries")
+        
+        # Step 2: Layout analysis (DISABLED due to MKL-DNN instability)
+        # PP-Structure causes crashes even with MKL-DNN disabled
+        # Using OCR-only mode for stability
+        logger.info("Skipping layout analysis (using OCR-only mode for stability)")
+        layout_result = []
         
         # Step 3: Augment text with spatial context
         augmented_text, raw_text, layout_blocks, tables = augment_text_with_context(
