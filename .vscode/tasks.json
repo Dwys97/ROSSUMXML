@@ -2,30 +2,18 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Start Database",
+            "label": "1. Start Database",
             "type": "shell",
             "command": "bash start-db.sh",
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "group": "dev"
+                "focus": false
             }
         },
         {
-            "label": "Start Frontend",
-            "type": "shell",
-            "command": "bash start-frontend.sh",
-            "problemMatcher": [],
-            "isBackground": true,
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "group": "dev"
-            }
-        },
-        {
-            "label": "Start Backend",
+            "label": "2. Start Backend",
             "type": "shell",
             "command": "bash start-backend.sh",
             "problemMatcher": [],
@@ -33,55 +21,83 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "group": "dev"
+                "focus": false
             }
         },
         {
-            "label": "Start All (Dev)",
+            "label": "3. Start Frontend",
             "type": "shell",
-            "command": "bash start-dev.sh",
+            "command": "bash start-frontend.sh",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "group": "dev"
+                "focus": false
             }
         },
         {
-            "label": "Start DB Watcher",
+            "label": "ML: Start OCR Service",
             "type": "shell",
-            "command": "bash auto-export-xmls.sh",
+            "command": "docker-compose up ocr-service",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "group": "dev"
+                "focus": false
             }
         },
         {
-            "label": "Start ML Service (LayoutLMv3)",
+            "label": "ML: Start Extractor Service",
             "type": "shell",
-            "command": "source /opt/conda/etc/profile.d/conda.sh && conda activate base && cd backend/ml-service && python app-advanced.py",
+            "command": "docker-compose up extractor-service",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "group": "dev"
-            },
-            "options": {
-                "env": {
-                    "ML_LAYOUTLM_ENABLED": "true",
-                    "ML_LAYOUTLM_LAZY": "true",
-                    "PORT": "5001",
-                    "FLASK_ENV": "development"
-                }
+                "focus": false
             }
         },
         {
-            "label": "Start Socket Server",
+            "label": "ML: Start API Gateway",
+            "type": "shell",
+            "command": "docker-compose up api-gateway",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false
+            }
+        },
+        {
+            "label": "ML: Start Label Studio",
+            "type": "shell",
+            "command": "docker-compose up label-studio",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false
+            }
+        },
+        {
+            "label": "ML: Start Redis",
+            "type": "shell",
+            "command": "docker-compose up redis",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false
+            }
+        },
+        {
+            "label": "ML: Start Socket Server",
             "type": "shell",
             "command": "bash start-socket-server.sh",
             "problemMatcher": [],
@@ -89,11 +105,11 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "group": "dev"
+                "focus": false
             }
         },
         {
-            "label": "Start Worker",
+            "label": "ML: Start Worker",
             "type": "shell",
             "command": "bash start-worker.sh",
             "problemMatcher": [],
@@ -101,19 +117,57 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "group": "dev"
+                "focus": false
             }
         },
         {
-            "label": "Start NGROK",
+            "label": "Utility: Kill Process on Port",
+            "type": "shell",
+            "command": "bash kill-port.sh ${input:portNumber}",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Utility: Start NGROK",
             "type": "shell",
             "command": "bash start-ngrok.sh",
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
-                "group": "dev"
+                "panel": "dedicated"
             }
+        },
+        {
+            "label": "Utility: Stop All Services",
+            "type": "shell",
+            "command": "docker-compose down",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Utility: View All Logs",
+            "type": "shell",
+            "command": "docker-compose logs -f",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "portNumber",
+            "type": "promptString",
+            "description": "Enter port number to kill process on:",
+            "default": "3000"
         }
     ]
 }

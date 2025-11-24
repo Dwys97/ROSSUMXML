@@ -1,5 +1,111 @@
 version: '3.8'
+
 services:
+  # ==========================================
+  # P1: OCR & Layout Processor (PaddleOCR + PP-Structure)
+  # ==========================================
+  ocr-service:
+    build: ./services/ocr-service
+    ports:
+      - "5002:5002"
+    environment:
+      PORT: 5002
+      PYTHONUNBUFFERED: 1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
+  # ==========================================
+  # P2: Semantic Extractor (GLiNER)
+  # ==========================================
+  extractor-service:
+    build: ./services/extractor-service
+    ports:
+      - "5003:5003"
+    environment:
+      PORT: 5003
+      GLINER_MODEL_PATH: urchade/gliner_small-v2.1
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./services/models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
+  # ==========================================
+  # P3: API Gateway & HITL Orchestrator
+  # ==========================================
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      SERVICE_OCR_URL: http://ocr-service:5002
+      SERVICE_EXTRACTOR_URL: http://extractor-service:5003
+      LABEL_STUDIO_URL: http://label-studio:8080
+      LABEL_STUDIO_API_KEY: ${LABEL_STUDIO_API_KEY:-}
+      CONFIDENCE_THRESHOLD: 0.90
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/rossumxml
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - ocr-service
+      - extractor-service
+      - label-studio
+      - db
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # ==========================================
+  # Label Studio (HITL)
+  # ==========================================
+  label-studio:
+    image: heartexlabs/label-studio:latest
+    ports:
+      - "8080:8080"
+    environment:
+      LABEL_STUDIO_HOST: http://localhost:8080
+      LABEL_STUDIO_USERNAME: admin@localhost
+      LABEL_STUDIO_PASSWORD: admin123
+      # Use shared PostgreSQL database
+      DJANGO_DB: default
+      POSTGRE_NAME: rossumxml
+      POSTGRE_USER: postgres
+      POSTGRE_PASSWORD: postgres
+      POSTGRE_HOST: db
+      POSTGRE_PORT: 5432
+      # Disable default SQLite
+      LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
+    depends_on:
+      - db
+    volumes:
+      - label_studio_data:/label-studio/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
+  # ==========================================
+  # Legacy Backend (XML Transformation + Invoice API)
+  # ==========================================
   backend:
     build: ./backend
     ports:
@@ -12,33 +118,15 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       JWT_SECRET: 6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e
-      ML_SERVICE_URL: http://ml-service:5001
+      # Route invoice extraction to new microservices
+      INVOICE_EXTRACTION_URL: http://api-gateway:8000
+      API_GATEWAY_URL: http://api-gateway:8000
     depends_on:
       - db
-      - ml-service
-
-  ml-service:
-    build: ./backend/ml-service
-    ports:
-      - "5001:5001"
-    environment:
-      MODEL_NAME: naver-clova-ix/donut-base-finetuned-docvqa
-      PYTHONUNBUFFERED: 1
-    # Uncomment for GPU support (requires nvidia-docker)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
+      - api-gateway
+    restart: unless-stopped  # ==========================================
+  # Infrastructure Services
+  # ==========================================
   db:
     image: postgres:13
     restart: always
@@ -68,3 +156,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  label_studio_data:
