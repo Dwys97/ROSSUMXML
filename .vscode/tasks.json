@@ -1,17 +1,187 @@
 {
     "version": "2.0.0",
     "tasks": [
+        // ==========================================
+        // Master Development Task
+        // ==========================================
         {
-            "label": "1. Start Database",
-            "type": "shell",
-            "command": "bash start-db.sh",
+            "label": "🚀 Start All Dev Services (Separate Terminals)",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "1. Start Database",
+                "2. Start Redis",
+                "3. Start OCR Service (GLiNER)",
+                "4. Start Extractor Service (GLiNER)",
+                "5. Start API Gateway (GLiNER)",
+                "6. Start Label Studio (HITL)",
+                "7. Start Backend",
+                "8. Start Socket Server",
+                "9. Start Worker",
+                "10. Start Frontend"
+            ],
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "focus": false
+                "focus": true
             }
         },
+        
+        // ==========================================
+        // Infrastructure Services
+        // ==========================================
+        {
+            "label": "1. Start Database",
+            "type": "shell",
+            "command": "docker-compose up db",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "infrastructure"
+            }
+        },
+        {
+            "label": "2. Start Redis",
+            "type": "shell",
+            "command": "docker-compose up redis",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "infrastructure"
+            }
+        },
+        
+        // ==========================================
+        // GLiNER Microservices
+        // ==========================================
+        {
+            "label": "3. Start OCR Service (GLiNER)",
+            "type": "shell",
+            "command": "docker-compose up ocr-service",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "microservices"
+            }
+        },
+        {
+            "label": "4. Start Extractor Service (GLiNER)",
+            "type": "shell",
+            "command": "docker-compose up extractor-service",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "microservices"
+            }
+        },
+        {
+            "label": "5. Start API Gateway (GLiNER)",
+            "type": "shell",
+            "command": "docker-compose up api-gateway",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "microservices"
+            }
+        },
+        {
+            "label": "6. Start Label Studio (HITL)",
+            "type": "shell",
+            "command": "docker-compose up label-studio",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "microservices"
+            }
+        },
+        
+        // ==========================================
+        // Application Services
+        // ==========================================
+        {
+            "label": "7. Start Backend",
+            "type": "shell",
+            "command": "echo '🔧 Starting Backend (Express + XML transformation)...' && sleep 3 && docker-compose up backend",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "application"
+            }
+        },
+        {
+            "label": "8. Start Socket Server",
+            "type": "shell",
+            "command": "bash start-socket-server.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "application"
+            }
+        },
+        {
+            "label": "9. Start Worker",
+            "type": "shell",
+            "command": "bash start-worker.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false,
+                "showReuseMessage": false,
+                "group": "application"
+            }
+        },
+        {
+            "label": "10. Start Frontend",
+            "type": "shell",
+            "command": "bash start-frontend.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true,
+                "showReuseMessage": false,
+                "group": "application"
+            }
+        },
+        
+        // ==========================================
+        // Legacy Individual Tasks (for backward compatibility)
+        // ==========================================
         {
             "label": "2. Start Backend",
             "type": "shell",
@@ -21,8 +191,7 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
-                "focus": false,
-                "showReuseMessage": false
+                "focus": false
             }
         },
         {
@@ -132,6 +301,10 @@
                 "focus": false
             }
         },
+        
+        // ==========================================
+        // Utility Tasks
+        // ==========================================
         {
             "label": "Utility: Kill Process on Port",
             "type": "shell",
@@ -155,7 +328,7 @@
         {
             "label": "Utility: Stop All Services",
             "type": "shell",
-            "command": "docker-compose down",
+            "command": "docker-compose down && echo '✅ All services stopped'",
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
@@ -168,6 +341,16 @@
             "command": "docker-compose logs -f",
             "problemMatcher": [],
             "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Utility: Health Check All Services",
+            "type": "shell",
+            "command": "echo '🏥 Checking service health...' && echo '' && echo '📦 Infrastructure:' && curl -sf http://localhost:5432 >/dev/null && echo '✅ PostgreSQL' || echo '❌ PostgreSQL' && curl -sf http://localhost:6379 >/dev/null && echo '✅ Redis' || echo '❌ Redis' && echo '' && echo '🤖 GLiNER Microservices:' && curl -sf http://localhost:5002/health >/dev/null && echo '✅ OCR Service' || echo '❌ OCR Service' && curl -sf http://localhost:5003/health >/dev/null && echo '✅ Extractor Service' || echo '❌ Extractor Service' && curl -sf http://localhost:8000/health >/dev/null && echo '✅ API Gateway' || echo '❌ API Gateway' && curl -sf http://localhost:8080/health >/dev/null && echo '✅ Label Studio' || echo '❌ Label Studio' && echo '' && echo '🌐 Application:' && curl -sf http://localhost:3000 >/dev/null && echo '✅ Backend' || echo '❌ Backend' && curl -sf http://localhost:3001 >/dev/null && echo '✅ Socket.io' || echo '❌ Socket.io' && curl -sf http://localhost:5173 >/dev/null && echo '✅ Frontend' || echo '❌ Frontend'",
+            "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated"
