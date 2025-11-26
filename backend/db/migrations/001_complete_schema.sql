@@ -383,6 +383,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'extracted', 'validated', 'approved', 'rejected', 'exported', 'to_review', 'reviewing', 'queried', 'postponed')),
     extraction_status VARCHAR(50) DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'processing', 'completed', 'failed', 'queued', 'extracting', 'correcting', 'reviewing')),
     confidence_score DECIMAL(5,2),
+    extraction_confidence DECIMAL(5,2), -- Per-field extraction confidence
     file_name VARCHAR(255), -- Original filename
     file_path TEXT,
     file_type VARCHAR(10),
@@ -527,6 +528,24 @@ CREATE INDEX IF NOT EXISTS idx_vendor_profiles_vendor_name ON vendor_profiles(ve
 CREATE INDEX IF NOT EXISTS idx_vendor_profiles_is_active ON vendor_profiles(is_active);
 
 COMMENT ON TABLE vendor_profiles IS 'Learned vendor-specific extraction patterns for improved accuracy';
+
+-- Extraction jobs (API Gateway HITL job tracking)
+CREATE TABLE IF NOT EXISTS extraction_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    file_name VARCHAR(255) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'to_review')),
+    confidence DECIMAL(5,2),
+    extracted_data JSONB,
+    label_studio_task_id INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_extraction_jobs_status ON extraction_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_extraction_jobs_created_at ON extraction_jobs(created_at);
+
+COMMENT ON TABLE extraction_jobs IS 'Microservices API Gateway job tracking for HITL orchestration';
 
 -- ============================================================================
 -- SECURITY & AUDIT

@@ -96,6 +96,10 @@ services:
       POSTGRE_PORT: 5432
       # Disable default SQLite
       LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
+      # Disable strict CSP for development
+      LABEL_STUDIO_CSP_SCRIPT_SRC: "'self' 'unsafe-inline' 'unsafe-eval'"
+      LABEL_STUDIO_CSP_STYLE_SRC: "'self' 'unsafe-inline'"
+      LABEL_STUDIO_CSP_FONT_SRC: "'self' data:"
     depends_on:
       - db
     volumes:
