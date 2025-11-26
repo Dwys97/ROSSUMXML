@@ -16,7 +16,7 @@ echo ""
 
 SCRIPT_DIR="$(dirname "$0")"
 MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
-FINAL_MIGRATION="$MIGRATIONS_DIR/FINAL_complete_schema.sql"
+FINAL_MIGRATION="$MIGRATIONS_DIR/001_complete_schema.sql"
 
 # Check if migration file exists
 if [ ! -f "$FINAL_MIGRATION" ]; then

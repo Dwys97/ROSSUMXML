@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255) NOT NULL, -- bcrypt hash
     password_hash VARCHAR(255), -- Alternative column for some code paths
     full_name VARCHAR(255) NOT NULL,
+    company VARCHAR(255), -- Company/organization name
     phone VARCHAR(50),
     address TEXT,
     city VARCHAR(100),
@@ -300,6 +301,7 @@ CREATE TABLE IF NOT EXISTS transformation_mappings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
+    mapping_name VARCHAR(255), -- Alternative column name for compatibility
     description TEXT,
     source_schema_id VARCHAR(255),
     target_schema_id VARCHAR(255),
@@ -378,9 +380,10 @@ CREATE TABLE IF NOT EXISTS invoices (
     due_date DATE,
     total_amount DECIMAL(15,2),
     currency VARCHAR(10) DEFAULT 'USD',
-    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'extracted', 'validated', 'approved', 'rejected', 'exported')),
-    extraction_status VARCHAR(50) DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'processing', 'completed', 'failed')),
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'extracted', 'validated', 'approved', 'rejected', 'exported', 'to_review', 'reviewing', 'queried', 'postponed')),
+    extraction_status VARCHAR(50) DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'processing', 'completed', 'failed', 'queued', 'extracting', 'correcting', 'reviewing')),
     confidence_score DECIMAL(5,2),
+    file_name VARCHAR(255), -- Original filename
     file_path TEXT,
     file_type VARCHAR(10),
     file_size BIGINT,
@@ -577,6 +580,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
     key_name VARCHAR(100) NOT NULL,
     api_key VARCHAR(255) NOT NULL UNIQUE,
     api_secret VARCHAR(255),
+    default_mapping_id UUID REFERENCES transformation_mappings(id) ON DELETE SET NULL,
+    auto_transform BOOLEAN DEFAULT false,
     permissions JSONB DEFAULT '[]',
     rate_limit INTEGER DEFAULT 1000,
     is_active BOOLEAN DEFAULT true,
@@ -713,6 +718,36 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Function to log security events (called from application code)
+CREATE OR REPLACE FUNCTION log_security_event(
+    p_user_id UUID,
+    p_event_type VARCHAR(50),
+    p_resource_type VARCHAR(50),
+    p_resource_id UUID,
+    p_action VARCHAR(100),
+    p_success BOOLEAN,
+    p_ip_address VARCHAR(45),
+    p_user_agent TEXT,
+    p_metadata JSONB,
+    p_location VARCHAR(255),
+    p_ip_location JSONB DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+    v_audit_id UUID;
+BEGIN
+    INSERT INTO security_audit_log (
+        user_id, event_type, resource_type, resource_id, action,
+        success, ip_address, user_agent, metadata, location, ip_location
+    ) VALUES (
+        p_user_id, p_event_type, p_resource_type, p_resource_id, p_action,
+        p_success, p_ip_address, p_user_agent, p_metadata, p_location, p_ip_location
+    ) RETURNING id INTO v_audit_id;
+    
+    RETURN v_audit_id;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Apply update_updated_at trigger to all relevant tables
 DO $$
 DECLARE
@@ -811,15 +846,16 @@ ON CONFLICT DO NOTHING;
 -- ============================================================================
 
 -- Create default admin user (password: password123)
--- Password hash for 'password123' using bcrypt
-INSERT INTO users (id, username, email, password, password_hash, full_name, created_at)
+-- Password hash for 'password123' using bcrypt (generated with bcrypt.hash('password123', 10))
+INSERT INTO users (id, username, email, password, password_hash, full_name, company, created_at)
 VALUES (
     'a0000000-0000-0000-0000-000000000001'::UUID,
     'admin',
     'd.radionovs@gmail.com',
-    '$2b$10$rZ9Q3PZZ1jLvYQZ5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5',
-    '$2b$10$rZ9Q3PZZ1jLvYQZ5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5',
+    '$2b$10$c7.NlZNAC3VtM2PmlOoit.XlmkB/h/fRyYUeYSbzDog8B40TGBQuq',
+    '$2b$10$c7.NlZNAC3VtM2PmlOoit.XlmkB/h/fRyYUeYSbzDog8B40TGBQuq',
     'System Administrator',
+    'SchemaBridge',
     CURRENT_TIMESTAMP
 )
 ON CONFLICT (email) DO UPDATE SET
