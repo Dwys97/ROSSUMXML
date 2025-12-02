@@ -136,7 +136,7 @@ function TransformerPage() {
 		<>
 			<SideNav />
 
-			<div className="absolute top-0 left-60 ml-12 min-w-1/12">
+			<div className="absolute top-0 left-60 ml-12 w-full">
 				{/* Transformation Limit Modal */}
 				<TransformationLimitModal
 					show={showLimitModal}
@@ -152,7 +152,7 @@ function TransformerPage() {
 					<h1 className="text-3xl">Transformer</h1>
 				</div>
 
-				<div className="">
+				<div className="w-xl">
 					<section className="how-to-use" style={{ marginTop: "0" }}>
 						<div className="steps-container">
 							<div className="step">
@@ -330,7 +330,11 @@ function TransformerPage() {
 							</div>
 						</div>
 						<div className="action-buttons">
-							<button id="transformBtn" className="primary-btn" onClick={handleTransform}>
+							<button
+								id="transformBtn"
+								className="bg-indigo-600 px-4 py-2 rounded-lg font-semibold text-white"
+								onClick={handleTransform}
+							>
 								Transform
 							</button>
 							<Link to="/editor" className="secondary-btn" role="button">
@@ -347,10 +351,9 @@ function TransformerPage() {
 							<h3 className="card-title">Input XML Preview</h3>
 							<textarea
 								id="inputXml"
-								className="monospace"
+								className="w-full border-2 p-4 rounded-lg h-48 border-gray-300"
 								readOnly
 								value={inputXml}
-								placeholder="Source XML content appears here..."
 							></textarea>
 						</div>
 						<div className="preview-card">
@@ -358,7 +361,7 @@ function TransformerPage() {
 								<h3 className="card-title">Output XML</h3>
 								<div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
 									<button id="copyBtn" className="btn-ghost" onClick={handleCopy}>
-										Copy
+										Copy XML
 									</button>
 									{outputXml && (
 										<a
@@ -372,13 +375,7 @@ function TransformerPage() {
 									)}
 								</div>
 							</div>
-							<textarea
-								id="outputXml"
-								className="monospace"
-								readOnly
-								value={outputXml}
-								placeholder="Transformed XML output will appear here..."
-							></textarea>
+							<textarea id="outputXml" className="monospace" readOnly value={outputXml} placeholder="Output XML"></textarea>
 						</div>
 					</section>
 				</div>
