@@ -10,8 +10,10 @@ const fs = require('fs').promises;
 const logger = require('../utils/logger');
 const io = require('socket.io-client');
 
-// Route to new microservices API Gateway
-const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://localhost:8000';
+// SmolDocling + Qwen2.5 microservices URLs
+const DOCLING_SERVICE_URL = process.env.DOCLING_SERVICE_URL || 'http://localhost:5004';
+const QWEN_SERVICE_URL = process.env.QWEN_SERVICE_URL || 'http://localhost:5005';
+const ORCHESTRATOR_SERVICE_URL = process.env.ORCHESTRATOR_SERVICE_URL || 'http://localhost:8000';
 const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3001';
 const ML_HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
 const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
@@ -21,8 +23,8 @@ let mlServiceHealthy = false;
 let lastHealthCheck = 0;
 
 /**
- * Check API Gateway health
- * Performs a health check on the microservices API Gateway with caching.
+ * Check Orchestrator Service health
+ * Performs a health check on the SmolDocling + Qwen2.5 orchestrator with caching.
  * Health check results are cached for 30 seconds.
  * 
  * @returns {Promise<boolean>} True if service is healthy and responding, false otherwise
@@ -35,7 +37,7 @@ async function checkMLServiceHealth() {
     }
 
     try {
-        const response = await axios.get(`${API_GATEWAY_URL}/health`, {
+        const response = await axios.get(`${ORCHESTRATOR_SERVICE_URL}/health`, {
             timeout: ML_HEALTH_CHECK_TIMEOUT
         });
         
@@ -43,7 +45,7 @@ async function checkMLServiceHealth() {
         lastHealthCheck = now;
         
         if (mlServiceHealthy) {
-            logger.info('Microservices API Gateway health check passed');
+            logger.info('SmolDocling + Qwen2.5 Orchestrator health check passed');
         }
         
         return mlServiceHealthy;
@@ -55,45 +57,97 @@ async function checkMLServiceHealth() {
 }
 
 /**
- * Convert microservices response format to legacy format
+ * Convert SmolDocling + Qwen2.5 response format to legacy format
  */
 function convertMicroservicesResponse(microservicesData) {
     const fields = microservicesData.fields || {};
     
     return {
+        // Invoice header
         invoice_number: fields.invoice_number?.value || null,
         invoice_date: fields.invoice_date?.value || null,
-        vendor_name: fields.vendor_name?.value || null,
-        vendor_address: fields.vendor_address?.value || null,
-        vat_number: fields.vat_number?.value || null,
-        buyer_name: fields.buyer_name?.value || null,
-        buyer_address: fields.buyer_address?.value || null,
         total_amount: fields.total_amount?.value || null,
         currency: fields.currency?.value || null,
+        
+        // Vendor/Exporter
+        vendor_name: fields.vendor_name?.value || null,
+        vendor_address: fields.vendor_address?.value || null,
+        vat_number: fields.vendor_vat_number?.value || fields.vat_number?.value || null,
+        vendor_country: fields.vendor_country?.value || null,
+        
+        // Buyer/Importer/Consignee
+        buyer_name: fields.buyer_name?.value || fields.importer_name?.value || null,
+        buyer_address: fields.buyer_address?.value || fields.importer_address?.value || null,
+        consignee_name: fields.consignee_name?.value || null,
+        consignee_address: fields.consignee_address?.value || null,
+        buyer_country: fields.buyer_country?.value || null,
+        
+        // Shipment totals
+        total_gross_weight: fields.total_gross_weight?.value || null,
+        total_net_weight: fields.total_net_weight?.value || null,
+        total_packages: fields.total_packages?.value || null,
+        weight_unit: fields.weight_unit?.value || null,
+        
+        // Terms
+        incoterms: fields.incoterms?.value || null,
+        payment_terms: fields.payment_terms?.value || null,
+        bank_details: fields.bank_details?.value || null,
+        
+        // Metadata
         confidence: microservicesData.confidence_score || 0,
         line_items: extractLineItems(fields),
-        extraction_method: 'microservices_gliner',
+        extraction_method: 'smoldocling_qwen2.5',
         hitl_required: microservicesData.hitl_required || false,
         label_studio_task_id: microservicesData.label_studio_task_id || null
     };
 }
 
 /**
- * Extract line items from GLiNER fields
+ * Extract line items from Qwen2.5 fields (customs/shipping invoice format)
  */
 function extractLineItems(fields) {
     const items = [];
-    const descriptions = Object.keys(fields).filter(k => k.startsWith('item_description_'));
     
-    descriptions.forEach(key => {
-        const index = key.split('_').pop();
-        items.push({
-            description: fields[`item_description_${index}`]?.value || null,
-            quantity: fields[`item_quantity_${index}`]?.value || null,
-            unit_price: fields[`item_unit_price_${index}`]?.value || null,
-            total: fields[`item_total_${index}`]?.value || null
+    // Find all HS codes as they're unique identifiers for line items
+    const hsCodes = Object.keys(fields).filter(k => k.match(/^hs_code(_\d+)?$/));
+    
+    if (hsCodes.length === 0) {
+        // Fallback: try item_description as identifier
+        const descriptions = Object.keys(fields).filter(k => k.match(/^item_description(_\d+)?$/));
+        descriptions.forEach(key => {
+            const index = key.match(/_(\d+)$/)?.[1] || '';
+            const suffix = index ? `_${index}` : '';
+            
+            items.push({
+                description: fields[`item_description${suffix}`]?.value || null,
+                hs_code: fields[`hs_code${suffix}`]?.value || null,
+                quantity: fields[`item_quantity${suffix}`]?.value || null,
+                unit_price: fields[`item_unit_price${suffix}`]?.value || null,
+                total_value: fields[`item_total_value${suffix}`]?.value || fields[`item_total${suffix}`]?.value || null,
+                gross_weight: fields[`item_gross_weight${suffix}`]?.value || null,
+                net_weight: fields[`item_net_weight${suffix}`]?.value || null,
+                country_of_origin: fields[`item_country_of_origin${suffix}`]?.value || fields[`country_of_origin${suffix}`]?.value || null,
+                unit_of_measure: fields[`item_unit_of_measure${suffix}`]?.value || null
+            });
         });
-    });
+    } else {
+        hsCodes.forEach(key => {
+            const index = key.match(/_(\d+)$/)?.[1] || '';
+            const suffix = index ? `_${index}` : '';
+            
+            items.push({
+                hs_code: fields[`hs_code${suffix}`]?.value || null,
+                description: fields[`item_description${suffix}`]?.value || null,
+                quantity: fields[`item_quantity${suffix}`]?.value || null,
+                unit_price: fields[`item_unit_price${suffix}`]?.value || null,
+                total_value: fields[`item_total_value${suffix}`]?.value || fields[`item_total${suffix}`]?.value || null,
+                gross_weight: fields[`item_gross_weight${suffix}`]?.value || null,
+                net_weight: fields[`item_net_weight${suffix}`]?.value || null,
+                country_of_origin: fields[`item_country_of_origin${suffix}`]?.value || fields[`country_of_origin${suffix}`]?.value || null,
+                unit_of_measure: fields[`item_unit_of_measure${suffix}`]?.value || null
+            });
+        });
+    }
     
     return items;
 }
@@ -219,45 +273,64 @@ async function processExtractionJob(job) {
         await job.progress(40);
         socketEvents.emitExtractionProgress(invoiceId, 40, 'Running AI extraction');
         
-        // Check API Gateway health before making request
-        const isHealthy = await checkMLServiceHealth();
-        if (!isHealthy) {
-            throw new Error(
-                `Microservices API Gateway is not available at ${API_GATEWAY_URL}. ` +
-                `Please ensure microservices are running. ` +
-                `Start with: docker-compose up ocr-service extractor-service api-gateway`
-            );
-        }
-        
-        logger.info(`Calling Microservices API Gateway for invoice ${invoiceId}`);
+        logger.info(`Calling SmolDocling + Qwen2.5 for invoice ${invoiceId}`);
 
-        // Convert base64 to buffer and create FormData
+        // Step 1: Call SmolDocling Service (OCR + Layout Analysis)
         const FormData = require('form-data');
         const formData = new FormData();
         
-        // Determine filename with extension
         const fileExtension = fileType.replace('application/', '.').replace('image/', '.');
         const fileName = `${invoiceId}${fileExtension}`;
         
-        // Add file to form data
         formData.append('file', fileBuffer, {
             filename: fileName,
             contentType: fileType === 'pdf' ? 'application/pdf' : `image/${fileType}`
         });
 
         const startTime = Date.now();
-        const response = await axios.post(
-            `${API_GATEWAY_URL}/api/v1/invoice/upload`,
+        
+        // Call SmolDocling Service
+        const doclingResponse = await axios.post(
+            `${DOCLING_SERVICE_URL}/process-document`,
             formData,
             {
-                headers: {
-                    ...formData.getHeaders()
-                },
-                timeout: 180000, // 3 minutes
-                maxContentLength: 50 * 1024 * 1024, // 50MB
-                maxBodyLength: 50 * 1024 * 1024
+                headers: { ...formData.getHeaders() },
+                timeout: 120000 // 2 minutes
             }
         );
+
+        if (!doclingResponse.data.success) {
+            throw new Error(doclingResponse.data.error || 'Document processing failed');
+        }
+
+        const doclingData = doclingResponse.data;
+        const markdown = doclingData.markdown || '';
+        const text = doclingData.text || '';
+        const tables = doclingData.tables || [];
+        
+        logger.info(`SmolDocling completed: ${text.length} chars, ${tables.length} tables`);
+        
+        await job.progress(55);
+        socketEvents.emitExtractionProgress(invoiceId, 55, 'Running field extraction with Qwen2.5');
+
+        // Step 2: Call Qwen2.5 Service for field extraction
+        const qwenResponse = await axios.post(
+            `${QWEN_SERVICE_URL}/extract-fields`,
+            {
+                markdown: markdown,
+                text: text,
+                tables: tables,
+                confidence_threshold: 0.7
+            },
+            {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 60000 // 1 minute
+            }
+        );
+
+        if (!qwenResponse.data.success) {
+            throw new Error(qwenResponse.data.error || 'Field extraction failed');
+        }
 
         const extractionTime = Date.now() - startTime;
         logger.info(`ML extraction completed in ${extractionTime}ms`);
@@ -265,12 +338,16 @@ async function processExtractionJob(job) {
         await job.progress(70);
         socketEvents.emitExtractionProgress(invoiceId, 70, 'Processing extraction results');
 
-        if (!response.data.success) {
-            throw new Error(response.data.error || 'Microservices extraction failed');
-        }
+        // Wrap response in expected format
+        const microservicesData = {
+            fields: qwenResponse.data.fields,
+            confidence_score: qwenResponse.data.confidence_score,
+            entity_count: qwenResponse.data.entity_count,
+            success: true
+        };
 
         // Convert microservices response format
-        const extractedData = convertMicroservicesResponse(response.data);
+        const extractedData = convertMicroservicesResponse(microservicesData);
 
         // Save extraction results to database
         await job.progress(80);
@@ -311,8 +388,8 @@ async function processExtractionJob(job) {
         let errorMessage = error.message;
         
         if (error.code === 'ECONNREFUSED') {
-            errorMessage = `Cannot connect to ML service at ${ML_SERVICE_URL}. ` +
-                          `Please start the ML service with: ./start-ml-mock.sh (development) or ./start-ml-service.sh (production)`;
+            errorMessage = `Cannot connect to ML service. ` +
+                          `Please start the ML services with: docker-compose up docling-service qwen-service orchestrator-service`;
         } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
             errorMessage = `ML service request timed out. The service may be overloaded or processing a large file.`;
         } else if (error.response) {
@@ -391,7 +468,7 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
     try {
         await client.query('BEGIN');
 
-        // Update invoice with extracted data
+        // Update invoice with extracted data (customs/shipping invoice fields)
         const updateInvoiceQuery = `
             UPDATE invoices
             SET
@@ -399,30 +476,48 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
                 invoice_date = $2,
                 currency = $3,
                 total_amount = $4,
-                tax_amount = $5,
-                subtotal = $6,
-                extraction_confidence = $7,
-                vendor_profile_id = $8,
-                extracted_data = $9,
-                extraction_status = $10,
+                extraction_confidence = $5,
+                vendor_profile_id = $6,
+                extracted_data = $7,
+                extraction_status = $8,
+                consignee_name = $9,
+                consignee_address = $10,
+                vendor_country = $11,
+                buyer_country = $12,
+                total_gross_weight = $13,
+                total_net_weight = $14,
+                total_packages = $15,
+                weight_unit = $16,
+                incoterms = $17,
+                payment_terms = $18,
+                bank_details = $19,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $11
+            WHERE id = $20
         `;
 
         // Normalize date to ISO format before saving
-        const normalizedDate = normalizeDate(extractedData.invoice?.date);
+        const normalizedDate = normalizeDate(extractedData.invoice_date);
 
         await client.query(updateInvoiceQuery, [
-            extractedData.invoice?.number || null,
+            extractedData.invoice_number || null,
             normalizedDate,
-            extractedData.invoice?.currency || null,
-            extractedData.totals?.total_amount || null,
-            extractedData.totals?.vat || null,
-            extractedData.totals?.net_amount || null,
+            extractedData.currency || null,
+            extractedData.total_amount || null,
             extractedData.confidence || 0,
             vendorProfileId,
             JSON.stringify(extractedData),
             'completed',
+            extractedData.consignee_name || null,
+            extractedData.consignee_address || null,
+            extractedData.vendor_country || null,
+            extractedData.buyer_country || null,
+            extractedData.total_gross_weight || null,
+            extractedData.total_net_weight || null,
+            extractedData.total_packages || null,
+            extractedData.weight_unit || 'KG',
+            extractedData.incoterms || null,
+            extractedData.payment_terms || null,
+            extractedData.bank_details || null,
             invoiceId
         ]);
 
@@ -636,18 +731,20 @@ extractionQueue.on('failed', (job, error) => {
     logger.error(`Worker failed job ${job.id}:`, error.message);
 });
 
-// Perform initial API Gateway health check
+// Perform initial Orchestrator health check
 (async () => {
     logger.info('Extraction worker started');
-    logger.info(`Microservices API Gateway URL: ${API_GATEWAY_URL}`);
+    logger.info(`SmolDocling Service URL: ${DOCLING_SERVICE_URL}`);
+    logger.info(`Qwen2.5 Service URL: ${QWEN_SERVICE_URL}`);
+    logger.info(`Orchestrator Service URL: ${ORCHESTRATOR_SERVICE_URL}`);
     
     const isHealthy = await checkMLServiceHealth();
     if (isHealthy) {
-        logger.info('✅ Microservices API Gateway is healthy and ready');
+        logger.info('✅ SmolDocling + Qwen2.5 Orchestrator is healthy and ready');
     } else {
-        logger.warn('⚠️  API Gateway health check failed');
+        logger.warn('⚠️  Orchestrator health check failed');
         logger.warn('   Extraction jobs will fail until microservices are available');
-        logger.warn('   Start with: docker-compose up ocr-service extractor-service api-gateway');
+        logger.warn('   Start with: docker-compose up docling-service qwen-service orchestrator-service');
     }
     
     logger.info('Worker is ready to process extraction jobs');

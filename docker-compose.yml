@@ -1,23 +1,16 @@
 services:
   # ==========================================
-  # P1: OCR & Layout Processor (PaddleOCR + PP-Structure)
+  # P1: Document Processing (SmolDocling v2)
   # ==========================================
-  ocr-service:
-    build: ./services/ocr-service
+  docling-service:
+    build: ./services/docling-service
     ports:
-      - "5002:5002"
+      - "5004:5004"
     environment:
-      PORT: 5002
+      PORT: 5004
       PYTHONUNBUFFERED: 1
-      FLAGS_use_mkldnn: 0
-      FLAGS_enable_mkldnn: 0
-      CPU_NUM: 1
-      MKL_NUM_THREADS: 1
-      OMP_NUM_THREADS: 1
-      OPENBLAS_NUM_THREADS: 1
-      FLAGS_cpu_deterministic: true
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5004/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -25,49 +18,45 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # P2: Semantic Extractor (GLiNER)
+  # P2: Field Extraction (Qwen2.5 via llama.cpp)
   # ==========================================
-  extractor-service:
-    build: ./services/extractor-service
+  qwen-service:
+    build: ./services/qwen-service
     ports:
-      - "5003:5003"
+      - "5005:5005"
     environment:
-      PORT: 5003
-      GLINER_MODEL_PATH: urchade/gliner_small-v2.1
+      PORT: 5005
+      QWEN_MODEL_PATH: /app/models/qwen2.5-0.5b-instruct-q4_0.gguf
       PYTHONUNBUFFERED: 1
     volumes:
-      - ./services/models:/app/models
+      - qwen_models:/app/models
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5005/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 90s
+      start_period: 120s
     restart: unless-stopped
 
   # ==========================================
-  # P3: API Gateway & HITL Orchestrator
+  # P3: Haystack Orchestration & HITL
   # ==========================================
-  api-gateway:
-    build: ./services/api-gateway
+  orchestrator-service:
+    build: ./services/orchestrator-service
     ports:
       - "8000:8000"
     environment:
       PORT: 8000
-      SERVICE_OCR_URL: http://ocr-service:5002
-      SERVICE_EXTRACTOR_URL: http://extractor-service:5003
+      DOCLING_SERVICE_URL: http://docling-service:5004
+      QWEN_SERVICE_URL: http://qwen-service:5005
       LABEL_STUDIO_URL: http://label-studio:8080
       LABEL_STUDIO_API_KEY: ${LABEL_STUDIO_API_KEY:-}
+      LABEL_STUDIO_PROJECT_ID: ${LABEL_STUDIO_PROJECT_ID:-1}
       CONFIDENCE_THRESHOLD: 0.90
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/rossumxml
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
     depends_on:
-      - ocr-service
-      - extractor-service
+      - docling-service
+      - qwen-service
       - label-studio
-      - db
-      - redis
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -131,12 +120,12 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # Route invoice extraction to new microservices
-      INVOICE_EXTRACTION_URL: http://api-gateway:8000
-      API_GATEWAY_URL: http://api-gateway:8000
+      INVOICE_EXTRACTION_URL: http://orchestrator-service:8000
+      API_GATEWAY_URL: http://orchestrator-service:8000
     depends_on:
       - db
       - redis
-      - api-gateway
+      - orchestrator-service
     restart: unless-stopped
 
   # Extraction Worker (Bull Queue Consumer)
@@ -155,14 +144,14 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # Microservices endpoints
-      API_GATEWAY_URL: http://api-gateway:8000
+      API_GATEWAY_URL: http://orchestrator-service:8000
       SOCKET_SERVER_URL: http://host.docker.internal:3001
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - db
       - redis
-      - api-gateway
+      - orchestrator-service
     restart: unless-stopped
 
   # ==========================================
@@ -198,3 +187,4 @@ volumes:
   postgres_data:
   redis_data:
   label_studio_data:
+  qwen_models:

@@ -1,0 +1,11 @@
+flask==3.0.0
+flask-cors==4.0.0
+# NumPy compatibility fix for PyTorch
+numpy>=1.24.0,<2.0.0
+# CPU-only PyTorch to reduce disk usage
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2+cpu
+torchvision==0.17.2+cpu
+# Docling v2 (latest stable - let pip resolve compatible versions)
+docling>=2.0,<3.0
+gunicorn==21.2.0

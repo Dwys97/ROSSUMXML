@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start all development services with GLiNER microservices architecture
+# Start all development services with SmolDocling + Qwen2.5 architecture
 # Each service runs in its own VS Code terminal via tasks
 
 set -e
@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR"
 echo "🚀 Starting SCHEMABRIDGE Development Environment"
 echo "=================================================="
 echo ""
-echo "Architecture: GLiNER-based Ultra-Lightweight IDP"
+echo "Architecture: SmolDocling v2 + Qwen2.5 + Haystack"
 echo ""
 
 # Check if running in VS Code
@@ -42,17 +42,17 @@ else
     echo "   ✅ Database initialized"
 fi
 
-# Step 2: Start GLiNER microservices
+# Step 2: Start SmolDocling + Qwen2.5 microservices
 echo ""
-echo "🤖 Step 2/7: Starting GLiNER Microservices..."
-echo "   Starting OCR Service (PaddleOCR)..."
-docker-compose up -d ocr-service
+echo "🤖 Step 2/7: Starting SmolDocling + Qwen2.5 Microservices..."
+echo "   Starting SmolDocling Service (Document Processing)..."
+docker-compose up -d docling-service
 
-echo "   Starting Extractor Service (GLiNER)..."
-docker-compose up -d extractor-service
+echo "   Starting Qwen2.5 Service (Field Extraction)..."
+docker-compose up -d qwen-service
 
-echo "   Starting API Gateway (FastAPI)..."
-docker-compose up -d api-gateway
+echo "   Starting Orchestrator (Pipeline Management)..."
+docker-compose up -d orchestrator-service
 
 echo "   Starting Label Studio (HITL)..."
 docker-compose up -d label-studio
@@ -108,10 +108,10 @@ echo "   Frontend:       http://localhost:5173"
 echo "   Backend API:    http://localhost:3000"
 echo "   Socket.io:      http://localhost:3001"
 echo ""
-echo "🤖 GLiNER Microservices:"
-echo "   API Gateway:    http://localhost:8000"
-echo "   OCR Service:    http://localhost:5002"
-echo "   Extractor:      http://localhost:5003"
+echo "🤖 SmolDocling + Qwen2.5 Microservices:"
+echo "   Orchestrator:   http://localhost:8000"
+echo "   SmolDocling:    http://localhost:5004"
+echo "   Qwen2.5:        http://localhost:5005"
 echo "   Label Studio:   http://localhost:8080 (admin@localhost / admin123)"
 echo ""
 echo "💾 Infrastructure:"

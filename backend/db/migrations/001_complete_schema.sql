@@ -379,6 +379,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     invoice_date DATE,
     due_date DATE,
     total_amount DECIMAL(15,2),
+    tax_amount DECIMAL(15,2),
+    subtotal DECIMAL(15,2),
     currency VARCHAR(10) DEFAULT 'USD',
     status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'extracted', 'validated', 'approved', 'rejected', 'exported', 'to_review', 'reviewing', 'queried', 'postponed')),
     extraction_status VARCHAR(50) DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'processing', 'completed', 'failed', 'queued', 'extracting', 'correcting', 'reviewing')),
