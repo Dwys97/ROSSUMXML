@@ -69,8 +69,8 @@ const TopNav = memo(function TopNav() {
 	}, [isMobileMenuOpen]);
 
 	return (
-		<div className="w-60">
-			<nav className="bg-gray-100 border-r border-r-gray-200 h-screen">
+		<div className="w-60 top-0 left-0 flex flex-col bg-gray-100 border-r-gray-200 border-r">
+			<nav className="fixed">
 				<NavLink to="/" onClick={handleNavLinkClick} aria-label="Home">
 					<p className="text-2xl font-bold">Logo</p>
 				</NavLink>
