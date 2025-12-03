@@ -36,7 +36,7 @@ Extract the following fields from the invoice above. Return ONLY a valid JSON ob
 If a field is not found, use null as the value.
 
 REQUIRED FIELDS:
-{
+{{{{
   "invoice_number": "string or null",
   "invoice_date": "YYYY-MM-DD or null",
   "currency": "USD/EUR/etc or null",
@@ -56,7 +56,7 @@ REQUIRED FIELDS:
   "incoterms": "FOB/CIF/etc or null",
   "payment_terms": "string or null",
   "line_items": [
-    {
+    {{{{
       "hs_code": "string or null",
       "description": "string or null",
       "quantity": "number or null",
@@ -66,9 +66,9 @@ REQUIRED FIELDS:
       "net_weight": "number or null",
       "country_of_origin": "string or null",
       "unit_of_measure": "string or null"
-    }
+    }}}}
   ]
-}
+}}}}
 
 JSON OUTPUT:"""
 
@@ -77,8 +77,8 @@ def initialize_model():
     global llm
     
     if llm is None:
-        model_path = os.getenv('QWEN_MODEL_PATH', '/app/models/qwen2.5-0.5b-instruct-q4_0.gguf')
-        logger.info(f"Loading Qwen2.5 model from: {model_path}")
+        model_path = os.getenv('QWEN_MODEL_PATH', '/app/models/qwen2.5-1.5b-instruct-q4_0.gguf')
+        logger.info(f"Loading Qwen2.5-1.5B model from: {model_path}")
         
         try:
             llm = Llama(

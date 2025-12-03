@@ -1,7 +1,7 @@
 """
-Service: Document Processing with SmolDocling v2
-Architecture: SmolDocling v2 (CPU-only, ~1GB)
-Purpose: Document parsing, OCR, layout analysis, table extraction
+Service: Document Processing with SmolDocling v2 + RapidOCR bbox
+Architecture: SmolDocling v2 (CPU-only, ~1GB) + RapidOCR for coordinates
+Purpose: Document parsing, OCR with bbox, layout analysis, table extraction
 Compliance: CPU-only, production-ready
 """
 
@@ -16,6 +16,10 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.datamodel.base_models import InputFormat
 from pathlib import Path
 import tempfile
+from rapidocr_onnxruntime import RapidOCR
+from pdf2image import convert_from_path
+import numpy as np
+from PIL import Image
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +33,7 @@ CORS(app)
 
 # Global converter instance
 converter = None
+ocr_engine = None
 
 def initialize_converter():
     """Lazy load Docling converter"""
@@ -50,6 +55,19 @@ def initialize_converter():
             logger.info("✓ Docling v2 converter initialized")
         except Exception as e:
             logger.error(f"Failed to initialize converter: {e}")
+            raise
+
+def initialize_ocr():
+    """Lazy load RapidOCR engine for bbox extraction"""
+    global ocr_engine
+    
+    if ocr_engine is None:
+        logger.info("Initializing RapidOCR for bbox extraction...")
+        try:
+            ocr_engine = RapidOCR()
+            logger.info("✓ RapidOCR initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize RapidOCR: {e}")
             raise
 
 @app.route('/health', methods=['GET'])
@@ -95,6 +113,7 @@ def process_document():
     """
     try:
         initialize_converter()
+        initialize_ocr()
         
         # Handle file upload
         temp_file = None
@@ -121,14 +140,24 @@ def process_document():
             
             logger.info(f"Processing document: {file_name} ({len(file_bytes)} bytes)")
             
-            # Convert document
+            # Step 1: Extract OCR bbox from PDF pages
+            ocr_results = extract_ocr_with_bbox(temp_file.name)
+            logger.info(f"Extracted {len(ocr_results)} OCR results with bbox")
+            
+            # Step 2: Convert document with Docling
             result = converter.convert(temp_file.name)
             
             # Extract structured data
+            markdown_text = result.document.export_to_markdown()
+            plain_text = result.document.export_to_text()
+            
+            logger.info(f"DEBUG: Markdown length: {len(markdown_text)}, Text length: {len(plain_text)}")
+            
             document_data = {
-                'markdown': result.document.export_to_markdown(),
-                'text': result.document.export_to_text(),
+                'markdown': markdown_text,
+                'text': plain_text,
                 'tables': extract_tables(result.document),
+                'ocr_results': ocr_results,  # Add OCR with bbox
                 'metadata': {
                     'page_count': len(result.document.pages) if hasattr(result.document, 'pages') else 1,
                     'title': getattr(result.document, 'title', None),
@@ -136,7 +165,7 @@ def process_document():
                 'structure': extract_structure(result.document)
             }
             
-            logger.info(f"✓ Document processed: {document_data['metadata']['page_count']} pages")
+            logger.info(f"✓ Document processed: {document_data['metadata']['page_count']} pages, {len(plain_text)} chars")
             
             return jsonify({
                 'success': True,
@@ -216,6 +245,56 @@ def extract_structure(document):
         logger.warning(f"Error extracting structure: {e}")
     
     return structure
+
+def extract_ocr_with_bbox(pdf_path):
+    """
+    Extract OCR text with bounding boxes from PDF using RapidOCR
+    
+    Returns:
+        [
+            {
+                "page": 1,
+                "text": "Invoice Number",
+                "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],  # 4 corner points
+                "confidence": 0.95
+            },
+            ...
+        ]
+    """
+    ocr_results = []
+    
+    try:
+        # Convert PDF pages to images
+        images = convert_from_path(pdf_path, dpi=300)
+        
+        for page_num, image in enumerate(images, start=1):
+            # Convert PIL Image to numpy array
+            img_array = np.array(image)
+            
+            # Run RapidOCR
+            result, elapse = ocr_engine(img_array)
+            
+            if result:
+                for detection in result:
+                    bbox, text, confidence = detection
+                    
+                    # bbox is [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                    # Flatten to [x1, y1, x2, y2, x3, y3, x4, y4]
+                    flat_bbox = [coord for point in bbox for coord in point]
+                    
+                    ocr_results.append({
+                        'page': page_num,
+                        'text': text,
+                        'bbox': flat_bbox,
+                        'confidence': float(confidence)
+                    })
+                
+                logger.info(f"Page {page_num}: Extracted {len(result)} text regions")
+        
+    except Exception as e:
+        logger.error(f"Error extracting OCR bbox: {e}", exc_info=True)
+    
+    return ocr_results
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5004))

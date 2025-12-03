@@ -303,11 +303,14 @@ async function processExtractionJob(job) {
             throw new Error(doclingResponse.data.error || 'Document processing failed');
         }
 
-        const doclingData = doclingResponse.data;
+        const doclingData = doclingResponse.data.document || doclingResponse.data;
         const markdown = doclingData.markdown || '';
         const text = doclingData.text || '';
         const tables = doclingData.tables || [];
         
+        logger.info(`DEBUG: doclingResponse.data keys: ${Object.keys(doclingResponse.data).join(', ')}`);
+        logger.info(`DEBUG: doclingData keys: ${Object.keys(doclingData).join(', ')}`);
+        logger.info(`DEBUG: markdown length: ${markdown.length}, text length: ${text.length}`);
         logger.info(`SmolDocling completed: ${text.length} chars, ${tables.length} tables`);
         
         await job.progress(55);
@@ -317,10 +320,9 @@ async function processExtractionJob(job) {
         const qwenResponse = await axios.post(
             `${QWEN_SERVICE_URL}/extract-fields`,
             {
-                markdown: markdown,
-                text: text,
-                tables: tables,
-                confidence_threshold: 0.7
+                document_text: text || markdown, // Qwen expects 'document_text' field
+                temperature: 0.1,
+                max_tokens: 2048
             },
             {
                 headers: { 'Content-Type': 'application/json' },

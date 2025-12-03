@@ -18,9 +18,9 @@ RUN CMAKE_ARGS="-DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS" \
 # Create models directory
 RUN mkdir -p /app/models
 
-# Download Qwen2.5-0.5B-Instruct GGUF model (Q4_0 quantized, ~300MB)
-RUN wget -O /app/models/qwen2.5-0.5b-instruct-q4_0.gguf \
-    https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_0.gguf
+# Download Qwen2.5-1.5B-Instruct GGUF model (Q4_0 quantized, ~1GB)
+RUN wget -O /app/models/qwen2.5-1.5b-instruct-q4_0.gguf \
+    https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_0.gguf
 
 # Copy application code
 COPY app.py .
@@ -35,4 +35,4 @@ EXPOSE 5005
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5005/health')"
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5005", "--workers", "1", "--timeout", "180", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5005", "--workers", "1", "--timeout", "60", "app:app"]

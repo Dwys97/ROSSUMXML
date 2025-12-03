@@ -8,4 +8,9 @@ torch==2.2.2+cpu
 torchvision==0.17.2+cpu
 # Docling v2 (latest stable - let pip resolve compatible versions)
 docling>=2.0,<3.0
+# RapidOCR for bbox extraction
+rapidocr-onnxruntime>=1.3.0
+# PDF to image conversion
+pdf2image>=1.16.0
+Pillow>=10.0.0
 gunicorn==21.2.0
