@@ -295,6 +295,16 @@ function TransformerPage() {
 							</FileDropzone>
 						</div>
 
+						<section className="flex flex-col gap-4">
+							<h3 className="text-xl">Input XML Preview</h3>
+							<textarea
+								id="inputXml"
+								className="w-full border-2 p-4 rounded-lg h-48 border-gray-300 bg-gray-50 hover:cursor-not-allowed text-gray-600"
+								readOnly
+								value={inputXml}
+							></textarea>
+						</section>
+
 						<div className="config-card">
 							<div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
 								<div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -349,42 +359,29 @@ function TransformerPage() {
 						</div>
 
 						<section className="flex flex-col gap-4">
-							<h3 className="text-xl">Input XML Preview</h3>
+							<h3 className="text-xl">Output XML Preview</h3>
 							<textarea
-								id="inputXml"
+								id="outputXml"
 								className="w-full border-2 p-4 rounded-lg h-48 border-gray-300"
 								readOnly
-								value={inputXml}
+								value={outputXml}
+								placeholder="Output XML"
 							></textarea>
-						</section>
-
-						<section className="previews">
-							<div className="preview-card">
-								<div className="card-header">
-									<h3 className="card-title">Output XML</h3>
-									<div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-										<button id="copyBtn" className="btn-ghost" onClick={handleCopy}>
-											Copy XML
-										</button>
-										{outputXml && (
-											<a
-												id="downloadLink"
-												className="primary-btn"
-												href={"data:text/xml;charset=utf-8," + encodeURIComponent(outputXml)}
-												download="transformed.xml"
-											>
-												Download
-											</a>
-										)}
-									</div>
-								</div>
-								<textarea
-									id="outputXml"
-									className="monospace"
-									readOnly
-									value={outputXml}
-									placeholder="Output XML"
-								></textarea>
+							<div className="flex gap-4">
+								<button
+									className="bg-indigo-100 px-4 py-2 rounded-lg font-semibold text-indigo-600 w-fit"
+									onClick={handleCopy}
+								>
+									Copy XML
+								</button>
+								<a
+									id="downloadLink"
+									className="bg-indigo-600 px-4 py-2 rounded-lg font-semibold text-white w-fit"
+									href={"data:text/xml;charset=utf-8," + encodeURIComponent(outputXml)}
+									download="transformed.xml"
+								>
+									Download XML file
+								</a>
 							</div>
 						</section>
 					</div>
