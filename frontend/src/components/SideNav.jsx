@@ -28,7 +28,7 @@ const SideNav = memo(function SideNav({ variant = "authenticated", isSticky = tr
 		window.location.href = "/";
 	};
 
-	const userInitial = user?.username?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || "U";
+	const userInitial = user?.username?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || "UA";
 
 	// Render authenticated sidebar
 	if (variant === "authenticated" && user) {

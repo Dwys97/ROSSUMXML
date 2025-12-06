@@ -134,7 +134,7 @@ function TransformerPage() {
 
 	return (
 		<div>
-			<div className="flex flex-row">
+			<div className="flex flex-row bg-gray-50">
 				<SideNav />
 
 				<div className="mx-12 w-full max-w-7xl">
@@ -148,38 +148,17 @@ function TransformerPage() {
 						onClose={() => setShowLimitModal(false)}
 						onUpgrade={handleUpgrade}
 					/>
-
-					<div className="">
-						<h1 className="text-3xl">Transformer</h1>
+					<div className="my-15">
+						<div className="flex flex-col gap-8">
+							<h1 className="text-2xl text-gray-700 font-semibold">Transformer</h1>
+							<p>
+								Upload your XML files, template, and mapping file, adjust any settings you need, run the transformation,
+								then preview and download the final XML or ZIP file.
+							</p>
+						</div>
 					</div>
 
 					<div className="">
-						<section className="how-to-use" style={{ marginTop: "0" }}>
-							<div className="steps-container">
-								<div className="step">
-									<div className="step-number">1</div>
-									<div className="step-text">
-										<h3>Upload Files</h3>
-										<p>Upload source XML(s), a destination template, and a JSON mapping file.</p>
-									</div>
-								</div>
-								<div className="step">
-									<div className="step-number">2</div>
-									<div className="step-text">
-										<h3>Configure & Transform</h3>
-										<p>Enable XPath if needed, then click the 'Transform' button to start.</p>
-									</div>
-								</div>
-								<div className="step">
-									<div className="step-number">3</div>
-									<div className="step-text">
-										<h3>Download Results</h3>
-										<p>Preview the output and download your transformed XML file or ZIP archive.</p>
-									</div>
-								</div>
-							</div>
-						</section>
-
 						<div className="upload-section">
 							<div className="bg-gray-100 border-2 border-gray-200 p-4 rounded-2xl w-full max-w-7xl">
 								<FileDropzone
