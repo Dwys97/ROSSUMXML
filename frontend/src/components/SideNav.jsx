@@ -62,7 +62,7 @@ const SideNav = memo(function SideNav({ variant = "authenticated", isSticky = tr
 							<NavLink
 								to="/analytics"
 								className={({ isActive }) =>
-									`flex gap-3 items-center px-3 py-2 w-full rounded-full transition-colors ${
+									`flex gap-3 items-center px-3 py-2 w-full rounded transition-colors ${
 										isActive ? "bg-teal-600 text-white" : "text-slate-700 hover:bg-slate-100"
 									}`
 								}
@@ -80,7 +80,7 @@ const SideNav = memo(function SideNav({ variant = "authenticated", isSticky = tr
 							{/* User Profile Button */}
 							<button
 								onClick={() => navigate("/profile")}
-								className="flex gap-3 items-center px-3 py-2 w-full rounded-full hover:bg-slate-100 transition-colors text-left"
+								className="flex gap-3 items-center px-3 py-2 w-full rounded hover:bg-slate-100 transition-colors text-left"
 							>
 								<div className="w-5 h-5 rounded bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
 									<span className="text-xs font-normal leading-4 text-teal-700">{userInitial}</span>
@@ -94,7 +94,7 @@ const SideNav = memo(function SideNav({ variant = "authenticated", isSticky = tr
 							{/* Settings */}
 							<button
 								onClick={() => setShowApiSettings(true)}
-								className="flex gap-3 items-center px-3 py-2 w-full rounded-full text-slate-700 hover:bg-slate-100 transition-colors"
+								className="flex gap-3 items-center px-3 py-2 w-full rounded text-slate-700 hover:bg-slate-100 transition-colors"
 							>
 								<SettingsIcon />
 								<span className="text-base font-normal leading-6">Settings</span>
@@ -104,7 +104,7 @@ const SideNav = memo(function SideNav({ variant = "authenticated", isSticky = tr
 							{/* Logout */}
 							<button
 								onClick={handleLogout}
-								className="flex gap-3 items-center px-3 py-2 w-full rounded-full text-slate-700 hover:bg-slate-100 transition-colors"
+								className="flex gap-3 items-center px-3 py-2 w-full rounded text-slate-700 hover:bg-slate-100 transition-colors"
 							>
 								<LogoutIcon />
 								<span className="text-base font-normal leading-6">Log out</span>

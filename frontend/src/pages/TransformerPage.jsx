@@ -6,6 +6,7 @@ import SideNav from "../components/SideNav";
 import TransformationLimitModal from "../components/TransformationLimitModal";
 import { useAuth } from "../contexts/useAuth";
 import { tokenStorage } from "../utils/tokenStorage";
+import DestinationTemplateUpload from "../components/DestinationTemplateUpload";
 
 function TransformerPage() {
 	const { user } = useAuth(); // Get user to check if logged in
@@ -149,14 +150,16 @@ function TransformerPage() {
 						onUpgrade={handleUpgrade}
 					/>
 					<div className="my-15">
-						<div className="flex flex-col gap-8">
+						<div className="flex flex-col gap-4">
 							<h1 className="text-2xl text-gray-700 font-semibold">Transformer</h1>
-							<p>
+							<p className="text-gray-700">
 								Upload your XML files, template, and mapping file, adjust any settings you need, run the transformation,
 								then preview and download the final XML or ZIP file.
 							</p>
 						</div>
 					</div>
+
+					<DestinationTemplateUpload></DestinationTemplateUpload>
 
 					<div className="">
 						<div className="upload-section">
