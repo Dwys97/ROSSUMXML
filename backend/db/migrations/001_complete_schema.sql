@@ -191,6 +191,7 @@ CREATE TABLE IF NOT EXISTS roles (
     id INTEGER GENERATED ALWAYS AS (role_id) STORED, -- Alias for compatibility
     role_name VARCHAR(50) NOT NULL UNIQUE, -- Alternative column name
     name VARCHAR(50) NOT NULL UNIQUE,
+    display_name VARCHAR(100), -- Human-readable role name for UI
     description TEXT,
     is_system_role BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -199,7 +200,7 @@ CREATE TABLE IF NOT EXISTS roles (
 
 CREATE INDEX IF NOT EXISTS idx_roles_name ON roles(name);
 
-COMMENT ON TABLE roles IS 'System-wide roles for RBAC (Admin, Developer, Viewer, API User)';
+COMMENT ON TABLE roles IS 'System-wide roles for RBAC (admin, developer, viewer, api_user)';
 
 -- Permissions (granular access control)
 CREATE TABLE IF NOT EXISTS permissions (
@@ -662,13 +663,24 @@ COMMENT ON TABLE webhook_settings IS 'User webhook configuration for event notif
 CREATE TABLE IF NOT EXISTS webhook_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    api_key_id UUID REFERENCES api_keys(id) ON DELETE SET NULL, -- API key used for transformation
     event_type VARCHAR(50) NOT NULL,
+    source_system VARCHAR(50), -- 'rossum', 'api', 'manual', etc.
+    rossum_annotation_id VARCHAR(100), -- Rossum annotation ID
+    rossum_document_id VARCHAR(100), -- Rossum document ID
+    rossum_queue_id VARCHAR(100), -- Rossum queue ID
     source_data JSONB,
+    source_xml_payload TEXT, -- Raw source XML
     transformed_data JSONB,
+    response_payload TEXT, -- Raw response payload
     mapping_id UUID REFERENCES transformation_mappings(id) ON DELETE SET NULL,
     status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed')),
+    http_status_code INTEGER,
     error_message TEXT,
     processing_time_ms INTEGER,
+    source_xml_size INTEGER, -- Size of source XML in bytes
+    transformed_xml_size INTEGER, -- Size of output XML in bytes
+    output_format VARCHAR(50), -- 'xml', 'json', etc.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -676,6 +688,7 @@ CREATE INDEX IF NOT EXISTS idx_webhook_events_user_id ON webhook_events(user_id)
 CREATE INDEX IF NOT EXISTS idx_webhook_events_event_type ON webhook_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_webhook_events_status ON webhook_events(status);
 CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_api_key_id ON webhook_events(api_key_id);
 
 COMMENT ON TABLE webhook_events IS 'History of webhook transformation events';
 
@@ -739,6 +752,26 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Function to check if user has a specific permission (used by backend RBAC)
+CREATE OR REPLACE FUNCTION user_has_permission(p_user_id UUID, p_permission_name VARCHAR)
+RETURNS BOOLEAN AS $$
+DECLARE
+    has_permission BOOLEAN;
+BEGIN
+    SELECT EXISTS (
+        SELECT 1
+        FROM user_roles ur
+        JOIN role_permissions rp ON ur.role_id = rp.role_id
+        JOIN permissions p ON rp.permission_id = p.permission_id
+        WHERE ur.user_id = p_user_id
+        AND p.name = p_permission_name
+        AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
+    ) INTO has_permission;
+    
+    RETURN has_permission;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Function to log security events (called from application code)
 CREATE OR REPLACE FUNCTION log_security_event(
     p_user_id UUID,
@@ -798,15 +831,16 @@ END $$;
 -- SEED DATA: DEFAULT ROLES & PERMISSIONS
 -- ============================================================================
 
--- Insert default system roles
-INSERT INTO roles (role_id, name, role_name, description, is_system_role) VALUES
-    (1, 'Admin', 'Admin', 'Full system access with user management', true),
-    (2, 'Developer', 'Developer', 'Development and testing access', true),
-    (3, 'Viewer', 'Viewer', 'Read-only access to resources', true),
-    (4, 'API User', 'API User', 'API-only access without UI permissions', true)
+-- Insert default system roles (use lowercase for name to match backend code checks)
+INSERT INTO roles (role_id, name, role_name, display_name, description, is_system_role) VALUES
+    (1, 'admin', 'admin', 'Administrator', 'Full system access with user management', true),
+    (2, 'developer', 'developer', 'Developer', 'Development and testing access', true),
+    (3, 'viewer', 'viewer', 'Viewer', 'Read-only access to resources', true),
+    (4, 'api_user', 'api_user', 'API User', 'API-only access without UI permissions', true)
 ON CONFLICT (role_id) DO UPDATE SET
     name = EXCLUDED.name,
     role_name = EXCLUDED.role_name,
+    display_name = EXCLUDED.display_name,
     description = EXCLUDED.description;
 
 -- Insert default permissions
@@ -825,7 +859,25 @@ INSERT INTO permissions (name, resource, action, description) VALUES
     ('admin:roles', 'admin', 'roles', 'Manage roles and permissions'),
     ('admin:audit', 'admin', 'audit', 'View security audit logs'),
     ('admin:settings', 'admin', 'settings', 'Manage system settings'),
-    ('api:access', 'api', 'access', 'Access REST API')
+    ('api:access', 'api', 'access', 'Access REST API'),
+    -- Additional permissions required by backend code
+    ('view_audit_log', 'admin', 'view', 'View security audit logs'),
+    ('manage_api_keys', 'api', 'manage', 'Manage API keys'),
+    ('manage_webhooks', 'webhook', 'manage', 'Manage webhooks'),
+    ('manage_output_delivery', 'output', 'manage', 'Manage output delivery'),
+    ('manage_mappings', 'mapping', 'manage', 'Manage transformation mappings'),
+    ('view_users', 'admin', 'view', 'View users'),
+    ('manage_users', 'admin', 'manage', 'Manage users'),
+    ('view_security_settings', 'admin', 'view', 'View security settings'),
+    ('manage_security_settings', 'admin', 'manage', 'Manage security settings'),
+    -- User management permissions for admin endpoints
+    ('user:read', 'user', 'read', 'Read user data'),
+    ('user:write', 'user', 'write', 'Write user data'),
+    ('user:delete', 'user', 'delete', 'Delete users'),
+    ('role:read', 'role', 'read', 'Read roles'),
+    ('role:manage', 'role', 'manage', 'Manage roles'),
+    ('subscription:read', 'subscription', 'read', 'Read subscription data'),
+    ('subscription:write', 'subscription', 'write', 'Write subscription data')
 ON CONFLICT (name) DO UPDATE SET
     description = EXCLUDED.description;
 
@@ -834,13 +886,13 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.role_id, p.permission_id
 FROM roles r
 CROSS JOIN permissions p
-WHERE r.name = 'Admin' -- Admin gets all permissions
+WHERE r.name = 'admin' -- Admin gets all permissions
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.role_id, p.permission_id
 FROM roles r, permissions p
-WHERE r.name = 'Developer' 
+WHERE r.name = 'developer' 
 AND p.name IN (
     'transform:execute', 'mapping:create', 'mapping:read', 'mapping:update', 'mapping:delete',
     'invoice:upload', 'invoice:read', 'invoice:update', 'invoice:export',
@@ -851,14 +903,14 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.role_id, p.permission_id
 FROM roles r, permissions p
-WHERE r.name = 'Viewer' 
+WHERE r.name = 'viewer' 
 AND p.name IN ('mapping:read', 'invoice:read')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.role_id, p.permission_id
 FROM roles r, permissions p
-WHERE r.name = 'API User' 
+WHERE r.name = 'api_user' 
 AND p.name IN ('transform:execute', 'api:access')
 ON CONFLICT DO NOTHING;
 
@@ -887,7 +939,7 @@ ON CONFLICT (email) DO UPDATE SET
 -- Assign Admin role to default admin user
 INSERT INTO user_roles (user_id, role_id, granted_at)
 SELECT 'a0000000-0000-0000-0000-000000000001'::UUID, role_id, CURRENT_TIMESTAMP
-FROM roles WHERE name = 'Admin'
+FROM roles WHERE name = 'admin'
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- Create subscription for admin user
