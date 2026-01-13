@@ -139,13 +139,7 @@ const RegisterPage = () => {
     return (
         <>
             <TopNav />
-            <div className={styles.authContainer}>
-                <div className={styles.authBackground} aria-hidden="true">
-                    <div className={styles.gradientOrb1}></div>
-                    <div className={styles.gradientOrb2}></div>
-                    <div className={styles.gradientOrb3}></div>
-                    <div className={styles.authOverlay}></div>
-                </div>
+            <div className={styles.authRoot}>
                 <div className={`${styles.authBox} ${styles.wideBox}`} role="main" aria-labelledby="register-heading">
                     <div className={styles.authGrid}>
                         <section className={styles.authFormPanel} aria-label="Registration form">
@@ -260,9 +254,9 @@ const RegisterPage = () => {
                                             <label htmlFor="password" className={styles.floatingLabel}>Password *</label>
                                             <button type="button" className={styles.showPasswordBtn} onClick={() => setShowPassword(v => !v)} tabIndex={0} aria-label={showPassword ? "Hide password" : "Show password"}>
                                                 {showPassword ? (
-                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><path d="M7.5 14.5l7-7" stroke="#bfc9d8" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5" /><path d="M7.5 14.5l7-7" stroke="#bfc9d8" strokeWidth="1.5" strokeLinecap="round" /></svg>
                                                 ) : (
-                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><circle cx="11" cy="11" r="3" stroke="#bfc9d8" strokeWidth="1.5"/></svg>
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5" /><circle cx="11" cy="11" r="3" stroke="#bfc9d8" strokeWidth="1.5" /></svg>
                                                 )}
                                             </button>
                                         </div>
@@ -271,13 +265,11 @@ const RegisterPage = () => {
                                                 {[...Array(5)].map((_, i) => (
                                                     <div
                                                         key={i}
-                                                        className={`${styles.strengthSegment} ${
-                                                            i < passwordStrength.score ? styles.active : ''
-                                                        } ${
-                                                            passwordStrength.score <= 2 ? styles.weak :
-                                                            passwordStrength.score <= 3 ? styles.medium :
-                                                            styles.strong
-                                                        }`}
+                                                        className={`${styles.strengthSegment} ${i < passwordStrength.score ? styles.active : ''
+                                                            } ${passwordStrength.score <= 2 ? styles.weak :
+                                                                passwordStrength.score <= 3 ? styles.medium :
+                                                                    styles.strong
+                                                            }`}
                                                     />
                                                 ))}
                                             </div>
@@ -312,9 +304,9 @@ const RegisterPage = () => {
                                             <label htmlFor="confirmPassword" className={styles.floatingLabel}>Confirm Password *</label>
                                             <button type="button" className={styles.showPasswordBtn} onClick={() => setShowConfirm(v => !v)} tabIndex={0} aria-label={showConfirm ? "Hide password" : "Show password"}>
                                                 {showConfirm ? (
-                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><path d="M7.5 14.5l7-7" stroke="#bfc9d8" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5" /><path d="M7.5 14.5l7-7" stroke="#bfc9d8" strokeWidth="1.5" strokeLinecap="round" /></svg>
                                                 ) : (
-                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5"/><circle cx="11" cy="11" r="3" stroke="#bfc9d8" strokeWidth="1.5"/></svg>
+                                                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 11C3.818 6.667 7.273 4.5 11 4.5c3.727 0 7.182 2.167 9 6.5-1.818 4.333-5.273 6.5-9 6.5-3.727 0-7.182-2.167-9-6.5z" stroke="#bfc9d8" strokeWidth="1.5" /><circle cx="11" cy="11" r="3" stroke="#bfc9d8" strokeWidth="1.5" /></svg>
                                                 )}
                                             </button>
                                         </div>

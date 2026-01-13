@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import FileDropzone from '../components/common/FileDropzone';
 import Footer from '../components/common/Footer';
 import TopNav from '../components/TopNav';
 import TransformationLimitModal from '../components/TransformationLimitModal';
+import MappingVisualizer from '../components/MappingVisualizer';
 import { useAuth } from '../contexts/useAuth';
 import { tokenStorage } from '../utils/tokenStorage';
 
 function TransformerPage() {
     const { user } = useAuth(); // Get user to check if logged in
     const navigate = useNavigate();
+    const sourceRef = useRef(null);
+    const targetRef = useRef(null);
+
     const [sourceFiles, setSourceFiles] = useState([]);
     const [destinationXml, setDestinationXml] = useState(null);
     const [mappingJson, setMappingJson] = useState(null);
@@ -32,6 +36,21 @@ function TransformerPage() {
     });
     const [showLimitModal, setShowLimitModal] = useState(false);
 
+    // Mock mappings for visualizer (since actual mapping parsing logic isn't fully exposed in this view)
+    // In a real scenario, we would parse `mappingJson` to get these.
+    // For the visual prototype, we generate 3 random links if files are present to show the effect.
+    const activeMappings = useMemo(() => {
+        if (sourceFiles.length > 0 && destinationXml) {
+            return [
+                { id: 1, sourceId: 'src-1', targetId: 'tgt-1' },
+                { id: 2, sourceId: 'src-2', targetId: 'tgt-2' },
+                { id: 3, sourceId: 'src-3', targetId: 'tgt-3' }
+            ];
+        }
+        return [];
+    }, [sourceFiles, destinationXml]);
+
+
     const handleTransform = async () => {
         if (sourceFiles.length === 0 || !destinationXml || !mappingJson) {
             alert('Please provide Source XML, Destination Template, and Mapping JSON.');
@@ -52,9 +71,9 @@ function TransformerPage() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             };
-            
+
             console.log(`[Transform] Using endpoint: ${endpoint} (authenticated)`);
-            
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: headers,
@@ -70,10 +89,10 @@ function TransformerPage() {
             if (response.status === 429) {
                 const errorData = await response.json();
                 console.log('Rate limit response:', errorData);
-                
+
                 // Handle both possible response formats
                 const usage = errorData.usage || errorData.details || {};
-                
+
                 setUsageInfo({
                     used: usage.used || 0,
                     limit: usage.limit || 10,
@@ -133,10 +152,12 @@ function TransformerPage() {
     };
 
     return (
-        <>
-            <TopNav />
-            
-            {/* Transformation Limit Modal */}
+        <div className="bento-grid">
+            {/* Header Area spans full width */}
+            <div style={{ gridColumn: '1 / -1' }}>
+                <TopNav />
+            </div>
+
             <TransformationLimitModal
                 show={showLimitModal}
                 subscriptionLevel={usageInfo.subscriptionLevel}
@@ -146,132 +167,113 @@ function TransformerPage() {
                 onClose={() => setShowLimitModal(false)}
                 onUpgrade={handleUpgrade}
             />
-            
-            <div className="app-container extra-spacing" style={{ paddingTop: '100px' }}>
-                <section className="how-to-use" style={{ marginTop: '0' }}>
-                <div className="steps-container">
-                    <div className="step">
-                        <div className="step-number">1</div>
-                        <div className="step-text">
-                            <h3>Upload Files</h3>
-                            <p>Upload source XML(s), a destination template, and a JSON mapping file.</p>
-                        </div>
-                    </div>
-                    <div className="step">
-                        <div className="step-number">2</div>
-                        <div className="step-text">
-                            <h3>Configure & Transform</h3>
-                            <p>Enable XPath if needed, then click the 'Transform' button to start.</p>
-                        </div>
-                    </div>
-                    <div className="step">
-                        <div className="step-number">3</div>
-                        <div className="step-text">
-                            <h3>Download Results</h3>
-                            <p>Preview the output and download your transformed XML file or ZIP archive.</p>
-                        </div>
-                    </div>
+
+            {/* CONFIGURATION PANEL (Left, span 3) */}
+            <div className="obsidian-card" style={{ gridColumn: 'span 3', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ marginBottom: '32px' }}>
+                    <h2 style={{ fontSize: '1.25rem', marginBottom: '8px', color: 'var(--text-primary)' }}>Configuration</h2>
+                    <p style={{ margin: 0, fontSize: '0.875rem' }}>Set transformation parameters.</p>
                 </div>
-            </section>
-            <br /><br />
 
-            <div className="upload-section">
-                <FileDropzone onFileSelect={(files) => { setSourceFiles(files); setSourceCount(files.length); if (files.length > 0) setInputXml(files[0].content); }}>
-                    <div className="icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9 12H15M9 16H15M17 21H7C6.46957 21 5.96086 20.7893 5.58579 20.4142C5.21071 20.0391 5 19.5304 5 19V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H12.586C12.8512 3.00006 13.1055 3.10545 13.293 3.293L18.707 8.707C18.8946 8.89449 18.9999 9.1488 19 9.414V19C19 19.5304 18.7893 20.0391 18.4142 20.4142C18.0391 20.7893 17.5304 21 17 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M13 3V7C13 7.53043 13.2107 8.03914 13.5858 8.41421C13.9609 8.78929 14.4696 9 15 9H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </div>
-                    <h3>Source XML(s)</h3>
-                    <p>Drop XML or ZIP files here</p>
-                    <span className="file-count">Selected: <span id="sourceCount">{sourceCount}</span></span>
-                </FileDropzone>
+                <div className="dropzone-selector-label">Options</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                        <input type="checkbox" className="checkbox" checked={useXPath} onChange={(e) => setUseXPath(e.target.checked)} />
+                        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Enable XPath</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                        <input type="checkbox" className="checkbox" checked={removeEmptyTags} onChange={(e) => setRemoveEmptyTags(e.target.checked)} />
+                        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Clean Empty Tags</span>
+                    </label>
+                </div>
 
-                <FileDropzone onFileSelect={(files) => setDestinationXml(files[0])}>
-                    <div className="icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M12 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M9 14L12 17L15 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </div>
-                    <h3>Destination Template</h3>
-                    <p>Drop a single XML template</p>
-                </FileDropzone>
+                <div className="dropzone-selector-divider"></div>
 
-                <FileDropzone onFileSelect={(files) => setXsdSchema(files[0])}>
-                    <div className="icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M9 15L11 17L16 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </div>
-                    <h3>XSD Schema</h3>
-                    <p>Drop XSD for output validation (Optional)</p>
-                </FileDropzone>
+                <div className="action-buttons" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: 'auto' }}>
+                    <button className="primary-btn" onClick={handleTransform} style={{ width: '100%', height: '44px' }}>
+                        Run Transformation
+                    </button>
+                    <Link to="/editor" className="secondary-btn" style={{ width: '100%', textAlign: 'center', boxSizing: 'border-box', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        Open Visual Editor
+                    </Link>
+                </div>
 
-                <FileDropzone onFileSelect={(files) => setMappingJson(files[0])}>
-                    <div className="icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M8 13L10 15L8 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M16 13L14 15L16 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </div>
-                    <h3>Mapping JSON</h3>
-                    <p>Drop your mapping file</p>
-                </FileDropzone>
+                <div className="status-message">
+                    Status: <span style={{ color: status === 'Ready' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{status}</span>
+                </div>
             </div>
 
-            <div className="config-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input type="checkbox" id="useXPathCheckbox" className="checkbox" checked={useXPath} onChange={(e) => setUseXPath(e.target.checked)} />
-                        <label htmlFor="useXPathCheckbox" style={{ fontSize: '0.875rem', cursor: 'pointer' }}>
-                            Enable XPath evaluation
-                            <abbr title="Use XPath expressions in your JSON mapping for advanced matching." className="tooltip">&#9432;</abbr>
-                        </label>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input type="checkbox" id="removeEmptyTagsCheckbox" className="checkbox" checked={removeEmptyTags} onChange={(e) => setRemoveEmptyTags(e.target.checked)} />
-                        <label htmlFor="removeEmptyTagsCheckbox" style={{ fontSize: '0.875rem', cursor: 'pointer' }}>
-                            Remove Empty Tags
-                            <abbr title="Tick this to remove empty XML tags from the output. Cargowise requires this to pass schema validation." className="tooltip">&#9432;</abbr>
-                        </label>
+            {/* SOURCE PANEL (Middle, span 5) */}
+            <div className="obsidian-card" style={{ gridColumn: 'span 5', display: 'flex', flexDirection: 'column' }} ref={sourceRef}>
+                <div className="card-header">
+                    <h3 className="card-title">Source Data</h3>
+                    <span className="text-muted" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>{sourceCount} FILES</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+                    <FileDropzone onFileSelect={(files) => { setSourceFiles(files); setSourceCount(files.length); if (files.length > 0) setInputXml(files[0].content); }}>
+                        <div className="icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <h3>Source XML</h3>
+                        <p>Drag & drop or click</p>
+                    </FileDropzone>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <FileDropzone onFileSelect={(files) => setMappingJson(files[0])}>
+                            <h3>Mapping JSON</h3>
+                            <p>Required for transform</p>
+                        </FileDropzone>
+                        <FileDropzone onFileSelect={(files) => setDestinationXml(files[0])}>
+                            <h3>Template XML</h3>
+                            <p>Desired output structure</p>
+                        </FileDropzone>
                     </div>
                 </div>
-                <div className="action-buttons">
-                    <button id="transformBtn" className="primary-btn" onClick={handleTransform}>Transform</button>
-                    <Link to="/editor" className="secondary-btn" role="button">Create / Edit Mapping</Link>
+
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--border-base)' }}>
+                    <textarea
+                        className="monospace"
+                        style={{ flex: 1, minHeight: '150px', resize: 'none', border: 'none', background: 'transparent', padding: 0 }}
+                        readOnly
+                        value={inputXml}
+                        placeholder="// Source content preview..."
+                    ></textarea>
                 </div>
-                <div id="actions" className="status-message">{status}</div>
             </div>
 
-            <section className="previews">
-                <div className="preview-card">
-                    <h3 className="card-title">Input XML Preview</h3>
-                    <textarea id="inputXml" className="monospace" readOnly value={inputXml} placeholder="Source XML content appears here..."></textarea>
-                </div>
-                <div className="preview-card">
-                    <div className="card-header">
-                        <h3 className="card-title">Output XML</h3>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <button id="copyBtn" className="btn-ghost" onClick={handleCopy}>Copy</button>
-                            {outputXml && (
-                                <a id="downloadLink" className="primary-btn" href={'data:text/xml;charset=utf-8,' + encodeURIComponent(outputXml)} download="transformed.xml">Download</a>
-                            )}
-                        </div>
+            {/* OUTPUT PANEL (Right, span 4) */}
+            <div className="obsidian-card" style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column' }} ref={targetRef}>
+                <div className="card-header">
+                    <h3 className="card-title">Output</h3>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn-ghost" onClick={handleCopy}>Copy</button>
+                        {outputXml && (
+                            <a className="secondary-btn" style={{ padding: '6px 12px', fontSize: '0.75rem', height: 'auto' }} href={'data:text/xml;charset=utf-8,' + encodeURIComponent(outputXml)} download="transformed.xml">Download</a>
+                        )}
                     </div>
-                    <textarea id="outputXml" className="monospace" readOnly value={outputXml} placeholder="Transformed XML output will appear here..."></textarea>
                 </div>
-            </section>
+
+                <div style={{ flex: 1, position: 'relative', display: 'flex', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--border-base)' }}>
+                    <textarea
+                        className="monospace"
+                        style={{ flex: 1, resize: 'none', border: 'none', background: 'transparent', padding: 0 }}
+                        readOnly
+                        value={outputXml}
+                        placeholder="// Transformed result..."
+                    ></textarea>
+                </div>
+                {/* Visualizer Layer */}
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
+                    <MappingVisualizer mappings={activeMappings} sourceRef={sourceRef} targetRef={targetRef} />
+                </div>
             </div>
-            <Footer text="© 2025 SchemaBridge — Built for production · EDI & XML integration" />
-        </>
+
+            {/* Footer */}
+            <div style={{ gridColumn: '1 / -1', marginTop: 'auto', textAlign: 'center', paddingTop: '40px', paddingBottom: '20px' }}>
+                <Footer text="© 2026 SCHEMA/BRIDGE" />
+            </div>
+        </div>
     );
 }
 

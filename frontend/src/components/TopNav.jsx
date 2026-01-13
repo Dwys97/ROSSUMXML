@@ -10,7 +10,7 @@ import logo from '../assets/logo-light.svg';
 const TopNav = memo(function TopNav() {
     const { user, checkAuth, logout } = useAuth();
     const location = useLocation();
-    const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact', '/api-docs'].includes(location.pathname);
+    const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact', '/api-docs', '/login', '/register'].includes(location.pathname);
     const isAdminPage = location.pathname.startsWith('/admin');
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -44,10 +44,10 @@ const TopNav = memo(function TopNav() {
     const handleLogout = () => {
         setIsMobileMenuOpen(false);
         setIsProfileOpen(false);
-        
+
         // Clear auth data first
         logout();
-        
+
         // Force hard redirect to landing page
         window.location.href = '/';
     };
@@ -86,8 +86,8 @@ const TopNav = memo(function TopNav() {
                                 <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
                                 <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
                                 {user ? (
-                                    <NavLink 
-                                        to="/transformer" 
+                                    <NavLink
+                                        to="/transformer"
                                         className={`${styles.navLink} ${styles.transformerButton}`}
                                         onClick={handleNavLinkClick}
                                     >
@@ -95,8 +95,12 @@ const TopNav = memo(function TopNav() {
                                     </NavLink>
                                 ) : (
                                     <>
-                                        <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
-                                        <NavLink to="/register" className={styles.loginButton}>Register</NavLink>
+                                        {location.pathname !== '/login' && (
+                                            <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
+                                        )}
+                                        {location.pathname !== '/register' && (
+                                            <NavLink to="/register" className={styles.loginButton}>Register</NavLink>
+                                        )}
                                     </>
                                 )}
                             </>
@@ -115,18 +119,18 @@ const TopNav = memo(function TopNav() {
                                                 👨‍💼 Admin
                                             </NavLink>
                                         )}
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 setIsAnalyticsOpen(true);
                                                 setIsMobileMenuOpen(false);
-                                            }} 
+                                            }}
                                             className={styles.navLink}
                                             aria-label="Analytics Dashboard"
                                         >
                                             📊 Analytics
                                         </button>
-                                        <button 
-                                            onClick={() => setShowApiSettings(true)} 
+                                        <button
+                                            onClick={() => setShowApiSettings(true)}
                                             className={styles.navLink}
                                             aria-label="API Settings"
                                         >
@@ -141,8 +145,8 @@ const TopNav = memo(function TopNav() {
                                         </NavLink>
                                     </>
                                 )}
-                                <button 
-                                    onClick={handleProfileClick} 
+                                <button
+                                    onClick={handleProfileClick}
                                     className={styles.userButton}
                                     aria-label="User profile"
                                 >
@@ -160,7 +164,7 @@ const TopNav = memo(function TopNav() {
                     </div>
 
                     {/* Mobile Menu Button */}
-                    <button 
+                    <button
                         onClick={toggleMobileMenu}
                         className={styles.mobileMenuButton}
                         aria-label="Toggle mobile menu"
@@ -195,8 +199,8 @@ const TopNav = memo(function TopNav() {
                                     Contact Us
                                 </NavLink>
                                 {user ? (
-                                    <NavLink 
-                                        to="/transformer" 
+                                    <NavLink
+                                        to="/transformer"
                                         className={styles.mobileNavLink}
                                         onClick={handleNavLinkClick}
                                     >
@@ -204,12 +208,16 @@ const TopNav = memo(function TopNav() {
                                     </NavLink>
                                 ) : (
                                     <>
-                                        <NavLink to="/login" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                            Login
-                                        </NavLink>
-                                        <NavLink to="/register" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
-                                            Register
-                                        </NavLink>
+                                        {location.pathname !== '/login' && (
+                                            <NavLink to="/login" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                                Login
+                                            </NavLink>
+                                        )}
+                                        {location.pathname !== '/register' && (
+                                            <NavLink to="/register" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+                                                Register
+                                            </NavLink>
+                                        )}
                                     </>
                                 )}
                             </>
@@ -228,20 +236,20 @@ const TopNav = memo(function TopNav() {
                                                 👨‍💼 Admin
                                             </NavLink>
                                         )}
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 setIsAnalyticsOpen(true);
                                                 setIsMobileMenuOpen(false);
-                                            }} 
+                                            }}
                                             className={styles.mobileNavLink}
                                         >
                                             📊 Analytics
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 setShowApiSettings(true);
                                                 setIsMobileMenuOpen(false);
-                                            }} 
+                                            }}
                                             className={styles.mobileNavLink}
                                         >
                                             ⚙️ API Settings
@@ -255,8 +263,8 @@ const TopNav = memo(function TopNav() {
                                         </NavLink>
                                     </>
                                 )}
-                                <button 
-                                    onClick={handleProfileClick} 
+                                <button
+                                    onClick={handleProfileClick}
                                     className={styles.mobileUserButton}
                                 >
                                     <div className={styles.userAvatar}>
@@ -274,15 +282,15 @@ const TopNav = memo(function TopNav() {
                 )}
             </nav>
             {isProfileOpen && user && (
-                <UserProfile 
-                    isOpen={isProfileOpen} 
+                <UserProfile
+                    isOpen={isProfileOpen}
                     onClose={() => setIsProfileOpen(false)}
                     onLogout={handleLogout}
                 />
             )}
             {showApiSettings && (
-                <ApiSettingsModal 
-                    isOpen={showApiSettings} 
+                <ApiSettingsModal
+                    isOpen={showApiSettings}
                     onClose={() => setShowApiSettings(false)}
                 />
             )}

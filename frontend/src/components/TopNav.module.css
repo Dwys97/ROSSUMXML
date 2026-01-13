@@ -1,260 +1,217 @@
+/* Modern Zinc TopNav */
+
 .mainNav {
-    position: fixed;
+    background: rgba(18, 18, 18, 0.8);
+    /* Charcoal with opacity */
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-base);
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
-    background: rgba(13, 27, 42, 0.95);
-    backdrop-filter: blur(10px);
     z-index: 1000;
+    width: 100%;
 }
 
 .navContainer {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
-    padding: 1rem 2rem;
+    padding: 0 32px;
+    height: 72px;
+    /* Fixed height */
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
 .logo {
-    height: 48px;
+    height: 32px;
     width: auto;
+    opacity: 0.9;
+    transition: opacity 0.2s;
+}
+
+.logo:hover {
+    opacity: 1;
 }
 
 .navLinks {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 8px;
+    /* Compact spacing */
 }
 
+/* Base Link Style */
 .navLink {
-    color: #e0e1dd;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
     text-decoration: none;
-    font-size: 0.9375rem;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
     transition: all 0.2s ease;
     background: transparent;
     border: none;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
 }
 
-.navLink:hover {
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.1);
+.navLink:hover,
+.navLink.active {
+    color: var(--text-primary);
+    background: var(--bg-surface);
 }
 
 .navLink.active {
-    color: #ffffff;
-    background: rgba(29, 114, 243, 0.2);
+    font-weight: 600;
+}
+
+/* Buttons */
+.loginButton {
+    composes: navLink;
+    border: 1px solid var(--border-base);
+    color: var(--text-primary);
+}
+
+.loginButton:hover {
+    border-color: var(--text-secondary);
+    background: var(--bg-surface);
 }
 
 .transformerButton {
-    background: #1d72f3;
-    color: white;
-    padding: 0.625rem 1.25rem;
-    border-radius: 6px;
+    background: var(--text-primary);
+    color: var(--bg-void) !important;
     font-weight: 600;
 }
 
 .transformerButton:hover {
-    background: #1557b0;
+    background: #e4e4e7;
+    /* Zinc 200 */
     transform: translateY(-1px);
 }
 
-.loginButton {
-    color: #e0e1dd;
-    text-decoration: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    border: 1px solid #3a506b;
-    transition: all 0.2s ease;
-}
-
-.loginButton:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #1d72f3;
-}
-
+/* User Profile Button */
 .userButton {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid #3a506b;
-    border-radius: 8px;
-    padding: 0.375rem 0.75rem;
+    gap: 12px;
+    padding: 6px 12px 6px 6px;
+    background: transparent;
+    border: 1px solid var(--border-base);
+    border-radius: 99px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    color: #e0e1dd;
+    transition: all 0.2s;
+    margin-left: 16px;
+    color: var(--text-primary);
+    font-family: inherit;
 }
 
 .userButton:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #1d72f3;
+    background: var(--bg-surface);
+    border-color: var(--text-secondary);
 }
 
 .userAvatar {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg-surface);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
     font-weight: 600;
     font-size: 0.875rem;
+    border: 1px solid var(--border-base);
 }
 
 .userName {
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     font-weight: 500;
 }
 
-/* API Settings Button */
-.apiSettingsButton {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: linear-gradient(135deg, #1d72f3 0%, #1557b0 100%);
-    border: none;
-    border-radius: 8px;
-    padding: 0.625rem 1.25rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: white;
-    font-weight: 600;
-    font-size: 0.9375rem;
-    box-shadow: 0 2px 8px rgba(29, 114, 243, 0.3);
-}
-
-.apiSettingsButton:hover {
-    background: linear-gradient(135deg, #1557b0 0%, #0f4280 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(29, 114, 243, 0.4);
-}
-
-.apiSettingsButton:active {
-    transform: translateY(0);
-}
-
-/* Mobile Menu Button */
+/* Mobile Menu */
 .mobileMenuButton {
     display: none;
+    /* Hidden by default */
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0.5rem;
-    z-index: 1001;
+    padding: 8px;
 }
 
 .hamburger {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: block;
     width: 24px;
+    height: 24px;
+    position: relative;
 }
 
 .hamburger span {
     display: block;
-    width: 100%;
+    position: absolute;
     height: 2px;
-    background: #e0e1dd;
-    transition: all 0.3s ease;
+    width: 100%;
+    background: var(--text-primary);
     border-radius: 2px;
+    left: 0;
+    transform-origin: center;
+    transition: all 0.25s ease;
 }
 
-.hamburger.hamburgerOpen span:nth-child(1) {
-    transform: rotate(45deg) translate(6px, 6px);
+.hamburger span:nth-child(1) {
+    top: 4px;
 }
 
-.hamburger.hamburgerOpen span:nth-child(2) {
+.hamburger span:nth-child(2) {
+    top: 11px;
+}
+
+.hamburger span:nth-child(3) {
+    top: 18px;
+}
+
+.hamburgerOpen span:nth-child(1) {
+    transform: rotate(45deg);
+    top: 11px;
+}
+
+.hamburgerOpen span:nth-child(2) {
     opacity: 0;
 }
 
-.hamburger.hamburgerOpen span:nth-child(3) {
-    transform: rotate(-45deg) translate(6px, -6px);
+.hamburgerOpen span:nth-child(3) {
+    transform: rotate(-45deg);
+    top: 11px;
 }
 
-/* Mobile Menu */
+/* Mobile Menu Dropdown */
 .mobileMenu {
-    display: none;
     position: absolute;
-    top: 100%;
+    top: 72px;
     left: 0;
-    right: 0;
-    background: rgba(13, 27, 42, 0.98);
-    backdrop-filter: blur(10px);
-    border-top: 1px solid #3a506b;
-    padding: 1rem 2rem;
+    width: 100%;
+    background: var(--bg-void);
+    border-bottom: 1px solid var(--border-base);
+    padding: 16px 0;
+    display: flex;
     flex-direction: column;
-    gap: 0.5rem;
 }
 
 .mobileNavLink {
-    color: #e0e1dd;
+    padding: 12px 32px;
+    color: var(--text-secondary);
     text-decoration: none;
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    display: block;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    width: 100%;
-    text-align: left;
+    font-size: 1rem;
+    border-left: 4px solid transparent;
 }
 
 .mobileNavLink:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-left-color: var(--text-primary);
 }
 
-.mobileUserButton {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid #3a506b;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: #e0e1dd;
-    width: 100%;
-}
-
-.mobileUserButton:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #1d72f3;
-}
-
-.mobileApiSettingsButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: linear-gradient(135deg, #1d72f3 0%, #1557b0 100%);
-    border: none;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: white;
-    font-weight: 600;
-    font-size: 0.9375rem;
-    width: 100%;
-    box-shadow: 0 2px 8px rgba(29, 114, 243, 0.3);
-}
-
-.mobileApiSettingsButton:hover {
-    background: linear-gradient(135deg, #1557b0 0%, #0f4280 100%);
-    box-shadow: 0 4px 12px rgba(29, 114, 243, 0.4);
-}
-
-/* Responsive */
 @media (max-width: 768px) {
     .navLinks {
         display: none;
@@ -264,24 +221,7 @@
         display: block;
     }
 
-    .mobileMenu {
-        display: flex;
-    }
-
     .navContainer {
-        padding: 1rem;
-    }
-
-    .logo {
-        height: 40px;
-    }
-
-    .mobileNavLink {
-        padding: 0.625rem 0.75rem;
-        font-size: 0.9375rem;
-    }
-
-    .mobileUserButton {
-        padding: 0.625rem 0.75rem;
+        padding: 0 20px;
     }
 }

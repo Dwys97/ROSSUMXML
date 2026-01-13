@@ -1,336 +1,329 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import TopNav from '../components/TopNav';
 import Footer from '../components/common/Footer';
 import styles from './LandingPage.module.css';
-import transformerImg from '../assets/transformer.png';
-import editorImg from '../assets/editor.png';
 
 function LandingPage() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  // removed paused state; auto-advance runs when inView and not reduced motion
-  const [inView, setInView] = useState(true);
-  const previewRef = useRef(null);
-  const touchStartX = useRef(null);
-  const touchStartY = useRef(null);
-
-  const handleTouchStart = (e) => {
-    if (!e.touches || e.touches.length === 0) return;
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e) => {
-    if (touchStartX.current == null || !e.changedTouches || e.changedTouches.length === 0) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    const dy = e.changedTouches[0].clientY - touchStartY.current;
-    touchStartX.current = null;
-    touchStartY.current = null;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-      setCurrentSlide((s) => (dx < 0 ? (s + 1) % 2 : (s - 1 + 2) % 2));
-    }
-  };
-
-  useEffect(() => {
-    setIsLoaded(true);
-    // Optional auto-advance for carousel (respects reduced motion)
-    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let timer;
-    if (!prefersReduced && inView) {
-      timer = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % 2);
-      }, 6000);
-    }
-    
-    const handleMouseMove = (e) => {
-      setMousePosition({
-        x: (e.clientX / window.innerWidth) * 100,
-        y: (e.clientY / window.innerHeight) * 100
-      });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      if (timer) clearInterval(timer);
-    };
-  }, [inView]);
-
-  // Start auto-advance only when the preview is in viewport
-  useEffect(() => {
-    if (!('IntersectionObserver' in window) || !previewRef.current) return;
-    const observer = new IntersectionObserver((entries) => {
-      const entry = entries[0];
-      setInView(entry.isIntersecting);
-    }, { threshold: 0.1 });
-    observer.observe(previewRef.current);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <>
       <TopNav />
-      <div className="app-container">
+      <div className={styles.hero}>
+        <div className={styles.technicalGrid}></div>
+        <div className={styles.scanLine}></div>
 
-        {/* Hero Section */}
-        <header className={styles.hero} style={{
-          '--mouse-x': `${mousePosition.x}%`,
-          '--mouse-y': `${mousePosition.y}%`
-        }}>
-          <div className={styles.heroBackground}>
-            <div className={styles.gradientOrb1}></div>
-            <div className={styles.gradientOrb2}></div>
-            <div className={styles.gradientOrb3}></div>
-            <div className={styles.heroOverlay}></div>
+        <div className={styles.heroContent}>
+          <div className={styles.systemBadge}>
+            <div className={styles.statusDot}></div>
+            System V3.0 // Ready
           </div>
-          
-          <div className={styles.heroContent}>
-            <div className={styles.floatingElements} aria-hidden="true">
-              <div className={styles.floatingXmlTag} data-speed="2">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>data</span>
-                <span className={styles.xmlBracket}>/&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="3">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>transform</span>
-                <span className={styles.xmlBracket}>&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="1.5">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>schema</span>
-                <span className={styles.xmlBracket}>/&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="2.5">
-                <span className={styles.xmlBracket}>&lt;/</span>
-                <span className={styles.xmlTagName}>xml</span>
-                <span className={styles.xmlBracket}>&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="1.8">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>mapping</span>
-                <span className={styles.xmlBracket}>/&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="2.2">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>field</span>
-                <span className={styles.xmlBracket}>&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="2.7">
-                <span className={styles.xmlBracket}>&lt;/</span>
-                <span className={styles.xmlTagName}>node</span>
-                <span className={styles.xmlBracket}>&gt;</span>
-              </div>
-              <div className={styles.floatingXmlTag} data-speed="3.2">
-                <span className={styles.xmlBracket}>&lt;</span>
-                <span className={styles.xmlTagName}>element</span>
-                <span className={styles.xmlBracket}>/&gt;</span>
-              </div>
+
+          <h1 className={styles.heroTitle}>
+            Schema <br /> Infrastructure
+          </h1>
+
+          <p className={styles.heroSubtitle}>
+                        // UNIVERSAL TRANSLATOR<br />
+            Map any XML structure to any other. <br />
+            Zero-code JSON definitions. Infinite scale.
+          </p>
+
+          <div className={styles.ctaGroup}>
+            <Link to="/transformer" className={styles.primaryBtn}>
+              Initialize Layer
+            </Link>
+            <Link to="/docs" className={styles.secondaryBtn}>
+              Documentation
+            </Link>
+          </div>
+        </div>
+
+        {/* THE ENGINE STAGE (3 COLUMNS) */}
+        <div className={styles.engineStage}>
+
+          {/* 1. SOURCE XML */}
+          <div className={`${styles.codeStream} ${styles.sourceStream}`}>
+            <div className={styles.streamHeader}>
+              <span>Input Source</span>
+              <span>XML</span>
             </div>
-            
-            <h1 className={`${styles.heroTitle} ${isLoaded ? styles.loaded : ''}`}>
-              <span className={`${styles.titleWord} ${styles.titleWordHighlight}`} style={{ animationDelay: '0.4s' }}>EFFORTLESS</span>
-              <span className={`${styles.titleWord} ${styles.heroSectionTitleWord}`} style={{ animationDelay: '0.9s' }}>XML</span>
-              <span className={`${styles.titleWord} ${styles.heroSectionTitleWord}`} style={{ animationDelay: '0.9s' }}>INTEGRATION,</span>
-              <span className={`${styles.titleWord} ${styles.titleWordHighlight}`} style={{ animationDelay: '1.4s' }}>INSTANT</span>
-              <span className={`${styles.titleWord} ${styles.heroSectionTitleWord}`} style={{ animationDelay: '1.9s' }}>RESULTS</span>
-            </h1>
-            
-            <p className={`${styles.subtitle} ${isLoaded ? styles.loaded : ''}`}>
-              Eliminate weeks of manual XML integration work. Our platform automatically maps, validates, and transforms 
-              complex data structures in <span className={styles.subtitleHighlight}>seconds, not months</span> — saving your team 
-              thousands of hours on every integration project.
-            </p>
-            
-            <div className={`${styles.ctaButtons} ${isLoaded ? styles.loaded : ''}`}>
-              <Link to="/transformer" className={`${styles.primaryBtn} ${styles.ctaBtn}`}>
-                <span>Start Free Trial</span>
-                <div className={styles.btnGlow}></div>
-              </Link>
-              <Link to="/request-demo" className={`${styles.secondaryBtn} ${styles.ctaBtn}`}>
-                <span>Request Demo</span>
-                <div className={styles.btnRipple}></div>
-              </Link>
-            </div>
-
-            <p className={styles.ctaMicrocopy}>No credit card required · Start in minutes</p>
-
-            <div className={styles.trustedBy} aria-label="Trusted by companies">
-              <span className={styles.trustedLabel}>Trusted by</span>
-              <ul className={styles.logoStrip}>
-                <li className={styles.logoItem} aria-hidden="true">Acme</li>
-                <li className={styles.logoItem} aria-hidden="true">Globex</li>
-                <li className={styles.logoItem} aria-hidden="true">Initech</li>
-                <li className={styles.logoItem} aria-hidden="true">Umbrella</li>
-                <li className={styles.logoItem} aria-hidden="true">Stark</li>
-              </ul>
-            </div>
-
-            {/* Hero Product Preview */}
-            <aside className={styles.heroPreview} aria-label="Product previews carousel" role="region">
-              <div
-                className={styles.previewCard}
-                ref={previewRef}
-              >
-                <div className={styles.previewHeader}>
-                  <span className={styles.previewDot}></span>
-                  <span className={styles.previewDot}></span>
-                  <span className={styles.previewDot}></span>
-                </div>
-                <div className={styles.previewBody} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-                  <div className={styles.carouselViewport}>
-                    <div className={styles.carouselTrack} aria-live="polite">
-                      <div className={`${styles.slide} ${currentSlide === 0 ? styles.active : ''}`}>
-                        <img
-                          src={transformerImg}
-                          alt="Transformer page screenshot"
-                          className={styles.previewImage}
-                          loading="lazy"
-                          decoding="async"
-                          aria-hidden={currentSlide !== 0}
-                        />
-                      </div>
-                      <div className={`${styles.slide} ${currentSlide === 1 ? styles.active : ''}`}>
-                        <img
-                          src={editorImg}
-                          alt="Editor page screenshot"
-                          className={styles.previewImage}
-                          loading="lazy"
-                          decoding="async"
-                          aria-hidden={currentSlide !== 1}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Invisible hotspot for keyboard/mouse click to go to next slide */}
-                  <button
-                    type="button"
-                    className={styles.hotspotNext}
-                    aria-label="Next screenshot"
-                    onClick={() => setCurrentSlide((s) => (s + 1) % 2)}
-                  />
-                </div>
-              </div>
-            </aside>
-            
-            <div className={`${styles.heroStats} ${isLoaded ? styles.loaded : ''}`}>
-              <div className={styles.stat}>
-                <div className={styles.statNumber}>95%</div>
-                <div className={styles.statLabel}>Time Savings</div>
-              </div>
-              <div className={styles.stat}>
-                <div className={styles.statNumber}>$2M+</div>
-                <div className={styles.statLabel}>Costs Saved</div>
-              </div>
-              <div className={styles.stat}>
-                <div className={styles.statNumber}>Zero</div>
-                <div className={styles.statLabel}>Data Loss</div>
-              </div>
-              <div className={styles.stat}>
-                <div className={styles.statNumber}>1 Week</div>
-                <div className={styles.statLabel}>Setup Time</div>
-              </div>
+            <div className={styles.streamContent}>
+              &lt;<span className={styles.tag}>LegacyOrder</span>&gt;<br />
+              &nbsp;&nbsp;&lt;<span className={styles.tag}>Header</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className={styles.tag}>Ref</span>&gt;PO-992&lt;/<span className={styles.tag}>Ref</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className={styles.tag}>Dt</span>&gt;20260115&lt;/<span className={styles.tag}>Dt</span>&gt;<br />
+              &nbsp;&nbsp;&lt;/<span className={styles.tag}>Header</span>&gt;<br />
+              &nbsp;&nbsp;&lt;<span className={styles.tag}>Rows</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className={styles.tag}>Row</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className={styles.tag}>Sku</span>&gt;A-100&lt;/<span className={styles.tag}>Sku</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;/<span className={styles.tag}>Row</span>&gt;<br />
+              &nbsp;&nbsp;&lt;/<span className={styles.tag}>Rows</span>&gt;<br />
+              &lt;/<span className={styles.tag}>LegacyOrder</span>&gt;
             </div>
           </div>
-        </header>
 
-        {/* How It Works Section */}
-        <section className={styles.workflowSection}>
-          <h2 className={styles.sectionTitle}>Enterprise Implementation Process</h2>
-          <div className={styles.stepsGrid}>
-            <div className={`${styles.step} ${styles.stepHover}`} data-step="1">
-              <div className={styles.stepNumber}>
-                <span>1</span>
-                <div className={styles.stepRing}></div>
-              </div>
-              <div className={styles.stepIcon}>📋</div>
-              <h3>Schema Analysis</h3>
-              <p>Our platform analyzes your existing XML schemas and data structures, identifying transformation patterns and mapping opportunities for optimal integration.</p>
-              <div className={styles.stepGlow}></div>
+          {/* 2. THE MAP (ENGINE) */}
+          <div className={`${styles.codeStream} ${styles.mapStream}`}>
+            <div className={styles.streamHeader} style={{ color: 'var(--accent-orange)' }}>
+              <span>Transformation Logic</span>
+              <span>JSON MAP</span>
             </div>
-            <div className={`${styles.step} ${styles.stepHover}`} data-step="2">
-              <div className={styles.stepNumber}>
-                <span>2</span>
-                <div className={styles.stepRing}></div>
-              </div>
-              <div className={styles.stepIcon}>⚙️</div>
-              <h3>Configuration & Testing</h3>
-              <p>Configure transformation rules through our enterprise dashboard with comprehensive validation, testing environments, and rollback capabilities.</p>
-              <div className={styles.stepGlow}></div>
+            <div className={styles.streamContent}>
+              &#123;<br />
+              &nbsp;&nbsp;<span className={styles.comment}>// Map Header Fields</span><br />
+              &nbsp;&nbsp;<span className={styles.key}>"NewOrder.ID"</span>: <span className={styles.str}>"LegacyOrder.Header.Ref"</span>,<br />
+              &nbsp;&nbsp;<span className={styles.key}>"NewOrder.Date"</span>: <span className={styles.str}>"LegacyOrder.Header.Dt"</span>,<br />
+              <br />
+              &nbsp;&nbsp;<span className={styles.comment}>// Array Transformation</span><br />
+              &nbsp;&nbsp;<span className={styles.key}>"NewOrder.Lines[]"</span>: &#123;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;<span className={styles.key}>"$for"</span>: <span className={styles.str}>"LegacyOrder.Rows.Row"</span>,<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;<span className={styles.key}>"ItemCode"</span>: <span className={styles.str}>"$item.Sku"</span><br />
+              &nbsp;&nbsp;&#125;<br />
+              &#125;
             </div>
-            <div className={`${styles.step} ${styles.stepHover}`} data-step="3">
-              <div className={styles.stepNumber}>
-                <span>3</span>
-                <div className={styles.stepRing}></div>
-              </div>
-              <div className={styles.stepIcon}>🚀</div>
-              <h3>Production Deployment</h3>
-              <p>Deploy to production with enterprise-grade monitoring, automatic scaling, and 24/7 support for mission-critical operations.</p>
-              <div className={styles.stepGlow}></div>
+          </div>
+
+          {/* 3. TARGET XML */}
+          <div className={`${styles.codeStream} ${styles.targetStream}`}>
+            <div className={styles.streamHeader}>
+              <span>Final Output</span>
+              <span>XML</span>
+            </div>
+            <div className={styles.streamContent}>
+              &lt;<span className={styles.tag}>NewOrder</span>&gt;<br />
+              &nbsp;&nbsp;&lt;<span className={styles.tag}>ID</span>&gt;PO-992&lt;/<span className={styles.tag}>ID</span>&gt;<br />
+              &nbsp;&nbsp;&lt;<span className={styles.tag}>Date</span>&gt;2026-01-15&lt;/<span className={styles.tag}>Date</span>&gt;<br />
+              &nbsp;&nbsp;&lt;<span className={styles.tag}>Lines</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className={styles.tag}>Line</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className={styles.tag}>ItemCode</span>&gt;A-100&lt;/<span className={styles.tag}>ItemCode</span>&gt;<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;/<span className={styles.tag}>Line</span>&gt;<br />
+              &nbsp;&nbsp;&lt;/<span className={styles.tag}>Lines</span>&gt;<br />
+              &lt;/<span className={styles.tag}>NewOrder</span>&gt;
+            </div>
+          </div>
+
+          {/* SVG CONNECTIONS OVERLAY */}
+          <svg className={styles.connectionCanvas} viewBox="0 0 1400 500" preserveAspectRatio="none">
+            {/* Define Marker */}
+            <defs>
+              <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L6,3 z" fill="var(--accent-orange)" />
+              </marker>
+            </defs>
+
+            {/* Path 1: Source Ref -> Map ID */}
+            <path className={styles.activeLine} d="M 330 140 C 450 140, 450 150, 560 150" />
+            <circle r="3" className={styles.dataPacket}>
+              <animateMotion dur="2s" repeatCount="indefinite" path="M 330 140 C 450 140, 450 150, 560 150" />
+            </circle>
+
+            {/* Path 2: Map ID -> Target ID */}
+            <path className={styles.activeLine} d="M 870 150 C 980 150, 980 140, 1080 140" />
+            <circle r="3" className={styles.dataPacket}>
+              <animateMotion dur="2s" begin="1s" repeatCount="indefinite" path="M 870 150 C 980 150, 980 140, 1080 140" />
+            </circle>
+
+            {/* Path 3: Source Sku -> Map ItemCode */}
+            <path className={styles.activeLine} d="M 330 250 C 450 250, 450 280, 560 280" />
+            <circle r="3" className={styles.dataPacket}>
+              <animateMotion dur="2.5s" begin="0.5s" repeatCount="indefinite" path="M 330 250 C 450 250, 450 280, 560 280" />
+            </circle>
+
+            {/* Path 4: Map ItemCode -> Target ItemCode */}
+            <path className={styles.activeLine} d="M 870 280 C 980 280, 980 250, 1080 250" />
+            <circle r="3" className={styles.dataPacket}>
+              <animateMotion dur="2.5s" begin="1.5s" repeatCount="indefinite" path="M 870 280 C 980 280, 980 250, 1080 250" />
+            </circle>
+
+          </svg>
+
+        </div>
+
+        {/* ANIMATED TICKER */}
+        <div className={styles.tickerSection}>
+          <div className={styles.tickerTrack}>
+            <div className={styles.tickerItem}>HIGH FREQUENCY TRADING SUPPORTED</div>
+            <div className={styles.tickerItem}>//</div>
+            <div className={styles.tickerItem}>SOC2 TYPE II COMPLIANT</div>
+            <div className={styles.tickerItem}>//</div>
+            <div className={styles.tickerItem}>99.999% UPTIME SLA</div>
+            <div className={styles.tickerItem}>//</div>
+            <div className={styles.tickerItem}>ISO 27001 CERTIFIED</div>
+            <div className={styles.tickerItem}>//</div>
+          </div>
+        </div>
+
+        {/* SECTION 1: SYSTEM CAPABILITIES */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionLabel}>System Architecture</span>
+            <h2 className={styles.sectionTitle}>SchemaBridge Core</h2>
+          </div>
+          <div className={styles.grid3x2}>
+            <div className={styles.gridItem}>
+              <div className={styles.itemIcon}>[IO]</div>
+              <span className={styles.itemHeader}>01 // STREAMING_PARSER</span>
+              <h3 className={styles.itemTitle}>Zero-Latency Ingest</h3>
+              <p className={styles.itemDesc}>Process gigabyte-scale XML streams without memory overhead using SAX-based event architecture.</p>
+            </div>
+            <div className={styles.gridItem}>
+              <div className={styles.itemIcon}>[MAP]</div>
+              <span className={styles.itemHeader}>02 // FLUID_MAPPING</span>
+              <h3 className={styles.itemTitle}>Declarative JSON Logic</h3>
+              <p className={styles.itemDesc}>Define complex transformations in simple JSON. No XSLT. No compilation steps.</p>
+            </div>
+            <div className={styles.gridItem}>
+              <div className={styles.itemIcon}>[VAL]</div>
+              <span className={styles.itemHeader}>03 // SCHEMA_GUARD</span>
+              <h3 className={styles.itemTitle}>Strict Validation</h3>
+              <p className={styles.itemDesc}>Enforce XSD and JSON Schema constraints in real-time. Reject malformed payloads instantly.</p>
+            </div>
+            <div className={styles.gridItem}>
+              <div className={styles.itemIcon}>[API]</div>
+              <span className={styles.itemHeader}>04 // REST_INTERFACE</span>
+              <h3 className={styles.itemTitle}>Headless Integration</h3>
+              <p className={styles.itemDesc}>Full API control. Embed transformation logic directly into your microservices.</p>
+            </div>
+            <div className={styles.gridItem}>
+              <div className={styles.itemIcon}>[SEC]</div>
+              <span className={styles.itemHeader}>05 // VAULT_SECURITY</span>
+              <h3 className={styles.itemTitle}>Immutable Audit Logs</h3>
+              <p className={styles.itemDesc}>Every transformation is cryptographically signed and logged for compliance.</p>
+            </div>
+            <div className={styles.gridItem}>
+              <div className={styles.itemIcon}>[SDK]</div>
+              <span className={styles.itemHeader}>06 // DEV_TOOLKIT</span>
+              <h3 className={styles.itemTitle}>TypeScript Native</h3>
+              <p className={styles.itemDesc}>First-class type definitions generated automatically from your schema maps.</p>
             </div>
           </div>
         </section>
 
-        {/* Testimonial Section */}
-        <section className={styles.testimonialSection}>
-          <blockquote className={styles.testimonialCard}>
-            <p>
-              “SchemaBridge cut our onboarding from months to days. Our teams ship integrations 10x faster with full auditability.”
-            </p>
-            <footer>
-              <span className={styles.testimonialAuthor}>Alex Morgan</span>
-              <span className={styles.testimonialMeta}>VP Engineering, FreightCo</span>
-            </footer>
-          </blockquote>
-        </section>
-
-  {/* Features Section */}
-        <section className={styles.featuresSection}>
-            <h2 className={styles.sectionTitle}>Enterprise-Grade Capabilities</h2>
-            <div className={styles.featuresGrid}>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>🔒</div>
-                    <h4>Security & Compliance</h4>
-                    <p>SOC 2 Type II certified with end-to-end encryption, audit trails, and role-based access controls for enterprise security requirements.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                 <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>⚡</div>
-                    <h4>High-Performance Processing</h4>
-                    <p>Process large XML files up to 1GB with sub-second transformation times using our optimized processing engine and auto-scaling infrastructure.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>🔗</div>
-                    <h4>Enterprise Integration</h4>
-                    <p>RESTful APIs, webhooks, and SDKs for seamless integration with your existing enterprise systems and CI/CD pipelines.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-                <div className={`${styles.featureCard} ${styles.featureHover}`}>
-                    <div className={styles.featureIcon}>📊</div>
-                    <h4>Analytics & Monitoring</h4>
-                    <p>Real-time dashboards, comprehensive logging, and advanced analytics for monitoring transformation performance and data quality.</p>
-                    <div className={styles.featureGradient}></div>
-                </div>
-        {/* Removed bottom four cards per request */}
+        {/* SECTION 2: ENTROPY SCALE */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionLabel}>The Problem</span>
+            <h2 className={styles.sectionTitle}>Entropy Management</h2>
+          </div>
+          <div className={styles.entropyContainer}>
+            <div className={`${styles.entropyBlock} ${styles.chaos}`}>
+              <span className={styles.scaleLabel}>Legacy System (Entropy: HIGH)</span>
+              <div className={styles.glitchText}>
+                &lt;Order_X99&gt;<br />
+                &nbsp;&nbsp;&lt;uNkown_Tag&gt;ERR#404&lt;/...&gt;<br />
+                &nbsp;&nbsp;&lt;DATA type="bloated"&gt;<br />
+                &nbsp;&nbsp;&nbsp;&nbsp;...legacy_payload_overflow...<br />
+                &nbsp;&nbsp;&lt;/DATA&gt;<br />
+                &lt;/Order_X99&gt;
+              </div>
             </div>
+            <div className={`${styles.entropyBlock} ${styles.order}`}>
+              <span className={styles.scaleLabel}>SchemaBridge (Entropy: ZERO)</span>
+              <div className={styles.cleanText}>
+                &#123;<br />
+                &nbsp;&nbsp;"id": "ORD-2026-X99",<br />
+                &nbsp;&nbsp;"status": "CLEAN",<br />
+                &nbsp;&nbsp;"payload": &#123;<br />
+                &nbsp;&nbsp;&nbsp;&nbsp;"verified": true,<br />
+                &nbsp;&nbsp;&nbsp;&nbsp;"optimized": true<br />
+                &nbsp;&nbsp;&#125;<br />
+                &#125;
+              </div>
+            </div>
+          </div>
         </section>
 
-        {/* Compliance & Uptime Section */}
-        <section className={styles.complianceSection} aria-label="Compliance and reliability">
-          <ul className={styles.badgeRow}>
-            <li className={styles.badge}>SOC 2 Type II</li>
-            <li className={styles.badge}>GDPR</li>
-            <li className={styles.badge}>ISO 27001</li>
-            <li className={styles.badge}>99.99% Uptime SLA</li>
-          </ul>
+        {/* SECTION 3: TERMINAL DEMO */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionLabel}>Developer Access</span>
+            <h2 className={styles.sectionTitle}>CLI Control</h2>
+          </div>
+          <div className={styles.terminalWindow}>
+            <div className={styles.terminalHeader}>
+              <div className={`${styles.dot} ${styles.red}`}></div>
+              <div className={`${styles.dot} ${styles.yellow}`}></div>
+              <div className={`${styles.dot} ${styles.green}`}></div>
+            </div>
+            <div className={styles.terminalBody}>
+              <div><span className={styles.prompt}>admin@server:~$</span><span className={styles.cmd}>npm install @schemabridge/core</span></div>
+              <span className={styles.output}>+ @schemabridge/core@3.0.0 installed in 1.4s</span>
+
+              <div><span className={styles.prompt}>admin@server:~$</span><span className={styles.cmd}>schemabridge map --src legacy.xml --out standardized.json</span></div>
+              <span className={styles.output}>> Parsing XML stream... OK</span>
+              <span className={styles.output}>> Applying 'Standard-V3' map... OK</span>
+              <span className={styles.output}>> Validating Schema... OK</span>
+              <span className={styles.output}>✓ Transformation complete (12ms)</span>
+
+              <div><span className={styles.prompt}>admin@server:~$</span><span className={styles.cursor}></span></div>
+            </div>
+          </div>
         </section>
 
+        {/* SECTION 4: CONNECTIVITY */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionLabel}>Integration Network</span>
+            <h2 className={styles.sectionTitle}>Universal Adapter</h2>
+          </div>
+          <div className={styles.networkContainer}>
+            {/* Static SVG Lines representation */}
+            <svg style={{ position: 'absolute', width: '100%', height: '100%' }}>
+              <line x1="50%" y1="50%" x2="20%" y2="20%" stroke="#1a1a1a" strokeWidth="1" />
+              <line x1="50%" y1="50%" x2="80%" y2="20%" stroke="#1a1a1a" strokeWidth="1" />
+              <line x1="50%" y1="50%" x2="30%" y2="80%" stroke="#1a1a1a" strokeWidth="1" />
+              <line x1="50%" y1="50%" x2="70%" y2="80%" stroke="#1a1a1a" strokeWidth="1" />
+            </svg>
+
+            <div className={styles.hubNode}>
+              <svg className={styles.hubIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+            </div>
+
+            <div className={`${styles.satelliteNode} ${styles.sat1}`}>SAP ERP</div>
+            <div className={`${styles.satelliteNode} ${styles.sat2}`}>SALESFORCE</div>
+            <div className={`${styles.satelliteNode} ${styles.sat3}`}>ORACLE NETSUITE</div>
+            <div className={`${styles.satelliteNode} ${styles.sat4}`}>CUSTOM API</div>
+          </div>
+        </section>
+
+        {/* SECTION 5: LOGS (Testimonials) */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionLabel}>Transmission Logs</span>
+            <h2 className={styles.sectionTitle}>System Reports</h2>
+          </div>
+          <div className={styles.logsContainer}>
+            <div className={styles.logEntry}>
+              <span className={styles.logTime}>2026-01-12 14:00</span>
+              <span className={styles.logStatus}>[SUCCESS]</span>
+              <div>
+                <span className={styles.logMessage}>"Migration logic reduced from 4 weeks to 2 days."</span>
+                <span className={styles.logAuthor}>// CTO, FinTech Global</span>
+              </div>
+            </div>
+            <div className={styles.logEntry}>
+              <span className={styles.logTime}>2026-01-12 14:05</span>
+              <span className={styles.logStatus}>[SUCCESS]</span>
+              <div>
+                <span className={styles.logMessage}>"SchemaBridge handles our Black Friday load (50k req/s) without jitter."</span>
+                <span className={styles.logAuthor}>// Lead Engineer, E-Comm Giant</span>
+              </div>
+            </div>
+            <div className={styles.logEntry}>
+              <span className={styles.logTime}>2026-01-12 14:10</span>
+              <span className={styles.logStatus}>[SUCCESS]</span>
+              <div>
+                <span className={styles.logMessage}>"The JSON mapping engine is exactly what the industry needed."</span>
+                <span className={styles.logAuthor}>// Solutions Architect, Logistics Co.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <Footer />
       </div>
-      <Footer text="© 2025 RossumXML Enterprise Platform — Trusted by Fortune 500 companies worldwide" />
     </>
   );
 }
