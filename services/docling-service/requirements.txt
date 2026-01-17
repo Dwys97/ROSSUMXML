@@ -2,10 +2,10 @@ flask==3.0.0
 flask-cors==4.0.0
 # NumPy compatibility fix for PyTorch
 numpy>=1.24.0,<2.0.0
-# CPU-only PyTorch to reduce disk usage
+# CPU-only PyTorch to reduce disk usage (v2.5.1 has xpu stub for docling compatibility)
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2+cpu
-torchvision==0.17.2+cpu
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
 # Docling v2 (latest stable - let pip resolve compatible versions)
 docling>=2.0,<3.0
 # RapidOCR for bbox extraction

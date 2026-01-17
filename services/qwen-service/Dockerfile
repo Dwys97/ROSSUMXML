@@ -1,38 +1,42 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for llama.cpp
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
-    cmake \
+    git \
     libgomp1 \
-    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN CMAKE_ARGS="-DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS" \
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
-
-# Create models directory
-RUN mkdir -p /app/models
-
-# Download Qwen2.5-1.5B-Instruct GGUF model (Q4_0 quantized, ~1GB)
-RUN wget -O /app/models/qwen2.5-1.5b-instruct-q4_0.gguf \
-    https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_0.gguf
 
 # Copy application code
 COPY app.py .
+
+# Create cache directory for model and set permissions
+RUN mkdir -p /app/models && chmod 755 /app/models
 
 # Create non-root user
 RUN useradd -m -u 1000 qwen && chown -R qwen:qwen /app
 USER qwen
 
+# Environment for HuggingFace cache
+ENV HF_HOME=/app/models
+ENV TRANSFORMERS_CACHE=/app/models
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
+
+# CPU-only settings
+ENV CUDA_VISIBLE_DEVICES=""
+ENV TORCH_DEVICE="cpu"
+
 EXPOSE 5005
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+# Model downloads on first request (~14GB for Qwen2.5-VL-7B)
+HEALTHCHECK --interval=30s --timeout=15s --start-period=600s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5005/health')"
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5005", "--workers", "1", "--timeout", "60", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5005", "--workers", "1", "--timeout", "600", "--worker-class", "sync", "app:app"]

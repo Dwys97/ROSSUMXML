@@ -1,0 +1,66 @@
+.page {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 40px;
+}
+
+.pageHeader {
+    margin-bottom: 24px;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+}
+
+.breadcrumb span {
+    color: #94a3b8;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.breadcrumb span:hover:not(.separator):not(.current) {
+    color: #a78bfa;
+}
+
+.breadcrumb .separator {
+    color: #475569;
+    cursor: default;
+}
+
+.breadcrumb .current {
+    color: #e2e8f0;
+    cursor: default;
+}
+
+.pageHeader h1 {
+    color: #e2e8f0;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, #e2e8f0, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.subtitle {
+    color: #94a3b8;
+    font-size: 1rem;
+    margin: 0;
+    max-width: 700px;
+    line-height: 1.6;
+}
+
+.content {
+    height: calc(100vh - 220px);
+    min-height: 500px;
+}

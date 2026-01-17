@@ -20,6 +20,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
 import InvoiceWorkflowPage from './pages/InvoiceWorkflowPage';
 import InvoiceAnnotationPage from './pages/InvoiceAnnotationPage';
+import FieldTemplatesPage from './pages/FieldTemplatesPage';
 import './App.css';
 
 function App() {
@@ -86,6 +87,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <InvoiceWorkflowPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/invoices/field-templates" 
+                element={
+                  <ProtectedRoute>
+                    <FieldTemplatesPage />
                   </ProtectedRoute>
                 } 
               />

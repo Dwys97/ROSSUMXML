@@ -1,7 +1,7 @@
 """
 Service: Haystack Orchestration Pipeline
-Architecture: Haystack + FastAPI for Document → Extraction → HITL flow
-Purpose: Orchestrate SmolDocling → Qwen2.5 → Label Studio with feedback loop
+Architecture: FastAPI for Document → Extraction → HITL flow
+Purpose: Orchestrate SmolDocling → NuExtract-v1.5 → Label Studio with feedback loop
 Compliance: Production-ready, active learning enabled
 """
 
@@ -37,7 +37,7 @@ app.add_middleware(
 
 # Service URLs
 DOCLING_SERVICE_URL = os.getenv('DOCLING_SERVICE_URL', 'http://docling-service:5004')
-QWEN_SERVICE_URL = os.getenv('QWEN_SERVICE_URL', 'http://qwen-service:5005')
+NUEXTRACT_SERVICE_URL = os.getenv('NUEXTRACT_SERVICE_URL', 'http://nuextract-service:5005')
 LABEL_STUDIO_URL = os.getenv('LABEL_STUDIO_URL', 'http://label-studio:8080')
 LABEL_STUDIO_API_KEY = os.getenv('LABEL_STUDIO_API_KEY', '')
 CONFIDENCE_THRESHOLD = float(os.getenv('CONFIDENCE_THRESHOLD', '0.90'))
@@ -62,6 +62,11 @@ class ExtractionResult(BaseModel):
     needs_review: bool = False
     label_studio_task_id: Optional[int] = None
 
+class UploadRequest(BaseModel):
+    """Request model for upload with optional custom schema"""
+    template_id: Optional[str] = None
+    schema: Optional[Dict[str, Any]] = None
+
 @app.get('/health')
 async def health_check():
     """Health check endpoint"""
@@ -74,20 +79,36 @@ async def health_check():
 @app.post('/api/v1/invoice/upload', response_model=ExtractionResult)
 async def upload_invoice(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    template_id: Optional[str] = None,
+    schema: Optional[str] = None  # JSON string of custom schema
 ):
     """
     Upload invoice and start extraction pipeline
     
     Pipeline:
     1. SmolDocling: Parse document → markdown + tables
-    2. Qwen2.5: Extract structured fields → JSON
+    2. NuExtract-large: Extract structured fields → JSON (with custom schema)
     3. Confidence check: If < threshold → send to Label Studio
     4. Return results or HITL task ID
+    
+    Args:
+        file: Invoice file (PDF, image)
+        template_id: Optional template ID to fetch schema from backend
+        schema: Optional JSON string of custom schema for extraction
     """
     try:
         job_id = str(uuid.uuid4())
         file_bytes = await file.read()
+        
+        # Parse schema if provided
+        custom_schema = None
+        if schema:
+            try:
+                custom_schema = json.loads(schema)
+                logger.info(f"[{job_id}] Using custom schema with {len(custom_schema)} fields")
+            except json.JSONDecodeError:
+                logger.warning(f"[{job_id}] Invalid schema JSON, using default")
         
         # Create job
         job = ExtractionJob(
@@ -102,7 +123,8 @@ async def upload_invoice(
             process_invoice_pipeline,
             job_id,
             file_bytes,
-            file.filename
+            file.filename,
+            custom_schema
         )
         
         logger.info(f"[{job_id}] Upload started for {file.filename}")
@@ -137,11 +159,12 @@ async def get_extraction_result(job_id: str):
 async def process_invoice_pipeline(
     job_id: str,
     file_bytes: bytes,
-    filename: str
+    filename: str,
+    custom_schema: Optional[Dict[str, Any]] = None
 ):
     """
     Haystack-inspired pipeline:
-    Document → Parse (Docling) → Extract (Qwen) → Route (HITL or Complete)
+    Document → Parse (Docling) → Extract (NuExtract) → Route (HITL or Complete)
     """
     try:
         job = jobs[job_id]
@@ -170,23 +193,28 @@ async def process_invoice_pipeline(
             
             logger.info(f"[{job_id}] Document parsed: {len(document_text)} chars")
             
-            # Step 2: Field Extraction (Qwen2.5)
-            logger.info(f"[{job_id}] Step 2: Field extraction")
+            # Step 2: Field Extraction (NuExtract-v1.5 GGUF with custom schema)
+            logger.info(f"[{job_id}] Step 2: Field extraction with NuExtract-v1.5")
             
-            qwen_response = await client.post(
-                f'{QWEN_SERVICE_URL}/extract-fields',
-                json={'document_text': document_text}
+            extraction_payload = {'text': document_text}
+            if custom_schema:
+                extraction_payload['schema'] = custom_schema
+                logger.info(f"[{job_id}] Using custom schema with {len(custom_schema)} fields")
+            
+            nuextract_response = await client.post(
+                f'{NUEXTRACT_SERVICE_URL}/extract',
+                json=extraction_payload
             )
             
-            if qwen_response.status_code != 200:
-                raise Exception(f"Qwen service failed: {qwen_response.text}")
+            if nuextract_response.status_code != 200:
+                raise Exception(f"NuExtract service failed: {nuextract_response.text}")
             
-            qwen_data = qwen_response.json()
-            if not qwen_data.get('success'):
+            nuextract_data = nuextract_response.json()
+            if not nuextract_data.get('success'):
                 raise Exception("Field extraction failed")
             
-            fields = qwen_data['fields']
-            confidence_score = qwen_data['confidence_score']
+            fields = nuextract_data['fields']
+            confidence_score = nuextract_data['confidence_score']
             
             logger.info(f"[{job_id}] Extracted {len(fields)} fields, confidence: {confidence_score:.2f}")
             

@@ -10,9 +10,9 @@ const fs = require('fs').promises;
 const logger = require('../utils/logger');
 const io = require('socket.io-client');
 
-// SmolDocling + Qwen2.5 microservices URLs
+// SmolDocling + NuExtract-v1.5 microservices URLs
 const DOCLING_SERVICE_URL = process.env.DOCLING_SERVICE_URL || 'http://localhost:5004';
-const QWEN_SERVICE_URL = process.env.QWEN_SERVICE_URL || 'http://localhost:5005';
+const NUEXTRACT_SERVICE_URL = process.env.NUEXTRACT_SERVICE_URL || 'http://localhost:5005';
 const ORCHESTRATOR_SERVICE_URL = process.env.ORCHESTRATOR_SERVICE_URL || 'http://localhost:8000';
 const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3001';
 const ML_HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
@@ -24,7 +24,7 @@ let lastHealthCheck = 0;
 
 /**
  * Check Orchestrator Service health
- * Performs a health check on the SmolDocling + Qwen2.5 orchestrator with caching.
+ * Performs a health check on the SmolDocling + NuExtract-v1.5 orchestrator with caching.
  * Health check results are cached for 30 seconds.
  * 
  * @returns {Promise<boolean>} True if service is healthy and responding, false otherwise
@@ -45,7 +45,7 @@ async function checkMLServiceHealth() {
         lastHealthCheck = now;
         
         if (mlServiceHealthy) {
-            logger.info('SmolDocling + Qwen2.5 Orchestrator health check passed');
+            logger.info('SmolDocling + NuExtract-v1.5 Orchestrator health check passed');
         }
         
         return mlServiceHealthy;

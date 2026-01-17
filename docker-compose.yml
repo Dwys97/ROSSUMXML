@@ -18,22 +18,19 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # P2: Field Extraction (Qwen2.5 via llama.cpp)
+  # P2: Field Extraction (NuExtract-v1.5 GGUF)
   # ==========================================
-  qwen-service:
-    build: ./services/qwen-service
+  nuextract-service:
+    build: ./services/nuextract-service
     ports:
       - "5005:5005"
     environment:
       PORT: 5005
-      QWEN_MODEL_PATH: /app/models/qwen2.5-1.5b-instruct-q4_0.gguf
       PYTHONUNBUFFERED: 1
-    volumes:
-      - qwen_models:/app/models
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5005/health')"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
       start_period: 120s
     restart: unless-stopped
@@ -48,14 +45,14 @@ services:
     environment:
       PORT: 8000
       DOCLING_SERVICE_URL: http://docling-service:5004
-      QWEN_SERVICE_URL: http://qwen-service:5005
+      NUEXTRACT_SERVICE_URL: http://nuextract-service:5005
       LABEL_STUDIO_URL: http://label-studio:8080
       LABEL_STUDIO_API_KEY: ${LABEL_STUDIO_API_KEY:-}
       LABEL_STUDIO_PROJECT_ID: ${LABEL_STUDIO_PROJECT_ID:-1}
       CONFIDENCE_THRESHOLD: 0.90
     depends_on:
       - docling-service
-      - qwen-service
+      - nuextract-service
       - label-studio
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -144,6 +141,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # Microservices endpoints
+      DOCLING_SERVICE_URL: http://docling-service:5004
+      NUEXTRACT_SERVICE_URL: http://nuextract-service:5005
+      ORCHESTRATOR_SERVICE_URL: http://orchestrator-service:8000
       API_GATEWAY_URL: http://orchestrator-service:8000
       SOCKET_SERVER_URL: http://host.docker.internal:3001
     extra_hosts:
@@ -151,6 +151,8 @@ services:
     depends_on:
       - db
       - redis
+      - docling-service
+      - nuextract-service
       - orchestrator-service
     restart: unless-stopped
 
@@ -187,4 +189,3 @@ volumes:
   postgres_data:
   redis_data:
   label_studio_data:
-  qwen_models:

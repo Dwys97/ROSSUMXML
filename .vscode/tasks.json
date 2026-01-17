@@ -11,7 +11,7 @@
                 "1. Start Database",
                 "2. Start Redis",
                 "3. Start SmolDocling Service",
-                "4. Start Qwen2.5 Service",
+                "4. Start NuExtract Service",
                 "5. Start Orchestrator Service",
                 "6. Start Label Studio (HITL)",
                 "7. Start Backend",
@@ -77,9 +77,9 @@
             }
         },
         {
-            "label": "4. Start Qwen2.5 Service",
+            "label": "4. Start NuExtract Service",
             "type": "shell",
-            "command": "docker-compose up qwen-service",
+            "command": "docker-compose up nuextract-service",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {

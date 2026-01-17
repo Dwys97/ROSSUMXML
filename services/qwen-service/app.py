@@ -1,16 +1,31 @@
 """
-Service: Field Extraction with Qwen2.5 (llama.cpp)
-Architecture: Qwen2.5-0.5B-Instruct via llama.cpp (CPU-only, ~500MB)
-Purpose: Structured field extraction from invoice text using local LLM
-Compliance: CPU-only, GDPR-compliant (no external API calls)
+Service: Invoice Extraction with Qwen2.5-VL-7B-Instruct
+Architecture: Vision-Language model for Document Visual Question Answering (DocVQA)
+Purpose: Extract structured fields directly from invoice images/PDFs
+Compliance: CPU-optimized, GDPR-compliant
+
+Qwen2.5-VL-7B-Instruct is a vision-language model that can:
+- Understand document layouts visually
+- Extract fields from images without OCR preprocessing
+- Handle complex table structures
+- Reason about document context
+
+Migration: NuExtract-large → Qwen2.5-VL-7B-Instruct
+Reason: Vision models skip OCR errors, understand layout, work directly with images
 """
 
 import os
 import json
 import logging
+import base64
+import io
+from typing import Dict, Any, Optional
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from llama_cpp import Llama
+from PIL import Image
+import torch
+from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+from qwen_vl_utils import process_vision_info
 
 # Configure logging
 logging.basicConfig(
@@ -22,223 +37,220 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Global model instance
-llm = None
+# Global model instances
+model = None
+processor = None
 
-# Extraction prompt template
-EXTRACTION_PROMPT = """You are an AI specialized in extracting structured data from customs commercial invoices.
+# Default extraction schema for customs invoices
+DEFAULT_SCHEMA = {
+    "invoice_number": "",
+    "invoice_date": "",
+    "currency": "",
+    "total_amount": "",
+    "vendor_name": "",
+    "vendor_address": "",
+    "vendor_vat_number": "",
+    "vendor_country": "",
+    "buyer_name": "",
+    "buyer_address": "",
+    "buyer_country": "",
+    "consignee_name": "",
+    "consignee_address": "",
+    "total_gross_weight": "",
+    "total_net_weight": "",
+    "weight_unit": "",
+    "incoterms": "",
+    "payment_terms": "",
+    "port_of_loading": "",
+    "port_of_discharge": "",
+    "country_of_origin": "",
+    "line_items": []
+}
 
-DOCUMENT TEXT:
-{document_text}
 
-INSTRUCTIONS:
-Extract the following fields from the invoice above. Return ONLY a valid JSON object with these fields.
-If a field is not found, use null as the value.
+def build_docvqa_prompt(schema: Dict[str, Any]) -> str:
+    """Build DocVQA prompt for structured extraction"""
+    fields = []
+    for key, value in schema.items():
+        if key != "line_items":
+            field_name = key.replace("_", " ").title()
+            fields.append(f"- {field_name}")
+    
+    prompt = f"""Extract the following information from this invoice document and return as valid JSON:
 
-REQUIRED FIELDS:
-{{{{
-  "invoice_number": "string or null",
-  "invoice_date": "YYYY-MM-DD or null",
-  "currency": "USD/EUR/etc or null",
-  "total_amount": "number or null",
-  "vendor_name": "string or null",
-  "vendor_address": "string or null",
-  "vendor_vat_number": "string or null",
-  "vendor_country": "string or null",
-  "buyer_name": "string or null",
-  "buyer_address": "string or null",
-  "buyer_country": "string or null",
-  "consignee_name": "string or null",
-  "consignee_address": "string or null",
-  "total_gross_weight": "number or null",
-  "total_net_weight": "number or null",
-  "weight_unit": "KG/LB/etc or null",
-  "incoterms": "FOB/CIF/etc or null",
-  "payment_terms": "string or null",
-  "line_items": [
-    {{{{
-      "hs_code": "string or null",
-      "description": "string or null",
-      "quantity": "number or null",
-      "unit_price": "number or null",
-      "total_value": "number or null",
-      "gross_weight": "number or null",
-      "net_weight": "number or null",
-      "country_of_origin": "string or null",
-      "unit_of_measure": "string or null"
-    }}}}
-  ]
-}}}}
+{chr(10).join(fields)}
 
-JSON OUTPUT:"""
+For line items, extract all rows with: HS Code, Description, Quantity, Unit of Measure, Unit Price, Total Value, Gross Weight, Net Weight, Country of Origin.
+
+Return ONLY valid JSON matching this structure:
+{json.dumps(schema, indent=2)}
+
+JSON:"""
+    return prompt
+
 
 def initialize_model():
-    """Lazy load Qwen2.5 model via llama.cpp"""
-    global llm
+    """Lazy load Qwen2.5-VL-7B-Instruct model"""
+    global model, processor
     
-    if llm is None:
-        model_path = os.getenv('QWEN_MODEL_PATH', '/app/models/qwen2.5-1.5b-instruct-q4_0.gguf')
-        logger.info(f"Loading Qwen2.5-1.5B model from: {model_path}")
+    if model is None:
+        model_name = "Qwen/Qwen2.5-VL-7B-Instruct"
+        logger.info(f"Loading Qwen2.5-VL model: {model_name}")
         
         try:
-            llm = Llama(
-                model_path=model_path,
-                n_ctx=4096,  # Context window
-                n_threads=4,  # CPU threads
-                n_gpu_layers=0,  # CPU-only
-                verbose=False
+            # Load processor
+            processor = AutoProcessor.from_pretrained(
+                model_name,
+                trust_remote_code=True,
+                min_pixels=256*28*28,
+                max_pixels=1280*28*28
             )
-            logger.info("✓ Qwen2.5 model loaded successfully")
+            
+            # Load model with CPU optimization
+            model = Qwen2VLForConditionalGeneration.from_pretrained(
+                model_name,
+                torch_dtype="auto",
+                device_map="cpu",
+                trust_remote_code=True,
+                low_cpu_mem_usage=True
+            )
+            model.eval()
+            
+            logger.info("✓ Qwen2.5-VL-7B model loaded successfully")
         except Exception as e:
-            logger.error(f"Failed to load Qwen2.5 model: {e}")
+            logger.error(f"Failed to load Qwen2.5-VL model: {e}")
             raise
 
+
+def extract_json_from_output(output: str) -> Optional[Dict[str, Any]]:
+    """Parse JSON from model output"""
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError:
+        pass
+    
+    output = output.strip()
+    start_idx = output.find('{')
+    if start_idx != -1:
+        depth = 0
+        for i, char in enumerate(output[start_idx:], start_idx):
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(output[start_idx:i+1])
+                    except json.JSONDecodeError:
+                        continue
+    
+    logger.warning(f"Could not parse JSON from output: {output[:200]}...")
+    return None
+
+
 @app.route('/health', methods=['GET'])
-def health_check():
+def health():
     """Health check endpoint"""
     return jsonify({
-        'status': 'healthy',
-        'service': 'qwen-service',
-        'version': '1.0.0',
-        'model_loaded': llm is not None
+        "status": "healthy",
+        "service": "qwen2.5-vl-docvqa-service",
+        "model": "Qwen2.5-VL-7B-Instruct",
+        "model_loaded": model is not None,
+        "model_size": "7B parameters",
+        "version": "3.0.0"
     })
+
 
 @app.route('/extract-fields', methods=['POST'])
 def extract_fields():
-    """
-    Extract structured invoice fields using Qwen2.5
-    
-    Request:
-        {
-            "document_text": "Full invoice text (markdown or plain text)",
-            "temperature": 0.1 (optional, default 0.1 for consistency),
-            "max_tokens": 2048 (optional)
-        }
-    
-    Response:
-        {
-            "success": true,
-            "fields": {
-                "invoice_number": {"value": "INV-2024-001", "confidence": 0.95},
-                "total_amount": {"value": "1250.00", "confidence": 0.89},
-                ...
-            },
-            "raw_output": "LLM raw JSON output",
-            "confidence_score": 0.87
-        }
-    """
+    """Extract structured fields from invoice image"""
     try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No JSON body provided"}), 400
+        
+        # Get image (base64 encoded or URL)
+        image_data = data.get('image')
+        image_url = data.get('image_url')
+        schema = data.get('schema', DEFAULT_SCHEMA)
+        
+        if not image_data and not image_url:
+            return jsonify({"error": "Either 'image' (base64) or 'image_url' must be provided"}), 400
+        
+        # Initialize model if not loaded
         initialize_model()
         
-        # Get input
-        data = request.json
-        if not data or 'document_text' not in data:
-            return jsonify({'error': 'No document_text provided'}), 400
-        
-        document_text = data['document_text']
-        temperature = float(data.get('temperature', 0.1))
-        max_tokens = int(data.get('max_tokens', 2048))
-        
-        if not document_text:
-            return jsonify({'error': 'Empty document_text'}), 400
-        
-        logger.info(f"Extracting fields from {len(document_text)} chars...")
-        
         # Build prompt
-        prompt = EXTRACTION_PROMPT.format(document_text=document_text[:4000])  # Limit context
+        prompt = build_docvqa_prompt(schema)
         
-        # Generate extraction
-        response = llm(
-            prompt,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            stop=["```", "\n\n\n"],  # Stop tokens
-            echo=False
+        # Prepare image
+        if image_data:
+            # Decode base64 image
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(io.BytesIO(image_bytes))
+        else:
+            # Load from URL
+            image = image_url
+        
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image},
+                    {"type": "text", "text": prompt}
+                ]
+            }
+        ]
+        
+        # Process
+        text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        image_inputs, video_inputs = process_vision_info(messages)
+        inputs = processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt"
         )
         
-        raw_output = response['choices'][0]['text'].strip()
-        logger.info(f"LLM output ({len(raw_output)} chars): {raw_output[:200]}...")
+        # Generate
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=2048,
+                temperature=0.1,
+                do_sample=False
+            )
         
-        # Parse JSON output
-        try:
-            # Try to extract JSON from potential markdown code blocks
-            if '```json' in raw_output:
-                raw_output = raw_output.split('```json')[1].split('```')[0].strip()
-            elif '```' in raw_output:
-                raw_output = raw_output.split('```')[1].split('```')[0].strip()
-            
-            extracted_data = json.loads(raw_output)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}")
+        # Decode
+        output_text = processor.decode(outputs[0], skip_special_tokens=True)
+        
+        # Extract JSON
+        extracted_fields = extract_json_from_output(output_text)
+        
+        if not extracted_fields:
             return jsonify({
-                'success': False,
-                'error': f'Invalid JSON output: {str(e)}',
-                'raw_output': raw_output
+                "error": "Failed to extract JSON from model output",
+                "raw_output": output_text[:500]
             }), 500
         
-        # Convert to confidence-scored format
-        fields = {}
-        confidence_scores = []
-        
-        for field_name, field_value in extracted_data.items():
-            if field_name == 'line_items':
-                # Handle line items separately
-                fields['line_items'] = {
-                    'value': field_value,
-                    'confidence': 0.85  # Base confidence for structured data
-                }
-                confidence_scores.append(0.85)
-            elif field_value is not None:
-                # Calculate confidence based on value completeness
-                confidence = calculate_field_confidence(field_name, field_value)
-                fields[field_name] = {
-                    'value': field_value,
-                    'confidence': confidence
-                }
-                confidence_scores.append(confidence)
-        
-        # Calculate overall confidence
-        overall_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
-        
-        logger.info(f"✓ Extracted {len(fields)} fields, confidence: {overall_confidence:.2f}")
+        # Calculate confidence
+        filled_fields = sum(1 for v in extracted_fields.values() if v and v != "")
+        total_fields = len(extracted_fields)
+        confidence = filled_fields / total_fields if total_fields > 0 else 0.0
         
         return jsonify({
-            'success': True,
-            'fields': fields,
-            'raw_output': raw_output,
-            'confidence_score': round(overall_confidence, 4)
+            "success": True,
+            "fields": extracted_fields,
+            "confidence_score": round(confidence, 2),
+            "model": "Qwen2.5-VL-7B-Instruct"
         })
         
     except Exception as e:
-        logger.error(f"Error extracting fields: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        logger.error(f"Error: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
-def calculate_field_confidence(field_name, field_value):
-    """
-    Calculate confidence score for a field based on value characteristics
-    """
-    confidence = 0.7  # Base confidence
-    
-    # Boost confidence for well-formatted fields
-    if field_name in ['invoice_number', 'hs_code'] and len(str(field_value)) > 3:
-        confidence += 0.15
-    elif field_name in ['invoice_date'] and '-' in str(field_value):
-        confidence += 0.15
-    elif field_name in ['total_amount', 'unit_price'] and isinstance(field_value, (int, float)):
-        confidence += 0.15
-    elif field_name in ['vendor_name', 'buyer_name'] and len(str(field_value)) > 5:
-        confidence += 0.1
-    
-    # Check for common patterns
-    value_str = str(field_value).lower()
-    if any(uncertain in value_str for uncertain in ['unknown', 'n/a', 'not found', 'none']):
-        confidence -= 0.3
-    
-    return min(max(confidence, 0.0), 1.0)
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5005))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=5005, debug=False)
