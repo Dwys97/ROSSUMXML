@@ -4,39 +4,29 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    libgomp1 \
+    gcc \
+    g++ \
+    make \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (without AVX2 requirement)
+RUN pip install --no-cache-dir \
+    flask==3.0.0 \
+    gunicorn==21.2.0 \
+    huggingface-hub==0.20.2 \
+    requests==2.31.0
 
-# Copy application code
+# Install llama-cpp-python without AVX2 (compatible with older CPUs)
+ENV CMAKE_ARGS="-DLLAMA_AVX=ON -DLLAMA_AVX2=OFF -DLLAMA_FMA=OFF -DLLAMA_F16C=OFF"
+RUN pip install --no-cache-dir llama-cpp-python==0.2.27
+
 COPY app.py .
 
-# Create cache directory for model and set permissions
-RUN mkdir -p /app/models && chmod 755 /app/models
+# Create models directory
+RUN mkdir -p /app/models
 
-# Create non-root user
-RUN useradd -m -u 1000 qwen && chown -R qwen:qwen /app
-USER qwen
+EXPOSE 5006
 
-# Environment for HuggingFace cache
-ENV HF_HOME=/app/models
-ENV TRANSFORMERS_CACHE=/app/models
-ENV HF_HUB_ENABLE_HF_TRANSFER=1
-
-# CPU-only settings
-ENV CUDA_VISIBLE_DEVICES=""
-ENV TORCH_DEVICE="cpu"
-
-EXPOSE 5005
-
-# Model downloads on first request (~14GB for Qwen2.5-VL-7B)
-HEALTHCHECK --interval=30s --timeout=15s --start-period=600s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5005/health')"
-
-CMD ["gunicorn", "--bind", "0.0.0.0:5005", "--workers", "1", "--timeout", "600", "--worker-class", "sync", "app:app"]
+# Run with Gunicorn (4 workers for parallel requests)
+CMD ["gunicorn", "--bind", "0.0.0.0:5006", "--workers", "2", "--timeout", "300", "--access-logfile", "-", "app:app"]
