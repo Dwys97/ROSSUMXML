@@ -61,7 +61,9 @@ fi
 export NODE_ENV=development
 export REDIS_HOST=localhost
 export REDIS_PORT=6379
-export ML_SERVICE_URL=http://localhost:5001
+export DOCLING_SERVICE_URL=http://localhost:5004
+export NUEXTRACT_SERVICE_URL=http://localhost:5005
+export ORCHESTRATOR_SERVICE_URL=http://localhost:8000
 export SOCKET_SERVER_URL=http://localhost:3001
 export POSTGRES_HOST=localhost
 export POSTGRES_PORT=5432
@@ -72,7 +74,9 @@ export POSTGRES_PASSWORD=postgres
 echo ""
 echo "🔧 Worker Configuration:"
 echo "  Redis: ${REDIS_HOST}:${REDIS_PORT}"
-echo "  ML Service: ${ML_SERVICE_URL}"
+echo "  Orchestrator: ${ORCHESTRATOR_SERVICE_URL}"
+echo "  SmolDocling: ${DOCLING_SERVICE_URL}"
+echo "  NuExtract: ${NUEXTRACT_SERVICE_URL}"
 echo "  Socket.io: ${SOCKET_SERVER_URL}"
 echo "  PostgreSQL: ${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
 echo "  Environment: ${NODE_ENV}"
