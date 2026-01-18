@@ -5,6 +5,30 @@ import styles from './FieldsPanel.module.css';
 const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject, onCorrect }) => {
     const [editingField, setEditingField] = useState(null);
     const [editValue, setEditValue] = useState('');
+
+    const formatDecimal = (value, decimals) => {
+        if (value === null || value === undefined || value === '') return '';
+        const raw = String(value).trim();
+        if (!raw) return '';
+        let cleaned = raw.replace(/[^0-9,.-]/g, '');
+        if (!cleaned || cleaned === '-' || cleaned === '.') return '';
+        const hasDot = cleaned.includes('.');
+        const hasComma = cleaned.includes(',');
+        if (hasDot && hasComma) {
+            const lastDot = cleaned.lastIndexOf('.');
+            const lastComma = cleaned.lastIndexOf(',');
+            if (lastComma > lastDot) {
+                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+            } else {
+                cleaned = cleaned.replace(/,/g, '');
+            }
+        } else if (!hasDot && hasComma) {
+            cleaned = cleaned.replace(',', '.');
+        }
+        const num = Number(cleaned);
+        if (Number.isNaN(num)) return '';
+        return num.toFixed(decimals);
+    };
     
     // Helper to get confidence score
     const getConfidence = (scores, field) => {
@@ -238,35 +262,35 @@ const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject, onCo
                 
                 <FieldRow
                     label="Subtotal"
-                    value={invoice?.subtotal}
+                    value={formatDecimal(invoice?.subtotal, 2)}
                     confidence={invoice?.extraction_confidence}
                     fieldPath="totals.subtotal"
                 />
                 
                 <FieldRow
                     label="Tax/VAT"
-                    value={invoice?.tax_amount}
+                    value={formatDecimal(invoice?.tax_amount, 2)}
                     confidence={invoice?.extraction_confidence}
                     fieldPath="totals.tax"
                 />
                 
                 <FieldRow
                     label="Total Amount"
-                    value={invoice?.total_amount}
+                    value={formatDecimal(invoice?.total_amount, 2)}
                     confidence={invoice?.extraction_confidence}
                     fieldPath="totals.total"
                 />
                 
                 <FieldRow
                     label="Gross Weight (kg)"
-                    value={invoice?.total_gross_weight}
+                    value={formatDecimal(invoice?.total_gross_weight, 3)}
                     confidence={invoice?.extraction_confidence}
                     fieldPath="totals.gross_weight"
                 />
                 
                 <FieldRow
                     label="Net Weight (kg)"
-                    value={invoice?.total_net_weight}
+                    value={formatDecimal(invoice?.total_net_weight, 3)}
                     confidence={invoice?.extraction_confidence}
                     fieldPath="totals.net_weight"
                 />

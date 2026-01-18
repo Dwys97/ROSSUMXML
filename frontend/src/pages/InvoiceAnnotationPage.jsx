@@ -37,6 +37,30 @@ const InvoiceAnnotationPage = () => {
     const [corrections, setCorrections] = useState([]); // Pending corrections to submit
     const [showFieldManager, setShowFieldManager] = useState(false); // Field manager modal
     
+    const formatDecimal = (value, decimals) => {
+        if (value === null || value === undefined || value === '') return '';
+        const raw = String(value).trim();
+        if (!raw) return '';
+        let cleaned = raw.replace(/[^0-9,.-]/g, '');
+        if (!cleaned || cleaned === '-' || cleaned === '.') return '';
+        const hasDot = cleaned.includes('.');
+        const hasComma = cleaned.includes(',');
+        if (hasDot && hasComma) {
+            const lastDot = cleaned.lastIndexOf('.');
+            const lastComma = cleaned.lastIndexOf(',');
+            if (lastComma > lastDot) {
+                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+            } else {
+                cleaned = cleaned.replace(/,/g, '');
+            }
+        } else if (!hasDot && hasComma) {
+            cleaned = cleaned.replace(',', '.');
+        }
+        const num = Number(cleaned);
+        if (Number.isNaN(num)) return '';
+        return num.toFixed(decimals);
+    };
+
     // Fetch invoice details
     const fetchInvoiceDetails = React.useCallback(async (isBackground = false) => {
         if (!isBackground) {
@@ -101,10 +125,10 @@ const InvoiceAnnotationPage = () => {
                         hs_code: getValue(fields.item_hs_code),
                         country_of_origin: getValue(fields.item_country_of_origin),
                         quantity: getValue(fields.item_quantity),
-                        unit_price: getValue(fields.item_unit_price),
-                        total_value: getValue(fields.item_total_value),
-                        net_weight: getValue(fields.item_net_weight),
-                        gross_weight: getValue(fields.item_gross_weight)
+                        unit_price: formatDecimal(getValue(fields.item_unit_price), 2),
+                        total_value: formatDecimal(getValue(fields.item_total_value), 2),
+                        net_weight: formatDecimal(getValue(fields.item_net_weight), 3),
+                        gross_weight: formatDecimal(getValue(fields.item_gross_weight), 3)
                     });
                     
                     // Extract bboxes
@@ -141,7 +165,14 @@ const InvoiceAnnotationPage = () => {
                 }
             } else {
                 // Flat format from database - use as-is
-                setLineItems(lineItemsData);
+                const formattedFlat = lineItemsData.map(item => ({
+                    ...item,
+                    unit_price: formatDecimal(item.unit_price, 2),
+                    total_value: formatDecimal(item.total_value, 2),
+                    net_weight: formatDecimal(item.net_weight, 3),
+                    gross_weight: formatDecimal(item.gross_weight, 3)
+                }));
+                setLineItems(formattedFlat);
             }
             
             // Parse extracted_data to populate bounding boxes for regular fields
@@ -282,10 +313,10 @@ const InvoiceAnnotationPage = () => {
                                     hs_code: item.hs_code || '',
                                     country_of_origin: item.country_of_origin || '',
                                     quantity: item.quantity || '',
-                                    unit_price: item.unit_price || '',
-                                    total_value: item.amount || '',
-                                    net_weight: item.net_weight || '',
-                                    gross_weight: item.gross_weight || ''
+                                    unit_price: formatDecimal(item.unit_price, 2),
+                                    total_value: formatDecimal(item.amount || item.total_value || item.total_price, 2),
+                                    net_weight: formatDecimal(item.net_weight, 3),
+                                    gross_weight: formatDecimal(item.gross_weight, 3)
                                 });
                             } else {
                                 // Handle nested format (from raw extraction)
@@ -310,10 +341,10 @@ const InvoiceAnnotationPage = () => {
                                     hs_code: getValue(fields.item_hs_code),
                                     country_of_origin: getValue(fields.item_country_of_origin),
                                     quantity: getValue(fields.item_quantity),
-                                    unit_price: getValue(fields.item_unit_price),
-                                    total_value: getValue(fields.item_total_value),
-                                    net_weight: getValue(fields.item_net_weight),
-                                    gross_weight: getValue(fields.item_gross_weight)
+                                    unit_price: formatDecimal(getValue(fields.item_unit_price), 2),
+                                    total_value: formatDecimal(getValue(fields.item_total_value), 2),
+                                    net_weight: formatDecimal(getValue(fields.item_net_weight), 3),
+                                    gross_weight: formatDecimal(getValue(fields.item_gross_weight), 3)
                                 });
                                 
                                 // Extract bboxes for each field (if they exist)
@@ -366,13 +397,13 @@ const InvoiceAnnotationPage = () => {
                                         ...merged[existingIndex],
                                         ...newItem,
                                         // Keep existing non-empty values
-                                        description: newItem.description || merged[existingIndex].description,
-                                        hs_code: newItem.hs_code || merged[existingIndex].hs_code,
-                                        country_of_origin: newItem.country_of_origin || merged[existingIndex].country_of_origin,
-                                        quantity: newItem.quantity || merged[existingIndex].quantity,
-                                        unit_price: newItem.unit_price || merged[existingIndex].unit_price,
-                                        net_weight: newItem.net_weight || merged[existingIndex].net_weight,
-                                        gross_weight: newItem.gross_weight || merged[existingIndex].gross_weight
+                                        description: newItem.description ?? merged[existingIndex].description,
+                                        hs_code: newItem.hs_code ?? merged[existingIndex].hs_code,
+                                        country_of_origin: newItem.country_of_origin ?? merged[existingIndex].country_of_origin,
+                                        quantity: newItem.quantity ?? merged[existingIndex].quantity,
+                                        unit_price: newItem.unit_price ?? merged[existingIndex].unit_price,
+                                        net_weight: newItem.net_weight ?? merged[existingIndex].net_weight,
+                                        gross_weight: newItem.gross_weight ?? merged[existingIndex].gross_weight
                                     };
                                 } else {
                                     merged.push(newItem);
@@ -392,7 +423,7 @@ const InvoiceAnnotationPage = () => {
             }
             
             // Handle per-line item field updates (item_description_1, hs_code_2, etc.)
-            const lineItemMatch = field.match(/^(item_description|item_quantity|item_unit_price|item_total_value|item_unit|item_no|material_no|hs_code|country_of_origin)_(\d+)$/);
+            const lineItemMatch = field.match(/^(item_description|item_quantity|item_unit_price|item_total_value|item_unit|item_no|material_no|hs_code|country_of_origin|item_net_weight|item_gross_weight)_(\d+)$/);
             if (lineItemMatch) {
                 const [, rawKey, indexStr] = lineItemMatch;
                 const lineIndex = Number(indexStr) - 1;
@@ -406,10 +437,18 @@ const InvoiceAnnotationPage = () => {
                     item_no: 'item_no',
                     material_no: 'item_code',
                     hs_code: 'hs_code',
-                    country_of_origin: 'country_of_origin'
+                    country_of_origin: 'country_of_origin',
+                    item_net_weight: 'net_weight',
+                    item_gross_weight: 'gross_weight'
                 };
 
                 const mappedKey = keyMap[rawKey] || rawKey;
+
+                const formattedValue = ['unit_price', 'total_value'].includes(mappedKey)
+                    ? formatDecimal(value, 2)
+                    : ['net_weight', 'gross_weight'].includes(mappedKey)
+                        ? formatDecimal(value, 3)
+                        : value;
 
                 setLineItems(prevItems => {
                     const updated = [...prevItems];
@@ -433,7 +472,7 @@ const InvoiceAnnotationPage = () => {
 
                     updated[lineIndex] = {
                         ...updated[lineIndex],
-                        [mappedKey]: value
+                        [mappedKey]: formattedValue
                     };
 
                     return updated;

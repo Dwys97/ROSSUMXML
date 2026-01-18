@@ -125,6 +125,7 @@ def build_dynamic_field_rules(field_manager: Optional[Dict[str, Any]], mode: str
                 desc = nested_def.get("description", "")
                 line = f"  - {nested_key}: {label}. {desc}".strip()
                 lines.append(line)
+            lines.append("  - For each line item, include ALL listed keys and use null when missing.")
             continue
         lines.append(_field_line(field))
 
@@ -140,6 +141,17 @@ def build_dynamic_prompt(document_text: str, field_manager: Optional[Dict[str, A
     scenario_clues = """- For Tabled: Follow the grid; treat the first row after headers as the start of a LineItem object.
 - For Floating: Associate numerical values with the nearest text label (e.g., 'Repair Value').
 - For Header-Heavy: Extract VAT/EORI and party names from contact blocks; map 'FAO' and 'Deliver To' to buyer_name.
+- If the table has columns like 'Net Wt', 'Gross Wt', 'Net Weight', 'Gross Weight', map them to line_items.net_weight and line_items.gross_weight.
+"""
+
+    formatting_rules = """FORMATTING:
+- Monetary fields must be numeric with exactly 2 decimal places.
+- Weight fields (net/gross/total weight) must be numeric with exactly 3 decimal places.
+
+TOTALS RULES:
+- Use explicit totals near the summary/amount due section (e.g., 'TOTAL', 'GRAND TOTAL', 'INVOICE TOTAL', 'AMOUNT DUE', 'TOTAL PAYABLE').
+- If a totals label exists, prefer that value over any sum of line items.
+- Only infer totals from line items when no explicit totals are present.
 """
 
     prompt = f"""<|im_start|>system
@@ -152,6 +164,8 @@ FIELD RULES:
 
 SCENARIO CLUES:
 {scenario_clues}
+
+{formatting_rules}
 
 Output only valid JSON following the schema. Use null for missing fields.
 <|im_end|>

@@ -178,7 +178,50 @@ def extract_line_items():
         logger.info(f"📄 Processing invoice {invoice_id} ({len(document_text)} chars)")
         field_manager = data.get('field_manager')
         
-        prompt = build_dynamic_prompt(document_text, field_manager=field_manager, mode="full")
+        prompt = build_dynamic_prompt(document_text, field_manager=field_manager, mode="line_items")
+
+        response = llm(
+            prompt,
+            max_tokens=data.get('max_tokens', 1200),
+            temperature=data.get('temperature', 0.1),
+            top_p=0.95,
+            stop=["<|im_end|>", "<|endoftext|>"],
+            echo=False
+        )
+
+        extracted_json = response['choices'][0]['text'].strip()
+
+        try:
+            extracted_data = json.loads(extracted_json)
+        except json.JSONDecodeError:
+            if "```json" in extracted_json:
+                json_start = extracted_json.find("```json") + 7
+                json_end = extracted_json.find("```", json_start)
+                extracted_json = extracted_json[json_start:json_end].strip()
+                extracted_data = json.loads(extracted_json)
+            elif "```" in extracted_json:
+                json_start = extracted_json.find("```") + 3
+                json_end = extracted_json.find("```", json_start)
+                extracted_json = extracted_json[json_start:json_end].strip()
+                extracted_data = json.loads(extracted_json)
+            else:
+                raise
+
+        if isinstance(extracted_data, dict) and isinstance(extracted_data.get('line_items'), list):
+            line_items = extracted_data.get('line_items') or []
+        elif isinstance(extracted_data, list):
+            line_items = extracted_data
+        else:
+            line_items = []
+
+        confidence = 0.85 if len(line_items) > 0 else 0.5
+
+        return jsonify({
+            'success': True,
+            'line_items': line_items,
+            'confidence': confidence,
+            'extraction_type': 'line_items'
+        })
 # ==========================================
 # FIELD EXTRACTION ENDPOINT (FULL)
 # ==========================================
@@ -219,65 +262,15 @@ def extract_customs_fields():
                 'error': 'Missing document_text'
             }), 400
         
-        logger.info(f"📄 Processing invoice {invoice_id} ({len(document_text)} chars)")
-        
-        # Qwen2.5 prompt for comprehensive customs invoice extraction
-        prompt = f"""<|im_start|>system
-You are a customs invoice data extractor. Extract ALL fields from the document into a JSON object.
+                logger.info(f"📄 Processing invoice {invoice_id} ({len(document_text)} chars)")
 
-REQUIRED FIELDS (use null if not found):
-- invoice_number: Invoice/Reference number
-- invoice_date: Date in YYYY-MM-DD format
-- due_date: Payment due date in YYYY-MM-DD format
-- currency: 3-letter currency code (EUR, USD, GBP)
+                field_manager = data.get('field_manager')
+                prompt = build_dynamic_prompt(document_text, field_manager=field_manager, mode="full")
 
-SELLER/VENDOR:
-- vendor_name: Seller/Exporter company name
-- vendor_address: Full seller address
-- vendor_vat: Seller VAT/Tax ID number
-
-BUYER/CONSIGNEE:
-- buyer_name: Buyer/Importer/Consignee company name  
-- buyer_address: Full buyer address
-- buyer_vat: Buyer VAT/Tax ID number
-
-TOTALS:
-- subtotal: Net amount before tax
-- tax_amount: VAT/Tax amount
-- total_amount: Total invoice amount including tax
-- total_gross_weight: Total gross weight (with unit like "100 KG")
-- total_net_weight: Total net weight (with unit)
-- total_packages: Number of packages/cartons
-
-TERMS:
-- incoterms: Trade term (EXW, FOB, CIF, DDP, DAP, etc.)
-- payment_terms: Payment conditions
-
-LINE ITEMS (as array):
-- line_items: Array of items, each with:
-  - item_no: Line/Item number
-  - material_no: SKU/Material code
-  - description: Product description
-  - hs_code: 6-10 digit HS/Commodity code
-  - origin: 2-letter country code (FR, DE, CN)
-  - quantity: Number of units
-  - unit: Unit of measure (kg, pcs, CU)
-  - unit_price: Price per unit
-  - total_price: Line total
-  - net_weight: Line item net weight
-  - gross_weight: Line item gross weight
-
-Return ONLY valid JSON. No markdown, no explanation.<|im_end|>
-<|im_start|>user
-{document_text}<|im_end|>
-<|im_start|>assistant
-"""
-        
-        # Generate extraction
-        response = llm(
-            prompt,
-            max_tokens=2048,
-            temperature=0.1,  # Low temperature for consistency
+                response = llm(
+                        prompt,
+                        max_tokens=data.get('max_tokens', 2048),
+                        temperature=data.get('temperature', 0.1),
             top_p=0.95,
             stop=["<|im_end|>", "<|endoftext|>"],
             echo=False

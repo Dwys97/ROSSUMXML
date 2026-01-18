@@ -76,6 +76,7 @@ export POSTGRES_PORT=5432
 export POSTGRES_DB=rossumxml
 export POSTGRES_USER=postgres
 export POSTGRES_PASSWORD=postgres
+export DEBUG_TABLES=true
 
 echo ""
 echo "🔧 Worker Configuration:"

@@ -69,17 +69,17 @@ function convertMicroservicesResponse(microservicesData) {
 
     if (lineItemsContainer && Array.isArray(lineItemsContainer) && lineItemsContainer.length > 0) {
         extractedLineItems = lineItemsContainer.map(item => ({
-            description: item.description?.value || item.description || null,
-            hs_code: item.hs_code?.value || item.hs_code || item.HS_Code || null,
-            item_code: item.item_no?.value || item.item_no || item.material_no?.value || item.material_no || item.item_code || item.Identifier || null,
-            quantity: item.quantity?.value || item.quantity || null,
-            unit_price: item.unit_price?.value || item.unit_price || item.Value || null,
-            total_value: item.total_price?.value || item.total_price || item.total_value?.value || item.total_value || null,
-            gross_weight: item.gross_weight?.value || item.gross_weight || null,
-            net_weight: item.net_weight?.value || item.net_weight || null,
-            country_of_origin: item.origin?.value || item.origin || item.country_of_origin?.value || item.country_of_origin || null,
-            unit_of_measure: item.unit?.value || item.unit || item.unit_of_measure?.value || item.unit_of_measure || null,
-            packages: item.packages?.value || item.packages || null
+            description: item.description?.value ?? item.description ?? null,
+            hs_code: item.hs_code?.value ?? item.hs_code ?? item.HS_Code ?? null,
+            item_code: item.item_no?.value ?? item.item_no ?? item.material_no?.value ?? item.material_no ?? item.item_code ?? item.Identifier ?? null,
+            quantity: item.quantity?.value ?? item.quantity ?? null,
+            unit_price: item.unit_price?.value ?? item.unit_price ?? item.Value ?? null,
+            total_value: item.total_price?.value ?? item.total_price ?? item.total_value?.value ?? item.total_value ?? null,
+            gross_weight: item.gross_weight?.value ?? item.gross_weight ?? null,
+            net_weight: item.net_weight?.value ?? item.net_weight ?? null,
+            country_of_origin: item.origin?.value ?? item.origin ?? item.country_of_origin?.value ?? item.country_of_origin ?? null,
+            unit_of_measure: item.unit?.value ?? item.unit ?? item.unit_of_measure?.value ?? item.unit_of_measure ?? null,
+            packages: item.packages?.value ?? item.packages ?? null
         }));
     } else {
         // Fallback to legacy flat-field extraction
@@ -117,7 +117,7 @@ function convertMicroservicesResponse(microservicesData) {
         invoice_number: getField('invoice_number', 'Invoice_Ref'),
         invoice_date: getField('invoice_date'),
         due_date: getField('due_date'),
-        total_amount: getField('total_amount', 'total_value', 'invoice_total'),
+            total_amount: getField('total_amount', 'total_value', 'invoice_total') || null,
         subtotal: getField('subtotal', 'net_amount'),
         tax_amount: getField('tax_amount', 'vat_amount'),
         currency: getField('currency'),
@@ -141,8 +141,8 @@ function convertMicroservicesResponse(microservicesData) {
         buyer: buyer.name ? buyer : null,
         
         // Shipment totals
-        total_gross_weight: getField('total_gross_weight'),
-        total_net_weight: getField('total_net_weight'),
+            total_gross_weight: normalizeDecimal(getField('total_gross_weight'), 3),
+            total_net_weight: normalizeDecimal(getField('total_net_weight'), 3),
         total_packages: getField('total_packages'),
         weight_unit: getField('weight_unit'),
         
@@ -181,16 +181,16 @@ function extractLineItems(fields) {
             const suffix = index ? `_${index}` : '';
             
             items.push({
-                description: fields[`item_description${suffix}`]?.value || null,
-                hs_code: fields[`hs_code${suffix}`]?.value || null,
-                item_code: fields[`item_code${suffix}`]?.value || null,
-                quantity: fields[`item_quantity${suffix}`]?.value || null,
-                unit_price: fields[`item_unit_price${suffix}`]?.value || null,
-                total_value: fields[`item_total_value${suffix}`]?.value || fields[`item_total${suffix}`]?.value || null,
-                gross_weight: fields[`item_gross_weight${suffix}`]?.value || null,
-                net_weight: fields[`item_net_weight${suffix}`]?.value || null,
-                country_of_origin: fields[`item_country_of_origin${suffix}`]?.value || fields[`country_of_origin${suffix}`]?.value || null,
-                unit_of_measure: fields[`item_unit_of_measure${suffix}`]?.value || null
+                description: fields[`item_description${suffix}`]?.value ?? null,
+                hs_code: fields[`hs_code${suffix}`]?.value ?? null,
+                item_code: fields[`item_code${suffix}`]?.value ?? null,
+                quantity: fields[`item_quantity${suffix}`]?.value ?? null,
+                unit_price: fields[`item_unit_price${suffix}`]?.value ?? null,
+                total_value: fields[`item_total_value${suffix}`]?.value ?? fields[`item_total${suffix}`]?.value ?? null,
+                gross_weight: fields[`item_gross_weight${suffix}`]?.value ?? null,
+                net_weight: fields[`item_net_weight${suffix}`]?.value ?? null,
+                country_of_origin: fields[`item_country_of_origin${suffix}`]?.value ?? fields[`country_of_origin${suffix}`]?.value ?? null,
+                unit_of_measure: fields[`item_unit_of_measure${suffix}`]?.value ?? null
             });
         });
     } else {
@@ -199,16 +199,16 @@ function extractLineItems(fields) {
             const suffix = index ? `_${index}` : '';
             
             items.push({
-                hs_code: fields[`hs_code${suffix}`]?.value || null,
-                item_code: fields[`item_code${suffix}`]?.value || null,
-                description: fields[`item_description${suffix}`]?.value || null,
-                quantity: fields[`item_quantity${suffix}`]?.value || null,
-                unit_price: fields[`item_unit_price${suffix}`]?.value || null,
-                total_value: fields[`item_total_value${suffix}`]?.value || fields[`item_total${suffix}`]?.value || null,
-                gross_weight: fields[`item_gross_weight${suffix}`]?.value || null,
-                net_weight: fields[`item_net_weight${suffix}`]?.value || null,
-                country_of_origin: fields[`item_country_of_origin${suffix}`]?.value || fields[`country_of_origin${suffix}`]?.value || null,
-                unit_of_measure: fields[`item_unit_of_measure${suffix}`]?.value || null
+                hs_code: fields[`hs_code${suffix}`]?.value ?? null,
+                item_code: fields[`item_code${suffix}`]?.value ?? null,
+                description: fields[`item_description${suffix}`]?.value ?? null,
+                quantity: fields[`item_quantity${suffix}`]?.value ?? null,
+                unit_price: fields[`item_unit_price${suffix}`]?.value ?? null,
+                total_value: fields[`item_total_value${suffix}`]?.value ?? fields[`item_total${suffix}`]?.value ?? null,
+                gross_weight: fields[`item_gross_weight${suffix}`]?.value ?? null,
+                net_weight: fields[`item_net_weight${suffix}`]?.value ?? null,
+                country_of_origin: fields[`item_country_of_origin${suffix}`]?.value ?? fields[`country_of_origin${suffix}`]?.value ?? null,
+                unit_of_measure: fields[`item_unit_of_measure${suffix}`]?.value ?? null
             });
         });
     }
@@ -653,6 +653,24 @@ async function processExtractionJob(job) {
             logger.info(`Emitting ${lineItems.length} line items to frontend...`);
             socketEvents.emitFieldUpdate(invoiceId, 'line_items', lineItems, normalizedFields.line_items.confidence || 0);
         }
+
+        let tableTotals = parseTablesForTotalsAndWeights(tables);
+        if (tableTotals?.lineItemWeights) {
+            Object.entries(tableTotals.lineItemWeights).forEach(([lineNumber, weights]) => {
+                if (weights?.net_weight !== undefined && weights?.net_weight !== null) {
+                    normalizedFields[`item_net_weight_${lineNumber}`] = {
+                        value: weights.net_weight,
+                        confidence: 0
+                    };
+                }
+                if (weights?.gross_weight !== undefined && weights?.gross_weight !== null) {
+                    normalizedFields[`item_gross_weight_${lineNumber}`] = {
+                        value: weights.gross_weight,
+                        confidence: 0
+                    };
+                }
+            });
+        }
         
         await job.progress(85);
         socketEvents.emitExtractionProgress(invoiceId, 85, `Extracted ${totalFields} fields`);
@@ -1032,6 +1050,32 @@ async function processExtractionJob(job) {
             };
         }
 
+        const headerColumnFromOcr = (regex) => {
+            for (const ocr of ocrResults) {
+                const text = (ocr.text || '').toLowerCase();
+                if (!regex.test(text)) continue;
+                const bbox = ocr.bbox_normalized;
+                if (!bbox || bbox.length !== 4) continue;
+                const [left, , right] = bbox;
+                return { x: left, width: right - left };
+            }
+            return null;
+        };
+
+        if (!columnMedians.item_net_weight) {
+            const netHeader = headerColumnFromOcr(/net\s*(weight|wt)/i);
+            if (netHeader) {
+                columnMedians.item_net_weight = netHeader;
+            }
+        }
+
+        if (!columnMedians.item_gross_weight) {
+            const grossHeader = headerColumnFromOcr(/gross\s*(weight|wt)/i);
+            if (grossHeader) {
+                columnMedians.item_gross_weight = grossHeader;
+            }
+        }
+
         const rowMedians = {};
         for (const [rowIndex, arr] of Object.entries(rowAnchors)) {
             rowMedians[rowIndex] = {
@@ -1070,6 +1114,115 @@ async function processExtractionJob(job) {
 
         // Convert microservices response format
         const extractedData = convertMicroservicesResponse(microservicesData);
+        if (Array.isArray(tables) && tables.length > 0) {
+            const firstTable = tables[0] || {};
+            const headersPreview = (firstTable.headers || []).slice(0, 12);
+            const rows = Array.isArray(firstTable.rows) ? firstTable.rows : [];
+            const lastRow = rows.length > 0 ? rows[rows.length - 1] : [];
+            const lastRowPreview = Array.isArray(lastRow) ? lastRow.slice(0, 12) : [];
+            logger.info(`Table preview headers: ${JSON.stringify(headersPreview)}`);
+            logger.info(`Table preview last row: ${JSON.stringify(lastRowPreview)}`);
+
+            if (process.env.DEBUG_TABLES === 'true') {
+                const allTables = tables.map((table, index) => {
+                    const headers = Array.isArray(table.headers) ? table.headers : [];
+                    const rowsAll = Array.isArray(table.rows) ? table.rows : [];
+                    return {
+                        index,
+                        score: scoreLineItemTable(headers),
+                        headers,
+                        rowCount: rowsAll.length,
+                        rowsSample: rowsAll.slice(0, 5),
+                        lastRow: rowsAll.length > 0 ? rowsAll[rowsAll.length - 1] : []
+                    };
+                });
+                const debugPayload = {
+                    headers: firstTable.headers || [],
+                    rowsSample: rows.slice(0, 5),
+                    lastRow: lastRow,
+                    allTables
+                };
+                await fs.writeFile(`/tmp/table-debug-${invoiceId}.json`, JSON.stringify(debugPayload, null, 2));
+                logger.info(`Wrote table debug to /tmp/table-debug-${invoiceId}.json`);
+            }
+        }
+        if (tableTotals) {
+            logger.info(`Table totals parsed from table index ${tableTotals.tableIndex} (score ${tableTotals.score})`);
+            if (tableTotals.headers) {
+                logger.info(`Line-item table headers: ${JSON.stringify(tableTotals.headers)}`);
+            }
+        }
+
+        const totalsOverride = tableTotals?.totals || extractTotalsFromText(textForExtraction);
+        if (!totalsOverride) {
+            logger.warn('Totals override not found from tables or text.');
+        } else {
+            logger.info(`Totals override candidate: ${JSON.stringify(totalsOverride)}`);
+        }
+        if (totalsOverride?.total_amount !== null && totalsOverride?.total_amount !== undefined) {
+            const currentTotal = normalizeDecimal(extractedData.total_amount, 2);
+            if (!currentTotal || Math.abs(totalsOverride.total_amount - currentTotal) > 0.01) {
+                logger.info(`Overriding total_amount with TOTALS row value: ${totalsOverride.total_amount}`);
+                extractedData.total_amount = totalsOverride.total_amount;
+            }
+        }
+        if (totalsOverride?.total_gross_weight !== null && totalsOverride?.total_gross_weight !== undefined) {
+            extractedData.total_gross_weight = totalsOverride.total_gross_weight;
+        }
+        if (totalsOverride?.total_net_weight !== null && totalsOverride?.total_net_weight !== undefined) {
+            extractedData.total_net_weight = totalsOverride.total_net_weight;
+        }
+
+        if (Array.isArray(extractedData.lineItems) && tableTotals?.lineItemWeights) {
+            extractedData.lineItems = extractedData.lineItems.map((item, index) => {
+                const lineNumber = item.line_number || item.lineNumber || index + 1;
+                const weights = tableTotals.lineItemWeights[lineNumber] || {};
+                return {
+                    ...item,
+                    net_weight: item.net_weight ?? weights.net_weight ?? item.net_weight,
+                    gross_weight: item.gross_weight ?? weights.gross_weight ?? item.gross_weight
+                };
+            });
+            extractedData.line_items = extractedData.lineItems;
+        }
+
+        const tableHeaders = parseTablesForHeaderFields(tables);
+        if (tableHeaders) {
+            const assignIfMissing = (key, value) => {
+                if (value === null || value === undefined || value === '') return;
+                if (extractedData[key] === null || extractedData[key] === undefined || extractedData[key] === '') {
+                    extractedData[key] = value;
+                }
+            };
+
+            Object.entries(tableHeaders).forEach(([key, value]) => {
+                if (['total_amount', 'subtotal', 'tax_amount'].includes(key)) {
+                    assignIfMissing(key, normalizeDecimal(value, 2));
+                } else if (['total_gross_weight', 'total_net_weight'].includes(key)) {
+                    assignIfMissing(key, normalizeDecimal(value, 3));
+                } else {
+                    assignIfMissing(key, value);
+                }
+            });
+
+            if (!extractedData.seller && extractedData.vendor_name) {
+                extractedData.seller = {
+                    name: extractedData.vendor_name,
+                    address: extractedData.vendor_address || null,
+                    vatNumber: extractedData.vat_number || extractedData.vendor_vat || null,
+                    country: extractedData.vendor_country || null
+                };
+            }
+
+            if (!extractedData.buyer && extractedData.buyer_name) {
+                extractedData.buyer = {
+                    name: extractedData.buyer_name,
+                    address: extractedData.buyer_address || null,
+                    vatNumber: extractedData.buyer_vat_id || extractedData.buyer_vat || null,
+                    country: extractedData.buyer_country || null
+                };
+            }
+        }
         // Normalize line items key and confidence
         extractedData.lineItems = extractedData.lineItems || extractedData.line_items || [];
         if (extractedData.confidence === undefined || extractedData.confidence === null) {
@@ -1187,6 +1340,282 @@ function normalizeDate(dateStr) {
 }
 
 /**
+ * Normalize numeric values with fixed decimals.
+ * - Strips currency/unit symbols
+ * - Handles comma as decimal separator
+ */
+function normalizeDecimal(value, decimals) {
+    if (value === null || value === undefined || value === '') return null;
+
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    let cleaned = raw.replace(/[^0-9,.-]/g, '');
+    if (!cleaned || cleaned === '-' || cleaned === '.') return null;
+
+    const hasDot = cleaned.includes('.');
+    const hasComma = cleaned.includes(',');
+
+    if (hasDot && hasComma) {
+        const lastDot = cleaned.lastIndexOf('.');
+        const lastComma = cleaned.lastIndexOf(',');
+        if (lastComma > lastDot) {
+            cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+        } else {
+            cleaned = cleaned.replace(/,/g, '');
+        }
+    } else if (!hasDot && hasComma) {
+        cleaned = cleaned.replace(',', '.');
+    }
+
+    const num = Number(cleaned);
+    if (Number.isNaN(num)) return null;
+
+    return Number(num.toFixed(decimals));
+}
+
+function extractTotalsFromText(text) {
+    if (!text) return null;
+    const lines = String(text).split(/\r?\n/);
+
+    const totalLabel = /(grand\s+total|invoice\s+total|total\s+amount|amount\s+due|total\s+payable|total\s+value|total\s+due|balance\s+due|\btotal\b)/i;
+    const lineItemNoise = /(line\s*total|item\s*total|line\s*amount)/i;
+
+    const extractNumberFromLine = (line) => {
+        const numberMatches = line.match(/-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2,3})/g) || [];
+        if (numberMatches.length === 0) return null;
+        return normalizeDecimal(numberMatches[numberMatches.length - 1], 2);
+    };
+
+    let total_amount = null;
+    let total_gross_weight = null;
+    let total_net_weight = null;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line) continue;
+
+        if (/gross\s*weight|gross\s*wt/i.test(line)) {
+            const match = line.match(/-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2,3})/g) || [];
+            if (match.length > 0) total_gross_weight = normalizeDecimal(match[match.length - 1], 3);
+        }
+        if (/net\s*weight|net\s*wt/i.test(line)) {
+            const match = line.match(/-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2,3})/g) || [];
+            if (match.length > 0) total_net_weight = normalizeDecimal(match[match.length - 1], 3);
+        }
+
+        if (totalLabel.test(line) && !lineItemNoise.test(line)) {
+            total_amount = extractNumberFromLine(line);
+            if (total_amount === null && lines[i + 1]) {
+                total_amount = extractNumberFromLine(lines[i + 1]);
+            }
+            if (total_amount !== null) break;
+        }
+    }
+
+    if (total_amount === null && total_gross_weight === null && total_net_weight === null) {
+        return null;
+    }
+
+    return { total_amount, total_gross_weight, total_net_weight };
+}
+
+function scoreLineItemTable(headers) {
+    const normalizeHeader = (value) => String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+
+    const normalizedHeaders = headers.map((h) => normalizeHeader(h));
+    return normalizedHeaders.reduce((score, header) => {
+        if (/description/.test(header)) score += 2;
+        if (/qty|quantity/.test(header)) score += 2;
+        if (/unit\b/.test(header)) score += 1;
+        if (/price|net\s*price|total\s*value|total\s*amount|line\s*total/.test(header)) score += 2;
+        if (/net\s*wt|gross\s*wt|net\s*weight|gross\s*weight/.test(header)) score += 3;
+        if (/hs\s*code|comm\s*code/.test(header)) score += 2;
+        if (/origin/.test(header)) score += 1;
+        if (/item\s*no|line\s*no|material/.test(header)) score += 1;
+        return score;
+    }, 0);
+}
+
+function parseTablesForTotalsAndWeights(tables) {
+    if (!Array.isArray(tables) || tables.length === 0) return null;
+
+    const normalizeHeader = (value) => String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+
+    const findIndex = (headers, predicate) => headers.findIndex(h => predicate(normalizeHeader(h)));
+
+    const totalLabelRegex = /\b(total|totals|grand total|invoice total|amount due|total payable|balance due)\b/i;
+
+    let totals = null;
+    const lineItemWeights = {};
+
+    let bestTable = null;
+    let bestScore = 0;
+    tables.forEach((table, index) => {
+        const headers = Array.isArray(table.headers) ? table.headers : [];
+        const rows = Array.isArray(table.rows) ? table.rows : [];
+        if (headers.length === 0 || rows.length === 0) return;
+
+        const score = scoreLineItemTable(headers);
+        if (score > bestScore) {
+            bestScore = score;
+            bestTable = { table, index, score };
+        }
+    });
+
+    if (!bestTable || bestScore < 4) {
+        return { totals, lineItemWeights };
+    }
+
+    const { table } = bestTable;
+    const headers = Array.isArray(table.headers) ? table.headers : [];
+    const rows = Array.isArray(table.rows) ? table.rows : [];
+
+    const netIdx = findIndex(headers, (h) => /net\s*weight|net\s*wt|netwt/.test(h));
+    const grossIdx = findIndex(headers, (h) => /gross\s*weight|gross\s*wt|grosswt/.test(h));
+    const totalCandidates = headers
+        .map((header, idx) => ({
+            idx,
+            header: normalizeHeader(header)
+        }))
+        .filter((entry) => /total\s*(value|amount|price)?|line\s*total|total\s*value|net\s*price/.test(entry.header));
+    const totalIdx = totalCandidates.length > 0
+        ? totalCandidates.sort((a, b) => b.idx - a.idx)[0].idx
+        : findIndex(headers, (h) => /price/.test(h));
+    const itemNoIdx = findIndex(headers, (h) => /item\s*no|item\s*number|line\s*no|line\s*number|no\.?$|item\b/.test(h));
+
+    rows.forEach((row, rowIndex) => {
+        const cells = Array.isArray(row) ? row : [];
+        const rowText = cells.join(' ').toLowerCase();
+        const isTotalsRow = totalLabelRegex.test(rowText) || cells.some(cell => totalLabelRegex.test(String(cell || '')));
+
+        const numericCells = cells.filter(cell => normalizeDecimal(cell, 2) !== null);
+        const alphaCells = cells.filter(cell => /[a-zA-Z]/.test(String(cell || '')));
+        const looksLikeSummary = numericCells.length >= 2 && alphaCells.length <= 2;
+
+        if (isTotalsRow || (looksLikeSummary && rowIndex === rows.length - 1)) {
+            const totalCell = totalIdx >= 0 ? cells[totalIdx] : null;
+            const grossCell = grossIdx >= 0 ? cells[grossIdx] : null;
+            const netCell = netIdx >= 0 ? cells[netIdx] : null;
+
+            const fallbackNumbers = rowText.match(/-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2,3})/g) || [];
+            const fallbackTotal = fallbackNumbers.length > 0
+                ? normalizeDecimal(fallbackNumbers[fallbackNumbers.length - 1], 2)
+                : null;
+
+            const numericCellPairs = cells
+                .map((cell, idx) => ({
+                    idx,
+                    raw: String(cell ?? ''),
+                    value: normalizeDecimal(cell, 2)
+                }))
+                .filter(entry => entry.value !== null);
+            const rightmostNumeric = numericCellPairs.length > 0
+                ? numericCellPairs.sort((a, b) => b.idx - a.idx)[0].value
+                : null;
+
+            let combinedTotal = null;
+            if (numericCellPairs.length >= 2) {
+                const sorted = numericCellPairs.sort((a, b) => b.idx - a.idx);
+                const [right, left] = sorted;
+                const rightHasDecimals = /[.,]\d{2,3}/.test(right.raw);
+                const leftIsInteger = !/[.,]/.test(left.raw.trim());
+                if (rightHasDecimals && leftIsInteger && right.value < 1000 && left.value >= 1) {
+                    combinedTotal = (left.value * 1000) + right.value;
+                }
+            }
+
+            totals = {
+                total_amount: normalizeDecimal(totalCell, 2) ?? combinedTotal ?? rightmostNumeric ?? fallbackTotal ?? totals?.total_amount,
+                total_gross_weight: normalizeDecimal(grossCell, 3) ?? totals?.total_gross_weight,
+                total_net_weight: normalizeDecimal(netCell, 3) ?? totals?.total_net_weight
+            };
+            return;
+        }
+
+        if (netIdx >= 0 || grossIdx >= 0) {
+            let lineNumber = rowIndex + 1;
+            if (itemNoIdx >= 0) {
+                const rawItemNo = cells[itemNoIdx];
+                const parsed = Number(String(rawItemNo || '').replace(/[^0-9]/g, ''));
+                if (Number.isFinite(parsed) && parsed > 0 && parsed <= rows.length + 2) {
+                    lineNumber = parsed;
+                }
+            }
+
+            const entry = lineItemWeights[lineNumber] || {};
+            if (netIdx >= 0) entry.net_weight = normalizeDecimal(cells[netIdx], 3);
+            if (grossIdx >= 0) entry.gross_weight = normalizeDecimal(cells[grossIdx], 3);
+            lineItemWeights[lineNumber] = entry;
+        }
+    });
+
+    return { totals, lineItemWeights, tableIndex: bestTable.index, score: bestTable.score, headers };
+}
+
+function parseTablesForHeaderFields(tables) {
+    if (!Array.isArray(tables) || tables.length === 0) return null;
+
+    const normalizeHeader = (value) => String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+
+    const labelMap = [
+        { key: 'invoice_number', test: /invoice\s*(no|number|#|nr|ref|reference)/i },
+        { key: 'invoice_date', test: /invoice\s*date|date\s*of\s*invoice/i },
+        { key: 'due_date', test: /due\s*date|payment\s*due/i },
+        { key: 'currency', test: /currency|curr\.?/i },
+        { key: 'incoterms', test: /incoterms|incoterm/i },
+        { key: 'payment_terms', test: /payment\s*terms|terms\s*of\s*payment/i },
+        { key: 'total_amount', test: /total\s*(amount|value|payable)|grand\s*total|amount\s*due|balance\s*due/i },
+        { key: 'subtotal', test: /sub\s*total|subtotal|net\s*amount/i },
+        { key: 'tax_amount', test: /tax\s*amount|vat\s*amount|tax\s*total/i },
+        { key: 'total_gross_weight', test: /total\s*gross\s*weight|gross\s*weight\s*total/i },
+        { key: 'total_net_weight', test: /total\s*net\s*weight|net\s*weight\s*total/i },
+        { key: 'total_packages', test: /total\s*packages|packages\s*total|no\.?\s*packages/i },
+        { key: 'vendor_name', test: /seller|vendor|exporter|shipper|consignor/i },
+        { key: 'vendor_address', test: /seller\s*address|vendor\s*address|exporter\s*address|shipper\s*address/i },
+        { key: 'vendor_vat', test: /seller\s*vat|vendor\s*vat|exporter\s*vat|seller\s*tax\s*id|vendor\s*tax\s*id/i },
+        { key: 'buyer_name', test: /buyer|consignee|importer/i },
+        { key: 'buyer_address', test: /buyer\s*address|consignee\s*address|importer\s*address/i },
+        { key: 'buyer_vat', test: /buyer\s*vat|consignee\s*vat|importer\s*vat|buyer\s*tax\s*id/i }
+    ];
+
+    const collected = {};
+
+    for (const table of tables) {
+        const rows = Array.isArray(table.rows) ? table.rows : [];
+        rows.forEach((row) => {
+            const cells = Array.isArray(row) ? row : [];
+            if (cells.length < 2) return;
+
+            const label = normalizeHeader(cells[0]);
+            if (!label) return;
+            const value = cells.slice(1).join(' ').trim();
+            if (!value) return;
+
+            const match = labelMap.find(entry => entry.test.test(label));
+            if (!match) return;
+
+            if (collected[match.key] === undefined || collected[match.key] === null || collected[match.key] === '') {
+                collected[match.key] = value;
+            }
+        });
+    }
+
+    if (Object.keys(collected).length === 0) return null;
+
+    return collected;
+}
+
+/**
  * Save extraction results to database
  */
 async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) {
@@ -1225,11 +1654,15 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
         // Normalize date to ISO format before saving
         const normalizedDate = normalizeDate(extractedData.invoice_date);
 
+        const normalizedTotalAmount = normalizeDecimal(extractedData.total_amount, 2);
+        const normalizedGrossWeight = normalizeDecimal(extractedData.total_gross_weight, 3);
+        const normalizedNetWeight = normalizeDecimal(extractedData.total_net_weight, 3);
+
         await client.query(updateInvoiceQuery, [
             extractedData.invoice_number || null,
             normalizedDate,
             extractedData.currency || null,
-            extractedData.total_amount || null,
+            normalizedTotalAmount,
             extractedData.confidence || 0,
             vendorProfileId,
             JSON.stringify(extractedData),
@@ -1238,8 +1671,8 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
             extractedData.consignee_address || null,
             extractedData.vendor_country || null,
             extractedData.buyer_country || null,
-            extractedData.total_gross_weight || null,
-            extractedData.total_net_weight || null,
+            normalizedGrossWeight,
+            normalizedNetWeight,
             extractedData.total_packages || null,
             extractedData.weight_unit || 'KG',
             extractedData.incoterms || null,
@@ -1409,15 +1842,15 @@ async function saveLineItems(client, invoiceId, lineItems) {
             };
         } else {
             // Flat format (legacy or manually entered)
-            description = item.description || null;
-            quantity = item.quantity || null;
-            unit_price = item.unit_price || null;
-            amount = item.amount || item.total_value || null;
-            hs_code = item.hs_code || null;
-            country_of_origin = item.country_of_origin || null;
-            net_weight = item.net_weight || null;
-            gross_weight = item.gross_weight || null;
-            item_code = item.item_code || null;
+            description = item.description ?? null;
+            quantity = item.quantity ?? null;
+            unit_price = item.unit_price ?? null;
+            amount = item.amount ?? item.total_value ?? null;
+            hs_code = item.hs_code ?? null;
+            country_of_origin = item.country_of_origin ?? null;
+            net_weight = item.net_weight ?? null;
+            gross_weight = item.gross_weight ?? null;
+            item_code = item.item_code ?? null;
             
             descConf = item.descriptionConfidence || 0;
             qtyConf = item.quantityConfidence || 0;
@@ -1430,6 +1863,11 @@ async function saveLineItems(client, invoiceId, lineItems) {
             }
         }
         
+        const normalizedUnitPrice = normalizeDecimal(unit_price, 2);
+        const normalizedAmount = normalizeDecimal(amount, 2);
+        const normalizedNetWeight = normalizeDecimal(net_weight, 3);
+        const normalizedGrossWeight = normalizeDecimal(gross_weight, 3);
+
         const itemConfidence = JSON.stringify({
             description: descConf,
             quantity: qtyConf,
@@ -1442,12 +1880,12 @@ async function saveLineItems(client, invoiceId, lineItems) {
             i + 1,
             description,
             quantity,
-            unit_price,
-            amount,
+            normalizedUnitPrice,
+            normalizedAmount,
             hs_code,
             country_of_origin,
-            net_weight,
-            gross_weight,
+            normalizedNetWeight,
+            normalizedGrossWeight,
             itemConfidence,
             item_code,
             JSON.stringify(itemBboxes)

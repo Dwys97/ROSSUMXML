@@ -26,6 +26,30 @@
     margin-left: 2rem;
 }
 
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.fieldManagerBtn {
+    padding: 0.65rem 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.fieldManagerBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(29, 114, 243, 0.6);
+    box-shadow: 0 6px 18px rgba(29, 114, 243, 0.15);
+}
+
 .title {
     margin: 0 0 0.5rem 0;
     font-size: 2rem;
@@ -188,6 +212,70 @@
 .loading p {
     margin: 0;
     font-size: 1rem;
+}
+
+/* Field Manager Modal */
+.modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 10, 20, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 1.5rem;
+}
+
+.modalContent {
+    width: min(1200px, 95vw);
+    max-height: 90vh;
+    background: rgba(17, 20, 30, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modalHeader h2 {
+    margin: 0 0 0.25rem 0;
+    color: #ffffff;
+    font-size: 1.4rem;
+}
+
+.modalHeader p {
+    margin: 0;
+    color: #a5a9b5;
+    font-size: 0.95rem;
+}
+
+.closeBtn {
+    background: transparent;
+    border: none;
+    color: #a5a9b5;
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: color 0.2s ease;
+}
+
+.closeBtn:hover {
+    color: #ffffff;
+}
+
+.modalBody {
+    padding: 1.5rem;
+    overflow-y: auto;
 }
 
 /* Stats Section */
