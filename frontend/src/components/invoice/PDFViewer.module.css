@@ -58,7 +58,7 @@
     background: rgba(16, 20, 30, 0.6);
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     padding: 2rem;
 }
 

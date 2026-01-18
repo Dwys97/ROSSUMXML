@@ -11,7 +11,7 @@ import json
 import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from docling.document_converter import DocumentConverter
+from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.datamodel.base_models import InputFormat
 from pathlib import Path
@@ -49,8 +49,12 @@ def initialize_converter():
             pipeline_options.do_table_structure = True
             pipeline_options.generate_page_images = False  # Save memory
             
-            # Initialize converter (Docling 2.64+ uses simplified API)
-            converter = DocumentConverter()
+            # Initialize converter with OCR enabled
+            converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
             
             logger.info("✓ Docling v2 converter initialized")
         except Exception as e:
@@ -185,27 +189,73 @@ def process_document():
         }), 500
 
 def extract_tables(document):
-    """Extract tables from document structure"""
+    """Extract tables from document structure with fallback strategies"""
     tables = []
     
     try:
-        if hasattr(document, 'tables'):
-            for table in document.tables:
-                table_data = {
-                    'headers': [],
-                    'rows': []
-                }
+        # Debug: Check if document has tables
+        has_tables = hasattr(document, 'tables')
+        num_tables = len(document.tables) if has_tables and document.tables else 0
+        logger.info(f"DEBUG: Document has tables? {has_tables}. Count: {num_tables}")
+
+        if has_tables and document.tables:
+            for i, table in enumerate(document.tables):
+                table_data = {'headers': [], 'rows': []}
+                extracted = False
                 
-                # Extract table structure
-                if hasattr(table, 'data'):
-                    # SmolDocling v2 table format
-                    table_data['headers'] = table.data.get('headers', [])
-                    table_data['rows'] = table.data.get('rows', [])
-                
-                tables.append(table_data)
+                try:
+                    # Debug: inspect one table to see structure
+                    if i == 0:
+                        logger.info(f"DEBUG: Table 0 Type: {type(table)}")
+                        logger.info(f"DEBUG: Table 0 Dir: {dir(table)[:20]}...") 
+
+                    # Attempt to extract grid data
+                    grid_source = None
+                    # Check path table.data.grid
+                    if hasattr(table, 'data') and hasattr(table.data, 'grid'):
+                        grid_source = table.data.grid
+                    # Check path table.grid
+                    elif hasattr(table, 'grid'):
+                        grid_source = table.grid
+                        
+                    if grid_source:
+                        grid = []
+                        for row in grid_source:
+                            grid_row = []
+                            for cell in row:
+                                text = getattr(cell, 'text', None)
+                                if text is None: text = str(cell)
+                                grid_row.append(text)
+                            grid.append(grid_row)
+                        
+                        if grid:
+                            table_data['headers'] = grid[0]
+                            table_data['rows'] = grid[1:]
+                            extracted = True
+                            logger.info(f"DEBUG: Table {i} extracted via grid. Rows: {len(grid)}")
+
+                except Exception as e:
+                    logger.warning(f"Table {i} grid extraction failed: {e}")
+
+                if not extracted and hasattr(table, 'export_to_dataframe'):
+                    try:
+                        df = table.export_to_dataframe()
+                        table_data['headers'] = df.columns.tolist()
+                        table_data['rows'] = df.fillna("").values.tolist()
+                        extracted = True
+                        logger.info(f"DEBUG: Table {i} extracted via dataframe. Rows: {len(df)}")
+                    except Exception as df_e: 
+                        logger.info(f"DEBUG: Table {i} dataframe export failed: {df_e}")
+
+                if extracted:
+                    tables.append(table_data)
+                else:
+                    logger.warning(f"DEBUG: Table {i} could not be extracted by any method.")
+                    
     except Exception as e:
-        logger.warning(f"Error extracting tables: {e}")
+        logger.error(f"Critical error extracting tables: {e}", exc_info=True)
     
+    logger.info(f"Total tables extracted: {len(tables)}")
     return tables
 
 def extract_structure(document):
@@ -255,7 +305,8 @@ def extract_ocr_with_bbox(pdf_path):
             {
                 "page": 1,
                 "text": "Invoice Number",
-                "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],  # 4 corner points
+                "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],  # 4 corner points (absolute)
+                "bbox_normalized": [x1, y1, x2, y2],  # [left, top, right, bottom] normalized 0-1
                 "confidence": 0.95
             },
             ...
@@ -268,6 +319,9 @@ def extract_ocr_with_bbox(pdf_path):
         images = convert_from_path(pdf_path, dpi=300)
         
         for page_num, image in enumerate(images, start=1):
+            # Get page dimensions for normalization
+            page_width, page_height = image.size
+            
             # Convert PIL Image to numpy array
             img_array = np.array(image)
             
@@ -282,14 +336,26 @@ def extract_ocr_with_bbox(pdf_path):
                     # Flatten to [x1, y1, x2, y2, x3, y3, x4, y4]
                     flat_bbox = [coord for point in bbox for coord in point]
                     
+                    # Calculate normalized bbox [left, top, right, bottom] (0-1 range)
+                    all_x = [point[0] for point in bbox]
+                    all_y = [point[1] for point in bbox]
+                    bbox_normalized = [
+                        min(all_x) / page_width,   # left
+                        min(all_y) / page_height,  # top
+                        max(all_x) / page_width,   # right
+                        max(all_y) / page_height   # bottom
+                    ]
+                    
                     ocr_results.append({
                         'page': page_num,
                         'text': text,
                         'bbox': flat_bbox,
+                        'bbox_normalized': bbox_normalized,
+                        'page_size': [page_width, page_height],
                         'confidence': float(confidence)
                     })
                 
-                logger.info(f"Page {page_num}: Extracted {len(result)} text regions")
+                logger.info(f"Page {page_num}: Extracted {len(result)} text regions ({page_width}x{page_height})")
         
     except Exception as e:
         logger.error(f"Error extracting OCR bbox: {e}", exc_info=True)

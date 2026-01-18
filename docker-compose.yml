@@ -18,26 +18,6 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # P2: Field Extraction (NuExtract-v1.5 GGUF) - DEPRECATED
-  # ==========================================
-  nuextract-service:
-    build: ./services/nuextract-service
-    ports:
-      - "5005:5005"
-    environment:
-      PORT: 5005
-      PYTHONUNBUFFERED: 1
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5005/health')"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      start_period: 120s
-    restart: unless-stopped
-    profiles:
-      - legacy  # Disabled by default, use: docker-compose --profile legacy up
-
-  # ==========================================
   # P2: Field Extraction (Qwen2.5-1.5B Q8_0 - PRODUCTION)
   # ==========================================
   qwen-service:
@@ -68,7 +48,6 @@ services:
     environment:
       PORT: 8000
       DOCLING_SERVICE_URL: http://docling-service:5004
-      NUEXTRACT_SERVICE_URL: http://qwen-service:5006
       QWEN_SERVICE_URL: http://qwen-service:5006
       LABEL_STUDIO_URL: http://label-studio:8080
       LABEL_STUDIO_API_KEY: ${LABEL_STUDIO_API_KEY:-}
@@ -97,21 +76,12 @@ services:
       LABEL_STUDIO_HOST: http://localhost:8080
       LABEL_STUDIO_USERNAME: admin@localhost
       LABEL_STUDIO_PASSWORD: admin123
-      # Use shared PostgreSQL database
-      DJANGO_DB: default
-      POSTGRE_NAME: rossumxml
-      POSTGRE_USER: postgres
-      POSTGRE_PASSWORD: postgres
-      POSTGRE_HOST: db
-      POSTGRE_PORT: 5432
-      # Disable default SQLite
+      # Use SQLite database (to keep PostgreSQL clean)
       LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
       # Disable strict CSP for development
       LABEL_STUDIO_CSP_SCRIPT_SRC: "'self' 'unsafe-inline' 'unsafe-eval'"
       LABEL_STUDIO_CSP_STYLE_SRC: "'self' 'unsafe-inline'"
       LABEL_STUDIO_CSP_FONT_SRC: "'self' data:"
-    depends_on:
-      - db
     volumes:
       - label_studio_data:/label-studio/data
     healthcheck:

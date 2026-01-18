@@ -5823,33 +5823,19 @@ exports.handler = async (event) => {
                 
                 const invoiceId = path.split('/').pop();
                 
+                // Get invoice - don't filter by user_id to allow admin access
                 const invoiceResult = await pool.query(`
                     SELECT 
                         i.*,
-                        COALESCE(
-                            json_agg(
-                                json_build_object(
-                                    'id', li.id,
-                                    'line_number', li.line_number,
-                                    'description', li.description,
-                                    'quantity', li.quantity,
-                                    'unit_price', li.unit_price,
-                                    'total_price', li.total_price,
-                                    'unit', li.unit,
-                                    'hs_code', li.hs_code,
-                                    'country_of_origin', li.country_of_origin,
-                                    'tax_rate', li.tax_rate,
-                                    'tax_amount', li.tax_amount,
-                                    'item_code', li.item_code
-                                ) ORDER BY li.line_number
-                            ) FILTER (WHERE li.id IS NOT NULL),
-                            '[]'
-                        ) as line_items
+                        u.full_name as uploader_name,
+                        u.email as uploader_email,
+                        r.full_name as reviewer_name,
+                        r.email as reviewer_email
                     FROM invoices i
-                    LEFT JOIN invoice_line_items li ON li.invoice_id = i.id
-                    WHERE i.id = $1 AND i.user_id = $2
-                    GROUP BY i.id
-                `, [invoiceId, user.id]);
+                    LEFT JOIN users u ON i.user_id = u.id
+                    LEFT JOIN users r ON i.reviewed_by = r.id
+                    WHERE i.id = $1
+                `, [invoiceId]);
                 
                 if (invoiceResult.rows.length === 0) {
                     return createResponse(404, JSON.stringify({ 
@@ -5859,133 +5845,52 @@ exports.handler = async (event) => {
                 
                 const invoice = invoiceResult.rows[0];
                 
-                // Remove file_data from response
+                // Remove file_data from response (too large for JSON)
                 delete invoice.file_data;
+                
+                // Get parties (buyer/seller/vendor)
+                const partiesResult = await pool.query(
+                    'SELECT * FROM invoice_parties WHERE invoice_id = $1',
+                    [invoiceId]
+                );
+                
+                // Get line items from database table (includes bboxes column)
+                const lineItemsResult = await pool.query(
+                    'SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY line_number',
+                    [invoiceId]
+                );
+                
+                // Line items from DB already have bboxes - use them directly
+                const lineItemsWithBboxes = lineItemsResult.rows.map(item => ({
+                    ...item,
+                    bboxes: item.bboxes || {}
+                }));
+                
+                // Get corrections/audit trail
+                const correctionsResult = await pool.query(
+                    `SELECT 
+                        c.*,
+                        u.full_name as corrected_by_name
+                    FROM invoice_corrections c
+                    LEFT JOIN users u ON c.user_id = u.id
+                    WHERE c.invoice_id = $1
+                    ORDER BY c.created_at DESC`,
+                    [invoiceId]
+                );
                 
                 return createResponse(200, JSON.stringify({
                     success: true,
-                    invoice
+                    invoice: invoice,
+                    parties: partiesResult.rows,
+                    lineItems: lineItemsResult.rows,
+                    lineItemsWithBboxes: lineItemsWithBboxes,
+                    corrections: correctionsResult.rows
                 }));
                 
             } catch (err) {
                 console.error('Error fetching invoice:', err);
                 return createResponse(500, JSON.stringify({ 
                     error: 'Failed to fetch invoice',
-                    details: err.message 
-                }));
-            }
-        }
-        
-        // Get invoice by ID (GET /api/invoice/:id)
-        if (path.match(/^\/api\/invoice\/[a-f0-9-]+$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
-            try {
-                const user = await verifyJWT(event);
-                
-                // Check permission
-                const permissionCheck = await requirePermission(pool, user.id, 'invoice:read');
-                if (!permissionCheck.authorized) {
-                    return createResponse(403, JSON.stringify({ 
-                        error: 'Forbidden', 
-                        message: permissionCheck.error 
-                    }));
-                }
-                
-                const invoiceId = path.split('/').pop();
-                
-                const invoiceResult = await pool.query(`
-                    SELECT 
-                        i.*,
-                        COALESCE(
-                            json_agg(
-                                json_build_object(
-                                    'id', li.id,
-                                    'line_number', li.line_number,
-                                    'description', li.description,
-                                    'quantity', li.quantity,
-                                    'unit_price', li.unit_price,
-                                    'total_price', li.total_price,
-                                    'unit', li.unit,
-                                    'hs_code', li.hs_code,
-                                    'country_of_origin', li.country_of_origin,
-                                    'tax_rate', li.tax_rate,
-                                    'tax_amount', li.tax_amount,
-                                    'item_code', li.item_code
-                                ) ORDER BY li.line_number
-                            ) FILTER (WHERE li.id IS NOT NULL),
-                            '[]'
-                        ) as line_items
-                    FROM invoices i
-                    LEFT JOIN invoice_line_items li ON li.invoice_id = i.id
-                    WHERE i.id = $1 AND i.user_id = $2
-                    GROUP BY i.id
-                `, [invoiceId, user.id]);
-                
-                if (invoiceResult.rows.length === 0) {
-                    return createResponse(404, JSON.stringify({ 
-                        error: 'Invoice not found' 
-                    }));
-                }
-                
-                const invoice = invoiceResult.rows[0];
-                
-                // Remove file_data from response
-                delete invoice.file_data;
-                
-                return createResponse(200, JSON.stringify({
-                    success: true,
-                    invoice
-                }));
-                
-            } catch (err) {
-                console.error('Error fetching invoice:', err);
-                return createResponse(500, JSON.stringify({ 
-                    error: 'Failed to fetch invoice',
-                    details: err.message 
-                }));
-            }
-        }
-        
-        // Get extraction status (GET /api/invoice/:id/extraction-status)
-        if (path.match(/^\/api\/invoice\/[a-f0-9-]+\/extraction-status$/) && (event.httpMethod === 'GET' || event.requestContext?.http?.method === 'GET')) {
-            try {
-                const user = await verifyJWT(event);
-                
-                // Check permission
-                const permissionCheck = await requirePermission(pool, user.id, 'invoice:read');
-                if (!permissionCheck.authorized) {
-                    return createResponse(403, JSON.stringify({ 
-                        error: 'Forbidden', 
-                        message: permissionCheck.error 
-                    }));
-                }
-                
-                const invoiceId = path.split('/')[3];
-                
-                const statusResult = await pool.query(`
-                    SELECT 
-                        extraction_status,
-                        extraction_confidence,
-                        extracted_data,
-                        updated_at
-                    FROM invoices
-                    WHERE id = $1 AND user_id = $2
-                `, [invoiceId, user.id]);
-                
-                if (statusResult.rows.length === 0) {
-                    return createResponse(404, JSON.stringify({ 
-                        error: 'Invoice not found' 
-                    }));
-                }
-                
-                return createResponse(200, JSON.stringify({
-                    success: true,
-                    status: statusResult.rows[0]
-                }));
-                
-            } catch (err) {
-                console.error('Error fetching extraction status:', err);
-                return createResponse(500, JSON.stringify({ 
-                    error: 'Failed to fetch extraction status',
                     details: err.message 
                 }));
             }

@@ -4,15 +4,16 @@ import styles from './BoundingBoxOverlay.module.css';
 /**
  * BoundingBoxOverlay - Displays and allows editing of field bounding boxes
  * 
- * Bounding boxes are normalized to 0-1000 scale for consistency across different image sizes
+ * Bounding boxes are normalized (0-1 from ML or 0-1000 legacy) and scaled to container size
  * Format: { x: number, y: number, width: number, height: number }
  */
 const BoundingBoxOverlay = ({ 
     boundingBoxes = {}, 
     selectedField = null, 
     onBoundingBoxUpdate = null,
-    containerWidth = null,  // Passed from PDFViewer
-    containerHeight = null  // Passed from PDFViewer
+    containerWidth = null,  // Passed from PDFViewer (canvas width in pixels)
+    containerHeight = null, // Passed from PDFViewer (canvas height in pixels)
+    scale = 1              // Zoom scale from PDFViewer
 }) => {
     const overlayRef = useRef(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -31,13 +32,12 @@ const BoundingBoxOverlay = ({
         console.log('[BoundingBoxOverlay] Dimensions update:', {
             propsWidth: containerWidth,
             propsHeight: containerHeight,
-            measuredWidth: dimensions.width,
-            measuredHeight: dimensions.height,
+            scale,
             actualWidth,
             actualHeight,
             bboxCount: Object.keys(boundingBoxes).length
         });
-    }, [containerWidth, containerHeight, dimensions, actualWidth, actualHeight, boundingBoxes]);
+    }, [containerWidth, containerHeight, scale, actualWidth, actualHeight, boundingBoxes]);
 
     // Fallback: Measure parent if props dimensions not provided
     useEffect(() => {
@@ -78,27 +78,42 @@ const BoundingBoxOverlay = ({
         return () => {
             window.removeEventListener('resize', updateDimensions);
         };
-    }, [containerWidth, containerHeight]);    // Convert normalized bounding box (0-1000) to actual pixel coordinates
+    }, [containerWidth, containerHeight]);    // Convert normalized bounding box to actual pixel coordinates
+    // Supports both 0-1 range (from ML) and 0-1000 range (legacy)
     const denormalizeBBox = (bbox) => {
         if (!bbox || !actualWidth || !actualHeight) return null;
         
-        return {
-            x: (bbox.x / 1000) * actualWidth,
-            y: (bbox.y / 1000) * actualHeight,
-            width: (bbox.width / 1000) * actualWidth,
-            height: (bbox.height / 1000) * actualHeight
-        };
+        // Detect if coordinates are in 0-1 range (ML output) or 0-1000 range (legacy)
+        const isZeroToOne = bbox.x <= 1 && bbox.y <= 1 && bbox.width <= 1 && bbox.height <= 1;
+        
+        if (isZeroToOne) {
+            // 0-1 normalized coordinates (from ML extraction)
+            return {
+                x: bbox.x * actualWidth,
+                y: bbox.y * actualHeight,
+                width: bbox.width * actualWidth,
+                height: bbox.height * actualHeight
+            };
+        } else {
+            // 0-1000 normalized coordinates (legacy format)
+            return {
+                x: (bbox.x / 1000) * actualWidth,
+                y: (bbox.y / 1000) * actualHeight,
+                width: (bbox.width / 1000) * actualWidth,
+                height: (bbox.height / 1000) * actualHeight
+            };
+        }
     };
     
-    // Convert pixel coordinates to normalized (0-1000)
+    // Convert pixel coordinates to normalized (0-1 range for ML compatibility)
     const normalizeBBox = (bbox) => {
         if (!bbox || !actualWidth || !actualHeight) return null;
         
         return {
-            x: Math.round((bbox.x / actualWidth) * 1000),
-            y: Math.round((bbox.y / actualHeight) * 1000),
-            width: Math.round((bbox.width / actualWidth) * 1000),
-            height: Math.round((bbox.height / actualHeight) * 1000)
+            x: bbox.x / actualWidth,
+            y: bbox.y / actualHeight,
+            width: bbox.width / actualWidth,
+            height: bbox.height / actualHeight
         };
     };
     
@@ -223,6 +238,10 @@ const BoundingBoxOverlay = ({
         <div 
             ref={overlayRef}
             className={styles.overlay}
+            style={{
+                width: `${actualWidth}px`,
+                height: `${actualHeight}px`
+            }}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
         >

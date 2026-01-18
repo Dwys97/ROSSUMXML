@@ -13,9 +13,12 @@ import styles from './InvoiceAnnotationPage.module.css';
 const InvoiceAnnotationPage = () => {
     const { id } = useParams();
     const { getToken } = useAuth();
-    const { joinInvoice, leaveInvoice, onFieldUpdate, onExtractionComplete, connected } = useSocket();
+    const { joinInvoice, leaveInvoice, onFieldUpdate, onExtractionComplete, onExtractionProgress, onOCRPreview, connected } = useSocket();
     const navigate = useNavigate();
     
+    // Add force refresh mechanism
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
     const [invoice, setInvoice] = useState(null);
     const [parties, setParties] = useState([]);
     const [lineItems, setLineItems] = useState([]);
@@ -25,18 +28,25 @@ const InvoiceAnnotationPage = () => {
     const [showQueryModal, setShowQueryModal] = useState(false);
     const [modalAction, setModalAction] = useState(null); // 'query' or 'reject'
     const [extracting, setExtracting] = useState(false);
+    const [extractionProgress, setExtractionProgress] = useState(0);
+    const [extractionStage, setExtractionStage] = useState('Initializing...');
+    const [ocrPreview, setOcrPreview] = useState(null); // OCR text preview while waiting for LLM
     const [extractedFields, setExtractedFields] = useState({}); // Progressive field updates
     const [boundingBoxes, setBoundingBoxes] = useState({}); // Field bounding boxes
     const [corrections, setCorrections] = useState([]); // Pending corrections to submit
     const [showFieldManager, setShowFieldManager] = useState(false); // Field manager modal
     
     // Fetch invoice details
-    const fetchInvoiceDetails = async () => {
-        setLoading(true);
+    const fetchInvoiceDetails = React.useCallback(async (isBackground = false) => {
+        if (!isBackground) {
+            setLoading(true);
+        }
         setError(null);
         
         try {
-            const response = await fetch(`/api/invoices/${id}`, {
+            console.log(`[Fetch] Loading invoice ${id} (isBackground=${isBackground})...`);
+            // Add cache busting
+            const response = await fetch(`/api/invoices/${id}?t=${Date.now()}`, {
                 headers: {
                     'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
@@ -48,6 +58,8 @@ const InvoiceAnnotationPage = () => {
             }
             
             const data = await response.json();
+            console.log('[Fetch] Fetched invoice status:', data.invoice.extraction_status);
+            console.log('[Fetch] Line items count:', (data.lineItems || []).length);
             
             setInvoice(data.invoice);
             setParties(data.parties || []);
@@ -58,7 +70,7 @@ const InvoiceAnnotationPage = () => {
                 ? data.lineItemsWithBboxes
                 : data.lineItems || [];
             
-            console.log('[Invoice Load] Line items format:', lineItemsData[0]);
+            console.log('[Invoice Load] Processed line items count:', lineItemsData.length);
             
             // Transform line items to UI format
             if (lineItemsData.length > 0 && lineItemsData[0].fields) {
@@ -155,25 +167,66 @@ const InvoiceAnnotationPage = () => {
             console.error('Error fetching invoice:', err);
             setError(err.message);
         } finally {
-            setLoading(false);
+            if (!isBackground) {
+                setLoading(false);
+            }
         }
-    };
+    }, [id, getToken]);
     
     useEffect(() => {
         if (id) {
+            console.log('[Effect] ID changed or initial mount. Fetching...');
             fetchInvoiceDetails();
-            
-            // Join invoice room for real-time updates
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, refreshTrigger, fetchInvoiceDetails]);
+
+    // Separate effect for socket room join - waits for connection
+    useEffect(() => {
+        if (id && connected) {
+            console.log('[Socket] Connected, joining invoice room:', id);
             joinInvoice(id);
             
-            // Cleanup: leave room on unmount
+            // Cleanup: leave room on unmount or id change
             return () => {
                 leaveInvoice(id);
             };
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id]);
+    }, [id, connected, joinInvoice, leaveInvoice]);
     
+    useEffect(() => {
+        if (!id || !connected) return;
+        
+        const unsubscribe = onExtractionProgress((data) => {
+            if (data.invoiceId === id) {
+                console.log('[Extraction Progress]', data);
+                setExtractionProgress(data.progress);
+                setExtractionStage(data.stage || 'Processing...');
+                setExtracting(true);
+            }
+        });
+        
+        return unsubscribe;
+    }, [id, connected, onExtractionProgress]);
+
+    // Listen for OCR preview (raw text while waiting for LLM)
+    useEffect(() => {
+        if (!id || !connected) return;
+        
+        const unsubscribe = onOCRPreview((data) => {
+            if (data.invoiceId === id) {
+                console.log('[OCR Preview] Received:', data.tableCount, 'tables');
+                setOcrPreview({
+                    text: data.ocrText,
+                    tableCount: data.tableCount
+                });
+                setExtractionStage(`OCR complete: ${data.tableCount} tables found. Analyzing with AI...`);
+            }
+        });
+        
+        return unsubscribe;
+    }, [id, connected, onOCRPreview]);
+
     // Listen for progressive field updates via Socket.IO
     useEffect(() => {
         if (!id || !connected) return;
@@ -363,13 +416,31 @@ const InvoiceAnnotationPage = () => {
             
             // Refresh invoice data to get final results
             if (data.invoiceId === id) {
-                setTimeout(() => window.location.reload(), 1000);
+                console.log('[Extraction Complete] Refreshing invoice details...');
+                // Add a small delay to ensure DB transaction is committed
+                setTimeout(() => {
+                    fetchInvoiceDetails(true); // Pass true for background refresh
+                }, 2000);
             }
         });
         
         return unsubscribe;
-    }, [id, connected, onExtractionComplete]);
+    }, [id, connected, onExtractionComplete, fetchInvoiceDetails]);
     
+    // Add generic polling fallback for processing status
+    useEffect(() => {
+        if (!invoice || (invoice.extraction_status !== 'processing' && invoice.extraction_status !== 'extracting')) {
+            return;
+        }
+
+        console.log('[Polling] Invoice is processing, starting poll...');
+        const pollInterval = setInterval(() => {
+            fetchInvoiceDetails(true);
+        }, 3000);
+
+        return () => clearInterval(pollInterval);
+    }, [invoice?.extraction_status, fetchInvoiceDetails]);
+
     // Handle field acceptance
     const handleAcceptField = async (fieldPath, value) => {
         try {
@@ -526,6 +597,9 @@ const InvoiceAnnotationPage = () => {
     // Handle ML extraction
     const handleExtract = async () => {
         setExtracting(true);
+        setExtractionProgress(0);
+        setExtractionStage('Starting...');
+        
         try {
             const response = await fetch(`/api/invoices/${id}/extract`, {
                 method: 'POST',
@@ -539,41 +613,12 @@ const InvoiceAnnotationPage = () => {
                 throw new Error('Extraction failed');
             }
             
-            alert('Extraction started! The invoice will be processed in the background.');
-            
-            // Poll for updates
-            const pollInterval = setInterval(async () => {
-                const checkResponse = await fetch(`/api/invoices/${id}`, {
-                    headers: {
-                        'Authorization': `Bearer ${getToken()}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (checkResponse.ok) {
-                    const data = await checkResponse.json();
-                    if (data.invoice.extraction_status === 'completed') {
-                        clearInterval(pollInterval);
-                        fetchInvoiceDetails();
-                        alert('Extraction completed successfully!');
-                        setExtracting(false);
-                    } else if (data.invoice.extraction_status === 'failed') {
-                        clearInterval(pollInterval);
-                        alert('Extraction failed. Please try again.');
-                        setExtracting(false);
-                    }
-                }
-            }, 3000); // Check every 3 seconds
-            
-            // Stop polling after 2 minutes
-            setTimeout(() => {
-                clearInterval(pollInterval);
-                setExtracting(false);
-            }, 120000);
+            // Note: Extraction progress is handled by Socket.IO events
+            // and the polling fallback in the useEffect hook.
             
         } catch (err) {
-            console.error('Error extracting invoice:', err);
-            alert('Extraction failed: ' + err.message);
+            console.error('Extraction error:', err);
+            alert('Failed to start extraction: ' + err.message);
             setExtracting(false);
         }
     };
@@ -612,7 +657,7 @@ const InvoiceAnnotationPage = () => {
     }
     
     const buyer = parties.find(p => p.party_type === 'buyer');
-    const seller = parties.find(p => p.party_type === 'seller');
+    const seller = parties.find(p => p.party_type === 'vendor' || p.party_type === 'seller');
     
     return (
         <div className={styles.container}>
@@ -666,22 +711,46 @@ const InvoiceAnnotationPage = () => {
             </div>
             
             {/* Progressive Extraction Indicator */}
-            {(extracting || invoice?.extraction_status === 'processing') && Object.keys(extractedFields).length > 0 && (
+            {(extracting || invoice?.extraction_status === 'processing') && (
                 <div className={styles.progressBanner}>
                     <div className={styles.progressHeader}>
                         <span className={styles.progressIcon}>🔄</span>
-                        <span className={styles.progressText}>Extracting fields in real-time...</span>
+                        <div style={{ flex: 1, marginLeft: '10px' }}>
+                            <div className={styles.progressStage}>
+                                <span>{extractionStage}</span>
+                                <span>{extractionProgress}%</span>
+                            </div>
+                            <div className={styles.progressBarContainer}>
+                                <div 
+                                    className={styles.progressBarFill} 
+                                    style={{ width: `${extractionProgress}%` }}
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <div className={styles.progressFields}>
-                        {Object.entries(extractedFields)
-                            .filter(([, value]) => typeof value === 'string' || typeof value === 'number')
-                            .map(([field, value]) => (
-                                <span key={field} className={styles.progressField}>
-                                    ✅ {field}: {value}
-                                </span>
-                            ))
-                        }
-                    </div>
+                    {Object.keys(extractedFields).length > 0 && (
+                        <div className={styles.progressFields}>
+                            {Object.entries(extractedFields)
+                                .filter(([, value]) => typeof value === 'string' || typeof value === 'number')
+                                .map(([field, value]) => (
+                                    <span key={field} className={styles.progressField}>
+                                        ✅ {field}: {value}
+                                    </span>
+                                ))
+                            }
+                        </div>
+                    )}
+                    {/* OCR Preview while waiting for LLM */}
+                    {ocrPreview && Object.keys(extractedFields).length === 0 && (
+                        <div className={styles.ocrPreview}>
+                            <div className={styles.ocrPreviewHeader}>
+                                📄 OCR Complete: {ocrPreview.tableCount} table(s) detected
+                            </div>
+                            <div className={styles.ocrPreviewText}>
+                                {ocrPreview.text?.substring(0, 300)}...
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
             

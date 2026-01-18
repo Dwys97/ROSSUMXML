@@ -6,7 +6,7 @@ The database has been consolidated into a **single final migration** that contai
 
 ### Active Migration
 
-- **FINAL_complete_schema.sql** - Complete database schema with all required tables
+- **001_complete_schema.sql** - Complete database schema with all required tables (single, rerunnable script)
 
 ### Migration Script
 
@@ -38,8 +38,8 @@ The database has been consolidated into a **single final migration** that contai
 17. **invoices** - Invoice documents
 18. **invoice_audit_log** - Invoice change history
 19. **invoice_corrections** - User corrections for ML
-20. **invoice_parties** - Invoice parties (buyer/seller)
-21. **invoice_line_items** - Invoice line items
+20. **invoice_parties** - Invoice parties (buyer/seller/consignee/shipper) with upsert-safe unique index
+21. **invoice_line_items** - Invoice line items (includes totals, weights, confidence scores)
 
 ### Organization Management (5)
 
@@ -80,7 +80,7 @@ The migration script automatically verifies:
 
 ## Legacy Migrations (Archived)
 
-The following migrations have been consolidated into `FINAL_complete_schema.sql`:
+The following migrations have been consolidated into `001_complete_schema.sql`:
 
 - 001_api_settings.sql
 - 002_transformation_mappings.sql
@@ -100,7 +100,7 @@ These files are kept for historical reference but are **NOT** applied during fre
 ## Database Audit (2025-11-23)
 
 ### Missing Tables Found (9)
-All missing tables have been added to `FINAL_complete_schema.sql`:
+All missing tables have been added to `001_complete_schema.sql`:
 
 1. ✅ invoice_audit_log
 2. ✅ invoice_corrections
@@ -114,17 +114,22 @@ All missing tables have been added to `FINAL_complete_schema.sql`:
 
 ### Schema Consistency
 
-All tables referenced in the codebase are now present in the database:
+All tables referenced in the codebase are now present in the database and aligned with the extraction worker:
 - Backend routes ✅
 - Services ✅
 - Workers ✅
 - Middleware ✅
 
+Recent fixes:
+- Added customs/shipping columns to invoices (consignee, weights, incoterms, payment/banking fields)
+- Added upsert support and confidence_scores to invoice_parties
+- Added total_value, weights, and confidence_scores to invoice_line_items
+
 ## Development
 
 ### Adding New Tables
 
-1. Edit `FINAL_complete_schema.sql`
+1. Edit `001_complete_schema.sql`
 2. Add new table with proper constraints
 3. Update this README
 4. Run `bash run-final-migration.sh` to test

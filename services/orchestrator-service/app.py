@@ -1,7 +1,7 @@
 """
 Service: Haystack Orchestration Pipeline
 Architecture: FastAPI for Document → Extraction → HITL flow
-Purpose: Orchestrate SmolDocling → NuExtract-v1.5 → Label Studio with feedback loop
+Purpose: Orchestrate SmolDocling → Qwen2.5-1.5B-Instruct → Label Studio with feedback loop
 Compliance: Production-ready, active learning enabled
 """
 
@@ -37,7 +37,7 @@ app.add_middleware(
 
 # Service URLs
 DOCLING_SERVICE_URL = os.getenv('DOCLING_SERVICE_URL', 'http://docling-service:5004')
-NUEXTRACT_SERVICE_URL = os.getenv('NUEXTRACT_SERVICE_URL', 'http://nuextract-service:5005')
+QWEN_SERVICE_URL = os.getenv('QWEN_SERVICE_URL', 'http://qwen-service:5006')
 LABEL_STUDIO_URL = os.getenv('LABEL_STUDIO_URL', 'http://label-studio:8080')
 LABEL_STUDIO_API_KEY = os.getenv('LABEL_STUDIO_API_KEY', '')
 CONFIDENCE_THRESHOLD = float(os.getenv('CONFIDENCE_THRESHOLD', '0.90'))
@@ -88,7 +88,7 @@ async def upload_invoice(
     
     Pipeline:
     1. SmolDocling: Parse document → markdown + tables
-    2. NuExtract-large: Extract structured fields → JSON (with custom schema)
+    2. Qwen2.5-1.5B: Extract structured fields → JSON (with custom schema)
     3. Confidence check: If < threshold → send to Label Studio
     4. Return results or HITL task ID
     
@@ -164,7 +164,7 @@ async def process_invoice_pipeline(
 ):
     """
     Haystack-inspired pipeline:
-    Document → Parse (Docling) → Extract (NuExtract) → Route (HITL or Complete)
+    Document → Parse (Docling) → Extract (Qwen2.5) → Route (HITL or Complete)
     """
     try:
         job = jobs[job_id]
@@ -193,28 +193,28 @@ async def process_invoice_pipeline(
             
             logger.info(f"[{job_id}] Document parsed: {len(document_text)} chars")
             
-            # Step 2: Field Extraction (NuExtract-v1.5 GGUF with custom schema)
-            logger.info(f"[{job_id}] Step 2: Field extraction with NuExtract-v1.5")
+            # Step 2: Field Extraction (Qwen2.5-1.5B-Instruct Q8_0)
+            logger.info(f"[{job_id}] Step 2: Field extraction with Qwen2.5-1.5B-Instruct")
             
             extraction_payload = {'text': document_text}
             if custom_schema:
                 extraction_payload['schema'] = custom_schema
                 logger.info(f"[{job_id}] Using custom schema with {len(custom_schema)} fields")
             
-            nuextract_response = await client.post(
-                f'{NUEXTRACT_SERVICE_URL}/extract',
+            qwen_response = await client.post(
+                f'{QWEN_SERVICE_URL}/extract',
                 json=extraction_payload
             )
             
-            if nuextract_response.status_code != 200:
-                raise Exception(f"NuExtract service failed: {nuextract_response.text}")
+            if qwen_response.status_code != 200:
+                raise Exception(f"Qwen service failed: {qwen_response.text}")
             
-            nuextract_data = nuextract_response.json()
-            if not nuextract_data.get('success'):
+            qwen_data = qwen_response.json()
+            if not qwen_data.get('success'):
                 raise Exception("Field extraction failed")
             
-            fields = nuextract_data['fields']
-            confidence_score = nuextract_data['confidence_score']
+            fields = qwen_data['fields']
+            confidence_score = qwen_data['confidence_score']
             
             logger.info(f"[{job_id}] Extracted {len(fields)} fields, confidence: {confidence_score:.2f}")
             

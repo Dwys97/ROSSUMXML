@@ -383,6 +383,17 @@ CREATE TABLE IF NOT EXISTS invoices (
     tax_amount DECIMAL(15,2),
     subtotal DECIMAL(15,2),
     currency VARCHAR(10) DEFAULT 'USD',
+    consignee_name VARCHAR(255),
+    consignee_address TEXT,
+    vendor_country VARCHAR(100),
+    buyer_country VARCHAR(100),
+    total_gross_weight DECIMAL(15,3),
+    total_net_weight DECIMAL(15,3),
+    total_packages INTEGER,
+    weight_unit VARCHAR(20) DEFAULT 'KG',
+    incoterms VARCHAR(50),
+    payment_terms TEXT,
+    bank_details TEXT,
     status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'extracted', 'validated', 'approved', 'rejected', 'exported', 'to_review', 'reviewing', 'queried', 'postponed')),
     extraction_status VARCHAR(50) DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'processing', 'completed', 'failed', 'queued', 'extracting', 'correcting', 'reviewing')),
     confidence_score DECIMAL(5,2),
@@ -416,12 +427,27 @@ CREATE INDEX IF NOT EXISTS idx_invoices_invoice_date ON invoices(invoice_date);
 
 COMMENT ON TABLE invoices IS 'Uploaded invoice documents with GLiNER extraction results';
 
+-- Ensure customs/shipping extensions exist when rerunning migration
+ALTER TABLE invoices
+    ADD COLUMN IF NOT EXISTS consignee_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS consignee_address TEXT,
+    ADD COLUMN IF NOT EXISTS vendor_country VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS buyer_country VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS total_gross_weight DECIMAL(15,3),
+    ADD COLUMN IF NOT EXISTS total_net_weight DECIMAL(15,3),
+    ADD COLUMN IF NOT EXISTS total_packages INTEGER,
+    ADD COLUMN IF NOT EXISTS weight_unit VARCHAR(20) DEFAULT 'KG',
+    ADD COLUMN IF NOT EXISTS incoterms VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS payment_terms TEXT,
+    ADD COLUMN IF NOT EXISTS bank_details TEXT;
+
 -- Invoice parties (vendor/buyer information)
 CREATE TABLE IF NOT EXISTS invoice_parties (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
     party_type VARCHAR(20) NOT NULL CHECK (party_type IN ('vendor', 'buyer', 'shipper', 'consignee')),
     name VARCHAR(255),
+    address_line1 TEXT,
     address TEXT,
     city VARCHAR(100),
     state VARCHAR(100),
@@ -432,11 +458,20 @@ CREATE TABLE IF NOT EXISTS invoice_parties (
     contact_person VARCHAR(255),
     phone VARCHAR(50),
     email VARCHAR(255),
+    confidence_scores JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_invoice_parties_invoice_id ON invoice_parties(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_parties_party_type ON invoice_parties(party_type);
+
+-- Upsert support for worker (ON CONFLICT (invoice_id, party_type))
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_parties_invoice_party_unique ON invoice_parties(invoice_id, party_type);
+
+-- Ensure new columns exist when rerunning migration
+ALTER TABLE invoice_parties
+    ADD COLUMN IF NOT EXISTS address_line1 TEXT,
+    ADD COLUMN IF NOT EXISTS confidence_scores JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON TABLE invoice_parties IS 'Vendor, buyer, and other party information extracted from invoices';
 
@@ -452,18 +487,33 @@ CREATE TABLE IF NOT EXISTS invoice_line_items (
     unit_price DECIMAL(15,2),
     unit VARCHAR(50),
     total_price DECIMAL(15,2),
+    total_value DECIMAL(15,2),
     tax_rate DECIMAL(5,2),
     tax_amount DECIMAL(15,2),
     hs_code VARCHAR(20),
     country_of_origin VARCHAR(100),
     item_code VARCHAR(100),
+    net_weight DECIMAL(15,3),
+    gross_weight DECIMAL(15,3),
+    confidence_scores JSONB DEFAULT '{}'::jsonb,
+    bboxes JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice_id ON invoice_line_items(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_line_items_line_number ON invoice_line_items(line_number);
+CREATE INDEX IF NOT EXISTS idx_invoice_line_items_bboxes ON invoice_line_items USING GIN(bboxes);
+
+-- Ensure worker-aligned columns exist when rerunning migration
+ALTER TABLE invoice_line_items
+    ADD COLUMN IF NOT EXISTS total_value DECIMAL(15,2),
+    ADD COLUMN IF NOT EXISTS net_weight DECIMAL(15,3),
+    ADD COLUMN IF NOT EXISTS gross_weight DECIMAL(15,3),
+    ADD COLUMN IF NOT EXISTS confidence_scores JSONB DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS bboxes JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON TABLE invoice_line_items IS 'Line items (products/services) extracted from invoices';
+COMMENT ON COLUMN invoice_line_items.bboxes IS 'Per-field bounding boxes: {description: {x,y,width,height,page}, quantity: {...}, ...}';
 
 -- Invoice corrections (user corrections for self-learning)
 CREATE TABLE IF NOT EXISTS invoice_corrections (

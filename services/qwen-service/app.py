@@ -86,7 +86,200 @@ def health():
     })
 
 # ==========================================
-# FIELD EXTRACTION ENDPOINT
+# HEADER-ONLY EXTRACTION (FAST)
+# ==========================================
+@app.route('/extract-headers', methods=['POST'])
+def extract_headers():
+    """
+    Fast extraction of header fields only (no line items).
+    This is faster and can run in parallel with line item extraction.
+    """
+    try:
+        if llm is None:
+            load_model()
+        
+        data = request.json
+        document_text = data.get('document_text', '')
+        invoice_id = data.get('invoice_id', 'unknown')
+        
+        if not document_text:
+            return jsonify({'success': False, 'error': 'Missing document_text'}), 400
+        
+        # Take only first 3000 chars for header extraction (headers are at top)
+        header_text = document_text[:3000]
+        
+        logger.info(f"📄 Extracting headers for {invoice_id} ({len(header_text)} chars)")
+        
+        prompt = f"""<|im_start|>system
+Extract ONLY header/metadata fields from this invoice. Do NOT extract line items.
+Return a JSON object with these fields (use null if not found):
+
+INVOICE INFO:
+- invoice_number: Invoice/Reference number
+- invoice_date: Date in YYYY-MM-DD format
+- due_date: Payment due date
+- currency: 3-letter code (EUR, USD, GBP)
+
+SELLER/VENDOR (the company sending the invoice):
+- vendor_name: Seller/Exporter company name
+- vendor_address: Full seller address
+- vendor_vat: Seller VAT/Tax ID
+
+BUYER/CONSIGNEE (the company receiving goods):
+- buyer_name: Buyer/Importer company name
+- buyer_address: Full buyer address  
+- buyer_vat: Buyer VAT/Tax ID
+
+TOTALS:
+- subtotal: Net amount before tax
+- tax_amount: VAT/Tax amount
+- total_amount: Total invoice value
+- total_gross_weight: Total gross weight
+- total_net_weight: Total net weight
+- total_packages: Number of packages
+
+TERMS:
+- incoterms: Trade term (EXW, FOB, CIF, DDP, DAP)
+- payment_terms: Payment conditions
+
+Return ONLY valid JSON. No markdown.<|im_end|>
+<|im_start|>user
+{header_text}<|im_end|>
+<|im_start|>assistant
+"""
+        
+        response = llm(
+            prompt,
+            max_tokens=768,  # Headers need more space
+            temperature=0.1,
+            top_p=0.95,
+            stop=["<|im_end|>", "<|endoftext|>"],
+            echo=False
+        )
+        
+        extracted_json = response['choices'][0]['text'].strip()
+        
+        try:
+            extracted_data = json.loads(extracted_json)
+        except json.JSONDecodeError:
+            if "```json" in extracted_json:
+                json_start = extracted_json.find("```json") + 7
+                json_end = extracted_json.find("```", json_start)
+                extracted_json = extracted_json[json_start:json_end].strip()
+                extracted_data = json.loads(extracted_json)
+            elif "```" in extracted_json:
+                json_start = extracted_json.find("```") + 3
+                json_end = extracted_json.find("```", json_start)
+                extracted_json = extracted_json[json_start:json_end].strip()
+                extracted_data = json.loads(extracted_json)
+            else:
+                raise
+        
+        confidence_scores = {k: 0.90 if v else 0.3 for k, v in extracted_data.items()}
+        
+        logger.info(f"✅ Header extraction completed for {invoice_id}: {len(extracted_data)} fields")
+        
+        return jsonify({
+            'success': True,
+            'extracted_fields': extracted_data,
+            'confidence_scores': confidence_scores,
+            'extraction_type': 'headers'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Header extraction failed: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==========================================
+# LINE ITEMS EXTRACTION
+# ==========================================
+@app.route('/extract-line-items', methods=['POST'])
+def extract_line_items():
+    """
+    Extract only line items from invoice. Can run in parallel with header extraction.
+    """
+    try:
+        if llm is None:
+            load_model()
+        
+        data = request.json
+        document_text = data.get('document_text', '')
+        invoice_id = data.get('invoice_id', 'unknown')
+        
+        if not document_text:
+            return jsonify({'success': False, 'error': 'Missing document_text'}), 400
+        
+        logger.info(f"📄 Extracting line items for {invoice_id} ({len(document_text)} chars)")
+        
+        prompt = f"""<|im_start|>system
+Extract ONLY line items/product rows from this invoice as a JSON array.
+Each line item should have these fields (use null if not found):
+- item_no: Line/Item number
+- material_no: SKU/Material/Part code
+- description: Product description
+- hs_code: 6-10 digit HS/Commodity/Tariff code
+- origin: 2-letter country code (FR, DE, CN, CZ, PL)
+- quantity: Number of units
+- unit: Unit of measure (kg, pcs, CU, EA)
+- unit_price: Price per unit
+- total_price: Line total amount
+- net_weight: Net weight for this line
+- gross_weight: Gross weight for this line
+
+Return ONLY a JSON array of line items. No markdown, no wrapper object.<|im_end|>
+<|im_start|>user
+{document_text}<|im_end|>
+<|im_start|>assistant
+"""
+        
+        response = llm(
+            prompt,
+            max_tokens=2048,  # Line items can be large
+            temperature=0.1,
+            top_p=0.95,
+            stop=["<|im_end|>", "<|endoftext|>"],
+            echo=False
+        )
+        
+        extracted_json = response['choices'][0]['text'].strip()
+        
+        try:
+            line_items = json.loads(extracted_json)
+            if not isinstance(line_items, list):
+                line_items = [line_items] if line_items else []
+        except json.JSONDecodeError:
+            if "```json" in extracted_json:
+                json_start = extracted_json.find("```json") + 7
+                json_end = extracted_json.find("```", json_start)
+                extracted_json = extracted_json[json_start:json_end].strip()
+                line_items = json.loads(extracted_json)
+            elif "```" in extracted_json:
+                json_start = extracted_json.find("```") + 3
+                json_end = extracted_json.find("```", json_start)
+                extracted_json = extracted_json[json_start:json_end].strip()
+                line_items = json.loads(extracted_json)
+            else:
+                raise
+        
+        if not isinstance(line_items, list):
+            line_items = [line_items] if line_items else []
+        
+        logger.info(f"✅ Line items extraction completed: {len(line_items)} items for {invoice_id}")
+        
+        return jsonify({
+            'success': True,
+            'line_items': line_items,
+            'item_count': len(line_items),
+            'confidence': 0.85,
+            'extraction_type': 'line_items'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Line items extraction failed: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==========================================
+# FIELD EXTRACTION ENDPOINT (FULL)
 # ==========================================
 @app.route('/extract-customs-fields', methods=['POST'])
 def extract_customs_fields():
@@ -127,33 +320,53 @@ def extract_customs_fields():
         
         logger.info(f"📄 Processing invoice {invoice_id} ({len(document_text)} chars)")
         
-        # Qwen2.5 prompt for structured extraction
+        # Qwen2.5 prompt for comprehensive customs invoice extraction
         prompt = f"""<|im_start|>system
-You are an expert at extracting structured data from customs invoices. Extract the following fields from the document and return ONLY a valid JSON object (no markdown, no explanation).
+You are a customs invoice data extractor. Extract ALL fields from the document into a JSON object.
 
-Required fields:
-- invoice_number: string
-- invoice_date: string (YYYY-MM-DD)
-- due_date: string (YYYY-MM-DD) or null
-- vendor_name: string
-- vendor_address: string
-- buyer_name: string
-- buyer_address: string
-- total_amount: number
-- tax_amount: number
-- subtotal: number
-- currency: string (3-letter code)
-- line_items: array of objects with:
-  - description: string
-  - quantity: number
-  - unit_price: number
-  - total_price: number
-  - tax_rate: number
-  - tax_amount: number
-  - item_code: string or null
-  - unit: string (e.g., "kg", "pcs")
+REQUIRED FIELDS (use null if not found):
+- invoice_number: Invoice/Reference number
+- invoice_date: Date in YYYY-MM-DD format
+- due_date: Payment due date in YYYY-MM-DD format
+- currency: 3-letter currency code (EUR, USD, GBP)
 
-If a field is not found, use null. Return valid JSON only.<|im_end|>
+SELLER/VENDOR:
+- vendor_name: Seller/Exporter company name
+- vendor_address: Full seller address
+- vendor_vat: Seller VAT/Tax ID number
+
+BUYER/CONSIGNEE:
+- buyer_name: Buyer/Importer/Consignee company name  
+- buyer_address: Full buyer address
+- buyer_vat: Buyer VAT/Tax ID number
+
+TOTALS:
+- subtotal: Net amount before tax
+- tax_amount: VAT/Tax amount
+- total_amount: Total invoice amount including tax
+- total_gross_weight: Total gross weight (with unit like "100 KG")
+- total_net_weight: Total net weight (with unit)
+- total_packages: Number of packages/cartons
+
+TERMS:
+- incoterms: Trade term (EXW, FOB, CIF, DDP, DAP, etc.)
+- payment_terms: Payment conditions
+
+LINE ITEMS (as array):
+- line_items: Array of items, each with:
+  - item_no: Line/Item number
+  - material_no: SKU/Material code
+  - description: Product description
+  - hs_code: 6-10 digit HS/Commodity code
+  - origin: 2-letter country code (FR, DE, CN)
+  - quantity: Number of units
+  - unit: Unit of measure (kg, pcs, CU)
+  - unit_price: Price per unit
+  - total_price: Line total
+  - net_weight: Line item net weight
+  - gross_weight: Line item gross weight
+
+Return ONLY valid JSON. No markdown, no explanation.<|im_end|>
 <|im_start|>user
 {document_text}<|im_end|>
 <|im_start|>assistant
@@ -174,6 +387,21 @@ If a field is not found, use null. Return valid JSON only.<|im_end|>
         # Parse JSON response
         try:
             extracted_data = json.loads(extracted_json)
+            
+            # 🛠️ NORMALIZE OUTPUT: If array, take the first item or wrap it
+            if isinstance(extracted_data, list):
+                if len(extracted_data) > 0 and isinstance(extracted_data[0], dict):
+                    # Keep the array structure if it contains the fields directly, 
+                    # but usually we want a single object for the invoice.
+                    # If the prompt returns [ {Invoice_Ref: ...} ], we take the first item.
+                    # If the prompt returns [ line_item_1, line_item_2 ], that's a problem because we lose header data?
+                    # "Return ONLY a valid JSON array" - implies the whole invoice is an object in an array?
+                    # Let's assume the user means `[{ "Invoice_Ref": ..., "line_items": ... }]`
+                    extracted_data = extracted_data[0]
+                else:
+                    # If it's a list of something else or empty, fallback
+                    extracted_data = {"raw_array": extracted_data}
+                    
         except json.JSONDecodeError:
             # Try to extract JSON from markdown code blocks
             if "```json" in extracted_json:

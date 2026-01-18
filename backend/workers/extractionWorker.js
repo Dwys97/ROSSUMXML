@@ -10,9 +10,9 @@ const fs = require('fs').promises;
 const logger = require('../utils/logger');
 const io = require('socket.io-client');
 
-// SmolDocling + NuExtract-v1.5 microservices URLs
+// SmolDocling + Qwen2.5-1.5B microservices URLs
 const DOCLING_SERVICE_URL = process.env.DOCLING_SERVICE_URL || 'http://localhost:5004';
-const NUEXTRACT_SERVICE_URL = process.env.NUEXTRACT_SERVICE_URL || 'http://localhost:5005';
+const QWEN_SERVICE_URL = process.env.QWEN_SERVICE_URL || 'http://localhost:5006';
 const ORCHESTRATOR_SERVICE_URL = process.env.ORCHESTRATOR_SERVICE_URL || 'http://localhost:8000';
 const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3001';
 const ML_HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
@@ -24,7 +24,7 @@ let lastHealthCheck = 0;
 
 /**
  * Check Orchestrator Service health
- * Performs a health check on the SmolDocling + NuExtract-v1.5 orchestrator with caching.
+ * Performs a health check on the SmolDocling + Qwen2.5-1.5B orchestrator with caching.
  * Health check results are cached for 30 seconds.
  * 
  * @returns {Promise<boolean>} True if service is healthy and responding, false otherwise
@@ -45,7 +45,7 @@ async function checkMLServiceHealth() {
         lastHealthCheck = now;
         
         if (mlServiceHealthy) {
-            logger.info('SmolDocling + NuExtract-v1.5 Orchestrator health check passed');
+            logger.info('SmolDocling + Qwen2.5-1.5B Orchestrator health check passed');
         }
         
         return mlServiceHealthy;
@@ -61,44 +61,106 @@ async function checkMLServiceHealth() {
  */
 function convertMicroservicesResponse(microservicesData) {
     const fields = microservicesData.fields || {};
+    const fieldsWithBboxes = microservicesData.fieldsWithBboxes || {};  // Fields with bbox coordinates
     
+    // Check if fields has a direct line_items array (new Qwen format)
+    let extractedLineItems = [];
+    const lineItemsContainer = fields.line_items?.value || fields.line_items || fields.Product_Line_Items;
+
+    if (lineItemsContainer && Array.isArray(lineItemsContainer) && lineItemsContainer.length > 0) {
+        extractedLineItems = lineItemsContainer.map(item => ({
+            description: item.description?.value || item.description || null,
+            hs_code: item.hs_code?.value || item.hs_code || item.HS_Code || null,
+            item_code: item.item_no?.value || item.item_no || item.material_no?.value || item.material_no || item.item_code || item.Identifier || null,
+            quantity: item.quantity?.value || item.quantity || null,
+            unit_price: item.unit_price?.value || item.unit_price || item.Value || null,
+            total_value: item.total_price?.value || item.total_price || item.total_value?.value || item.total_value || null,
+            gross_weight: item.gross_weight?.value || item.gross_weight || null,
+            net_weight: item.net_weight?.value || item.net_weight || null,
+            country_of_origin: item.origin?.value || item.origin || item.country_of_origin?.value || item.country_of_origin || null,
+            unit_of_measure: item.unit?.value || item.unit || item.unit_of_measure?.value || item.unit_of_measure || null,
+            packages: item.packages?.value || item.packages || null
+        }));
+    } else {
+        // Fallback to legacy flat-field extraction
+        extractedLineItems = extractLineItems(fields);
+    }
+
+    // Helper to extract field value
+    const getField = (key, ...altKeys) => {
+        if (fields[key]?.value !== undefined) return fields[key].value;
+        if (fields[key] !== undefined) return fields[key];
+        for (const alt of altKeys) {
+            if (fields[alt]?.value !== undefined) return fields[alt].value;
+            if (fields[alt] !== undefined) return fields[alt];
+        }
+        return null;
+    };
+
+    // Build seller/buyer objects for saveInvoiceParties
+    const seller = {
+        name: getField('vendor_name', 'exporter_name', 'seller_name'),
+        address: getField('vendor_address', 'exporter_address', 'seller_address'),
+        vatNumber: getField('vendor_vat', 'vendor_vat_number', 'seller_vat', 'vat_number'),
+        country: getField('vendor_country', 'exporter_country', 'seller_country')
+    };
+    
+    const buyer = {
+        name: getField('buyer_name', 'importer_name', 'consignee_name'),
+        address: getField('buyer_address', 'importer_address', 'consignee_address'),
+        vatNumber: getField('buyer_vat', 'buyer_vat_number', 'importer_vat'),
+        country: getField('buyer_country', 'importer_country')
+    };
+
     return {
         // Invoice header
-        invoice_number: fields.invoice_number?.value || null,
-        invoice_date: fields.invoice_date?.value || null,
-        total_amount: fields.total_amount?.value || null,
-        currency: fields.currency?.value || null,
+        invoice_number: getField('invoice_number', 'Invoice_Ref'),
+        invoice_date: getField('invoice_date'),
+        due_date: getField('due_date'),
+        total_amount: getField('total_amount', 'total_value', 'invoice_total'),
+        subtotal: getField('subtotal', 'net_amount'),
+        tax_amount: getField('tax_amount', 'vat_amount'),
+        currency: getField('currency'),
         
-        // Vendor/Exporter
-        vendor_name: fields.vendor_name?.value || null,
-        vendor_address: fields.vendor_address?.value || null,
-        vat_number: fields.vendor_vat_number?.value || fields.vat_number?.value || null,
-        vendor_country: fields.vendor_country?.value || null,
+        // Vendor/Exporter (flat fields for DB columns)
+        vendor_name: seller.name,
+        vendor_address: seller.address,
+        vat_number: seller.vatNumber,
+        vendor_country: seller.country,
         
-        // Buyer/Importer/Consignee
-        buyer_name: fields.buyer_name?.value || fields.importer_name?.value || null,
-        buyer_address: fields.buyer_address?.value || fields.importer_address?.value || null,
-        consignee_name: fields.consignee_name?.value || null,
-        consignee_address: fields.consignee_address?.value || null,
-        buyer_country: fields.buyer_country?.value || null,
+        // Buyer/Importer/Consignee (flat fields)
+        buyer_name: buyer.name,
+        buyer_address: buyer.address,
+        buyer_vat_id: buyer.vatNumber,
+        buyer_country: buyer.country,
+        consignee_name: getField('consignee_name'),
+        consignee_address: getField('consignee_address'),
+        
+        // Nested buyer/seller objects for invoice_parties table
+        seller: seller.name ? seller : null,
+        buyer: buyer.name ? buyer : null,
         
         // Shipment totals
-        total_gross_weight: fields.total_gross_weight?.value || null,
-        total_net_weight: fields.total_net_weight?.value || null,
-        total_packages: fields.total_packages?.value || null,
-        weight_unit: fields.weight_unit?.value || null,
+        total_gross_weight: getField('total_gross_weight'),
+        total_net_weight: getField('total_net_weight'),
+        total_packages: getField('total_packages'),
+        weight_unit: getField('weight_unit'),
         
         // Terms
-        incoterms: fields.incoterms?.value || null,
-        payment_terms: fields.payment_terms?.value || null,
-        bank_details: fields.bank_details?.value || null,
+        incoterms: getField('incoterms', 'incoterm'),
+        payment_terms: getField('payment_terms'),
+        bank_details: getField('bank_details'),
         
         // Metadata
         confidence: microservicesData.confidence_score || 0,
-        line_items: extractLineItems(fields),
+        line_items: extractedLineItems,  // For backward compatibility
+        lineItems: extractedLineItems,   // For saveExtractionResults
         extraction_method: 'smoldocling_qwen2.5',
         hitl_required: microservicesData.hitl_required || false,
-        label_studio_task_id: microservicesData.label_studio_task_id || null
+        label_studio_task_id: microservicesData.label_studio_task_id || null,
+        
+        // Bounding boxes for visual highlighting
+        final_fields: fieldsWithBboxes  // Fields with bbox coordinates for UI
     };
 }
 
@@ -121,6 +183,7 @@ function extractLineItems(fields) {
             items.push({
                 description: fields[`item_description${suffix}`]?.value || null,
                 hs_code: fields[`hs_code${suffix}`]?.value || null,
+                item_code: fields[`item_code${suffix}`]?.value || null,
                 quantity: fields[`item_quantity${suffix}`]?.value || null,
                 unit_price: fields[`item_unit_price${suffix}`]?.value || null,
                 total_value: fields[`item_total_value${suffix}`]?.value || fields[`item_total${suffix}`]?.value || null,
@@ -137,6 +200,7 @@ function extractLineItems(fields) {
             
             items.push({
                 hs_code: fields[`hs_code${suffix}`]?.value || null,
+                item_code: fields[`item_code${suffix}`]?.value || null,
                 description: fields[`item_description${suffix}`]?.value || null,
                 quantity: fields[`item_quantity${suffix}`]?.value || null,
                 unit_price: fields[`item_unit_price${suffix}`]?.value || null,
@@ -184,6 +248,25 @@ const socketEvents = {
     },
     emitExtractionFailed: (invoiceId, error, attemptsMade) => {
         socket.emit('extraction:failed', { invoiceId, error, attemptsMade, timestamp: Date.now() });
+    },
+    // NEW: Emit individual field updates for live progress
+    emitFieldUpdate: (invoiceId, fieldName, fieldValue, confidence) => {
+        socket.emit('extraction:field-update', { 
+            invoiceId, 
+            field: fieldName, 
+            value: fieldValue, 
+            confidence: confidence || 0,
+            timestamp: Date.now() 
+        });
+    },
+    // NEW: Emit OCR preview while waiting for AI
+    emitOCRPreview: (invoiceId, ocrText, tableCount) => {
+        socket.emit('extraction:ocr-preview', {
+            invoiceId,
+            preview: ocrText.substring(0, 500),
+            tableCount,
+            timestamp: Date.now()
+        });
     }
 };
 
@@ -250,8 +333,8 @@ async function processExtractionJob(job) {
         }
 
         // Get vendor profile if exists
-        await job.progress(30);
-        socketEvents.emitExtractionProgress(invoiceId, 30, 'Detecting vendor profile');
+        await job.progress(20);
+        socketEvents.emitExtractionProgress(invoiceId, 20, 'Detecting vendor profile');
         let vendorProfileId = vendorId;
         
         if (!vendorProfileId) {
@@ -268,10 +351,13 @@ async function processExtractionJob(job) {
             callback_url: `${SOCKET_SERVER_URL}/field-update`,  // Progressive updates endpoint
             invoice_id: invoiceId
         };
+        
+        await job.progress(30);
+        socketEvents.emitExtractionProgress(invoiceId, 30, 'Preparing ML extraction');
 
         // Call ML service
         await job.progress(40);
-        socketEvents.emitExtractionProgress(invoiceId, 40, 'Running AI extraction');
+        socketEvents.emitExtractionProgress(invoiceId, 40, 'Analysing document layout');
         
         logger.info(`Calling SmolDocling + Qwen2.5 for invoice ${invoiceId}`);
 
@@ -307,58 +393,451 @@ async function processExtractionJob(job) {
         const markdown = doclingData.markdown || '';
         const text = doclingData.text || '';
         const tables = doclingData.tables || [];
+        const ocrResults = doclingData.ocr_results || []; // OCR results with bboxes
         
         logger.info(`DEBUG: doclingResponse.data keys: ${Object.keys(doclingResponse.data).join(', ')}`);
         logger.info(`DEBUG: doclingData keys: ${Object.keys(doclingData).join(', ')}`);
         logger.info(`DEBUG: markdown length: ${markdown.length}, text length: ${text.length}`);
-        logger.info(`SmolDocling completed: ${text.length} chars, ${tables.length} tables`);
+        logger.info(`DEBUG: ocrResults count: ${ocrResults.length}`);
+        logger.info(`SmolDocling completed: ${text.length} chars, ${tables.length} tables, ${ocrResults.length} OCR regions`);
         
-        await job.progress(55);
-        socketEvents.emitExtractionProgress(invoiceId, 55, 'Running field extraction with Qwen2.5');
+        // Send OCR preview to frontend immediately so user sees progress
+        socketEvents.emitOCRPreview(invoiceId, text || markdown, tables.length);
+        
+        await job.progress(60);
+        socketEvents.emitExtractionProgress(invoiceId, 60, `OCR complete: ${tables.length} tables found. Running AI extraction...`);
+
+        // Prefer markdown for Qwen as it preserves table structure better than plain text
+        // If markdown is empty, fallback to text
+        const textForExtraction = markdown.length > 0 ? markdown : text;
+        logger.info(`Sending ${textForExtraction.length} chars of ${markdown.length > 0 ? 'markdown' : 'plain text'} to Qwen`);
 
         // Step 2: Call Qwen2.5 Service for field extraction
-        const qwenResponse = await axios.post(
-            `${QWEN_SERVICE_URL}/extract-fields`,
-            {
-                document_text: text || markdown, // Qwen expects 'document_text' field
-                temperature: 0.1,
-                max_tokens: 2048
-            },
-            {
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 60000 // 1 minute
+        // === PARALLEL EXTRACTION: Headers + Line Items simultaneously ===
+        const useParallelExtraction = process.env.PARALLEL_EXTRACTION !== 'false';
+        
+        let extractedFields = {};
+        let confidenceScores = {};
+        
+        if (useParallelExtraction) {
+            logger.info('Using PARALLEL extraction for headers and line items');
+            
+            // Launch both extractions in parallel
+            const [headersPromise, lineItemsPromise] = [
+                axios.post(
+                    `${QWEN_SERVICE_URL}/extract-headers`,
+                    { document_text: textForExtraction, invoice_id: invoiceId },
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 120000 }
+                ).catch(err => {
+                    logger.warn(`Header extraction failed: ${err.message}, falling back to full extraction`);
+                    return null;
+                }),
+                axios.post(
+                    `${QWEN_SERVICE_URL}/extract-line-items`,
+                    { document_text: textForExtraction, invoice_id: invoiceId },
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 180000 }
+                ).catch(err => {
+                    logger.warn(`Line items extraction failed: ${err.message}`);
+                    return null;
+                })
+            ];
+            
+            // Emit header fields as soon as they arrive
+            const headersResponse = await headersPromise;
+            if (headersResponse?.data?.success) {
+                const headerFields = headersResponse.data.extracted_fields || {};
+                const headerConfidence = headersResponse.data.confidence_scores || {};
+                
+                // Emit each header field progressively
+                for (const [fieldName, fieldValue] of Object.entries(headerFields)) {
+                    if (fieldValue) {
+                        socketEvents.emitFieldUpdate(invoiceId, fieldName, fieldValue, headerConfidence[fieldName] || 0.9);
+                        extractedFields[fieldName] = fieldValue;
+                        confidenceScores[fieldName] = headerConfidence[fieldName] || 0.9;
+                    }
+                }
+                
+                await job.progress(70);
+                socketEvents.emitExtractionProgress(invoiceId, 70, 'Headers extracted. Processing line items...');
+                logger.info(`Headers extracted: ${Object.keys(headerFields).length} fields`);
             }
-        );
+            
+            // Wait for line items
+            const lineItemsResponse = await lineItemsPromise;
+            if (lineItemsResponse?.data?.success) {
+                extractedFields.line_items = lineItemsResponse.data.line_items || [];
+                confidenceScores.line_items = lineItemsResponse.data.confidence || 0.85;
+                
+                socketEvents.emitFieldUpdate(invoiceId, 'line_items', extractedFields.line_items, 0.85);
+                logger.info(`Line items extracted: ${extractedFields.line_items.length} items`);
+            }
+            
+            // If parallel extraction failed, fall back to full extraction
+            if (!headersResponse?.data?.success && !lineItemsResponse?.data?.success) {
+                logger.warn('Parallel extraction failed, falling back to full extraction');
+                const qwenResponse = await axios.post(
+                    `${QWEN_SERVICE_URL}/extract-customs-fields`,
+                    { document_text: textForExtraction, invoice_id: invoiceId },
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 180000 }
+                );
+                
+                if (qwenResponse.data.success) {
+                    extractedFields = qwenResponse.data.extracted_fields || {};
+                    confidenceScores = qwenResponse.data.confidence_scores || {};
+                } else {
+                    throw new Error(qwenResponse.data.error || 'Field extraction failed');
+                }
+            }
+        } else {
+            // Original sequential extraction
+            const qwenResponse = await axios.post(
+                `${QWEN_SERVICE_URL}/extract-customs-fields`,
+                {
+                    document_text: textForExtraction,
+                    invoice_id: invoiceId,
+                    temperature: 0.1,
+                    max_tokens: 2048
+                },
+                {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 180000
+                }
+            );
 
-        if (!qwenResponse.data.success) {
-            throw new Error(qwenResponse.data.error || 'Field extraction failed');
+            if (!qwenResponse.data.success) {
+                throw new Error(qwenResponse.data.error || 'Field extraction failed');
+            }
+            
+            extractedFields = qwenResponse.data.extracted_fields || qwenResponse.data.fields || {};
+            confidenceScores = qwenResponse.data.confidence_scores || {};
         }
+
+        await job.progress(80);
+        socketEvents.emitExtractionProgress(invoiceId, 80, 'Validating extracted data');
+
+        // Normalize Qwen (extracted_fields + confidence_scores) into the legacy fields structure
+        // extractedFields and confidenceScores are already defined above
+
+        const logJson = (label, obj) => {
+            try {
+                const str = JSON.stringify(obj);
+                logger.info(`DEBUG: ${label}: ${str.substring(0, 1500)}${str.length > 1500 ? '...<truncated>' : ''}`);
+            } catch (e) {
+                logger.warn(`DEBUG: ${label} logging failed: ${e.message}`);
+            }
+        };
+
+        logJson('Qwen extracted_fields', extractedFields);
+        logJson('Qwen confidence_scores', confidenceScores);
+
+        const normalizeKey = (key) => key
+            .replace(/([a-z])([A-Z])/g, '$1_$2') // camelCase -> snake_case
+            .replace(/[-\s]+/g, '_')
+            .toLowerCase();
+
+        const buildFieldsFromQwen = (rawFields, rawConfidence) => {
+            const normalized = {};
+
+            const lineItemKeyMap = {
+                description: 'item_description',
+                desc: 'item_description',
+                name: 'item_description',
+                quantity: 'item_quantity',
+                qty: 'item_quantity',
+                unit_price: 'item_unit_price',
+                price: 'item_unit_price',
+                unit_cost: 'item_unit_price',
+                
+                // Qwen Prompt Mappings
+                identifier: 'item_code',
+                sku: 'item_code',
+                item_code: 'item_code',
+                material: 'item_code',
+                
+                value: 'item_total_value',
+                total_value: 'item_total_value',
+                total_price: 'item_total_value',
+                amount: 'item_total_value',
+                
+                origin: 'country_of_origin',
+                country_of_origin: 'country_of_origin',
+                origin_country: 'country_of_origin',
+                ctry: 'country_of_origin',
+                
+                tax_rate: 'item_tax_rate',
+                tax_amount: 'item_tax_amount',
+                
+                unit: 'item_unit',
+                hs_code: 'hs_code',
+                comm_code: 'hs_code',
+                
+                net_weight: 'item_net_weight',
+                gross_weight: 'item_gross_weight'
+            };
+
+            const isLineItemsKey = (k) => ['line_items', 'lineitems', 'items', 'lines', 'product_line_items'].includes(normalizeKey(k));
+
+            for (const [rawKey, value] of Object.entries(rawFields)) {
+                const key = normalizeKey(rawKey);
+
+                if (Array.isArray(value) && isLineItemsKey(key)) {
+                    value.forEach((item, idx) => {
+                        const suffix = `_${idx + 1}`;
+                        const lineConfArr = rawConfidence?.line_items || rawConfidence?.items || rawConfidence?.lines || rawConfidence?.lineItems || rawConfidence?.Product_Line_Items || rawConfidence?.product_line_items;
+                        const lineConf = Array.isArray(lineConfArr) ? (lineConfArr[idx] || {}) : {};
+
+                        Object.entries(item || {}).forEach(([ikRaw, iv]) => {
+                            const ik = normalizeKey(ikRaw);
+                            const base = lineItemKeyMap[ik] || ik;
+                            normalized[`${base}${suffix}`] = {
+                                value: iv,
+                                confidence: lineConf[ik] || lineConf[ikRaw] || 0
+                            };
+                        });
+                    });
+                } else {
+                    normalized[key] = {
+                        value,
+                        confidence: rawConfidence[key] || rawConfidence[rawKey] || 0
+                    };
+                }
+            }
+
+            return normalized;
+        };
+
+        const normalizedFields = buildFieldsFromQwen(extractedFields, confidenceScores);
+        logger.info(`DEBUG: Qwen extracted_fields keys: ${Object.keys(extractedFields || {}).join(', ')}`);
+        if (Array.isArray(extractedFields?.line_items)) {
+            logger.info(`DEBUG: Qwen line_items count: ${extractedFields.line_items.length}`);
+        }
+        logger.info(`DEBUG: normalizedFields keys: ${Object.keys(normalizedFields || {}).join(', ')}`);
+        logJson('normalizedFields sample', Object.fromEntries(Object.entries(normalizedFields || {}).slice(0, 30)));
+
+        // === PROGRESSIVE FIELD EMISSION TO FRONTEND ===
+        // Stream each extracted field to the frontend for live updates
+        const fieldEntries = Object.entries(normalizedFields || {});
+        const totalFields = fieldEntries.length;
+        logger.info(`Emitting ${totalFields} fields progressively to frontend...`);
+        
+        for (let i = 0; i < fieldEntries.length; i++) {
+            const [fieldName, fieldData] = fieldEntries[i];
+            // Skip line_items array - handled separately
+            if (fieldName === 'line_items') continue;
+            
+            const fieldValue = typeof fieldData === 'object' ? fieldData.value : fieldData;
+            const confidence = typeof fieldData === 'object' ? (fieldData.confidence || 0) : 0;
+            
+            // Emit field update to frontend
+            socketEvents.emitFieldUpdate(invoiceId, fieldName, fieldValue, confidence);
+            
+            // Calculate progress within 70-85% range for field emission
+            const fieldProgress = 70 + Math.round((i / totalFields) * 15);
+            await job.progress(fieldProgress);
+            
+            // Small delay for visual effect (25ms between fields)
+            await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        
+        // Emit line items if present
+        if (normalizedFields.line_items && Array.isArray(normalizedFields.line_items.value)) {
+            const lineItems = normalizedFields.line_items.value;
+            logger.info(`Emitting ${lineItems.length} line items to frontend...`);
+            socketEvents.emitFieldUpdate(invoiceId, 'line_items', lineItems, normalizedFields.line_items.confidence || 0);
+        }
+        
+        await job.progress(85);
+        socketEvents.emitExtractionProgress(invoiceId, 85, `Extracted ${totalFields} fields`);
+
+        const collectConfidences = (conf) => {
+            const vals = [];
+            for (const v of Object.values(conf || {})) {
+                if (typeof v === 'number') vals.push(v);
+                else if (typeof v === 'object') vals.push(...collectConfidences(v));
+            }
+            return vals;
+        };
+
+        const confVals = collectConfidences(confidenceScores);
+        const flatConfValues = confVals.filter(v => typeof v === 'number');
+        const avgConfidence = flatConfValues.length > 0 ? flatConfValues.reduce((a, b) => a + b, 0) / flatConfValues.length : 0;
 
         const extractionTime = Date.now() - startTime;
         logger.info(`ML extraction completed in ${extractionTime}ms`);
 
-        await job.progress(70);
-        socketEvents.emitExtractionProgress(invoiceId, 70, 'Processing extraction results');
+        await job.progress(90);
+        socketEvents.emitExtractionProgress(invoiceId, 90, 'Finalizing result structure');
+
+        // === MATCH FIELD VALUES TO OCR BBOXES ===
+        // Create a lookup map from OCR text to bbox (normalized)
+        const textToBbox = {};
+        const allOcrTexts = [];  // For fuzzy matching
+        
+        ocrResults.forEach(ocr => {
+            const normalizedText = (ocr.text || '').trim().toLowerCase();
+            if (normalizedText && ocr.bbox_normalized) {
+                textToBbox[normalizedText] = {
+                    bbox: ocr.bbox_normalized,  // [left, top, right, bottom] 0-1
+                    page: ocr.page || 1,
+                    confidence: ocr.confidence || 0.9,
+                    originalText: ocr.text
+                };
+                allOcrTexts.push({ text: normalizedText, data: textToBbox[normalizedText] });
+            }
+        });
+        
+        logger.info(`Built textToBbox map with ${Object.keys(textToBbox).length} entries from ${ocrResults.length} OCR results`);
+        
+        // Function to find bbox for a field value with improved matching
+        const findBboxForValue = (value, fieldName = '') => {
+            if (!value) return null;
+            const strValue = String(value).trim();
+            if (!strValue || strValue === 'null' || strValue === 'undefined') return null;
+            
+            const normalizedValue = strValue.toLowerCase();
+            
+            // 1. Exact match
+            if (textToBbox[normalizedValue]) {
+                return textToBbox[normalizedValue];
+            }
+            
+            // 2. First word match (e.g., "Great Bear" -> find "great")
+            const firstWord = normalizedValue.split(/\s+/)[0];
+            if (firstWord && firstWord.length > 2 && textToBbox[firstWord]) {
+                return textToBbox[firstWord];
+            }
+            
+            // 3. Last word match (useful for company names like "Wilkinson Sword GmbH")
+            const words = normalizedValue.split(/\s+/);
+            const lastWord = words[words.length - 1];
+            if (lastWord && lastWord.length > 2 && textToBbox[lastWord]) {
+                return textToBbox[lastWord];
+            }
+            
+            // 4. Number match (for invoice numbers, amounts, dates)
+            const digits = strValue.replace(/[^\d]/g, '');
+            if (digits && digits.length >= 3) {
+                for (const [text, bboxData] of Object.entries(textToBbox)) {
+                    const textDigits = text.replace(/[^\d]/g, '');
+                    if (textDigits === digits || 
+                        (textDigits.length >= 3 && (textDigits.includes(digits) || digits.includes(textDigits)))) {
+                        return bboxData;
+                    }
+                }
+            }
+            
+            // 5. Significant word match (words > 4 chars, skip common words)
+            const skipWords = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'have', 'will', 'your', 'not']);
+            const significantWords = words.filter(w => w.length > 4 && !skipWords.has(w));
+            for (const word of significantWords) {
+                if (textToBbox[word]) {
+                    return textToBbox[word];
+                }
+                // Check if OCR text contains this significant word
+                for (const [text, bboxData] of Object.entries(textToBbox)) {
+                    if (text.includes(word)) {
+                        return bboxData;
+                    }
+                }
+            }
+            
+            // 6. Partial match - OCR text contains value or vice versa (minimum 4 chars)
+            if (normalizedValue.length >= 4) {
+                for (const [text, bboxData] of Object.entries(textToBbox)) {
+                    if (text.length < 3) continue;
+                    if (text.includes(normalizedValue) || normalizedValue.includes(text)) {
+                        return bboxData;
+                    }
+                }
+            }
+            
+            // 7. Country code matching (for 2-letter codes like FR, DE, CZ)
+            if (normalizedValue.length === 2 && /^[a-z]{2}$/.test(normalizedValue)) {
+                // Look for country code in table cells
+                for (const [text, bboxData] of Object.entries(textToBbox)) {
+                    if (text === normalizedValue || text.startsWith(normalizedValue + ' ')) {
+                        return bboxData;
+                    }
+                }
+            }
+            
+            // 8. Field-specific matching based on field name
+            if (fieldName.includes('unit') && normalizedValue === 'cu') {
+                // Look for "CU" or "cu" in unit columns
+                for (const [text, bboxData] of Object.entries(textToBbox)) {
+                    if (text === 'cu' || text === 'unit' || text.endsWith(' cu')) {
+                        return bboxData;
+                    }
+                }
+            }
+            
+            return null;
+        };
+        
+        // Add bboxes to normalized fields
+        const fieldsWithBboxes = {};
+        let matchedCount = 0;
+        
+        for (const [fieldName, fieldData] of Object.entries(normalizedFields)) {
+            // Skip complex objects like line_items
+            if (fieldName === 'line_items' && Array.isArray(fieldData?.value || fieldData)) {
+                continue;
+            }
+            
+            const value = typeof fieldData === 'object' ? fieldData.value : fieldData;
+            const confidence = typeof fieldData === 'object' ? fieldData.confidence : 0;
+            
+            const bboxMatch = findBboxForValue(value, fieldName);
+            
+            // Convert normalized [left, top, right, bottom] to {x, y, width, height} format
+            let bboxObj = null;
+            if (bboxMatch?.bbox && Array.isArray(bboxMatch.bbox) && bboxMatch.bbox.length === 4) {
+                const [left, top, right, bottom] = bboxMatch.bbox;
+                bboxObj = {
+                    x: left,
+                    y: top,
+                    width: right - left,
+                    height: bottom - top
+                };
+                matchedCount++;
+            }
+            
+            fieldsWithBboxes[fieldName] = {
+                value,
+                confidence,
+                bbox: bboxObj,
+                page: bboxMatch?.page || 1,
+                source: 'ml_extraction'
+            };
+        }
+        
+        logger.info(`Matched ${matchedCount}/${Object.keys(fieldsWithBboxes).length} fields to bboxes`);
 
         // Wrap response in expected format
         const microservicesData = {
-            fields: qwenResponse.data.fields,
-            confidence_score: qwenResponse.data.confidence_score,
-            entity_count: qwenResponse.data.entity_count,
+            fields: normalizedFields,
+            fieldsWithBboxes: fieldsWithBboxes,  // Include bbox-matched fields
+            confidence_score: avgConfidence,
+            entity_count: Object.keys(normalizedFields).length,
             success: true
         };
 
         // Convert microservices response format
         const extractedData = convertMicroservicesResponse(microservicesData);
+        // Normalize line items key and confidence
+        extractedData.lineItems = extractedData.lineItems || extractedData.line_items || [];
+        if (extractedData.confidence === undefined || extractedData.confidence === null) {
+            extractedData.confidence = microservicesData.confidence_score || 0;
+        }
 
         // Save extraction results to database
-        await job.progress(80);
-        socketEvents.emitExtractionProgress(invoiceId, 80, 'Saving extraction results');
+        await job.progress(95);
+        socketEvents.emitExtractionProgress(invoiceId, 95, 'Saving to database');
         await saveExtractionResults(invoiceId, extractedData, vendorProfileId);
 
         // Extraction completed - status already set to 'completed' in saveExtractionResults
-        await job.progress(90);
-        socketEvents.emitExtractionProgress(invoiceId, 90, 'Finalizing extraction');
+        await job.progress(98);
+        socketEvents.emitExtractionProgress(invoiceId, 98, 'Optimization complete');
 
         // Save OCR cache for future training
         await saveOCRCache(invoiceId, filePath, {
@@ -564,7 +1043,7 @@ async function saveInvoiceParties(client, invoiceId, extractedData) {
             confidence_scores = EXCLUDED.confidence_scores
     `;
 
-    // Seller
+    // Vendor (seller) - database constraint requires 'vendor' not 'seller'
     if (extractedData.seller) {
         const sellerConfidence = JSON.stringify({
             name: extractedData.seller.nameConfidence || 0,
@@ -574,7 +1053,7 @@ async function saveInvoiceParties(client, invoiceId, extractedData) {
         
         await client.query(partiesQuery, [
             invoiceId,
-            'seller',
+            'vendor',  // Changed from 'seller' to match DB constraint
             extractedData.seller.name || null,
             extractedData.seller.address || null,
             extractedData.seller.vatNumber || null,
@@ -615,9 +1094,9 @@ async function saveLineItems(client, invoiceId, lineItems) {
     const insertQuery = `
         INSERT INTO invoice_line_items (
             invoice_id, line_number, description, quantity, unit_price, 
-            total_value, hs_code, country_of_origin, net_weight, gross_weight, confidence_scores
+            total_value, hs_code, country_of_origin, net_weight, gross_weight, confidence_scores, item_code, bboxes
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13::jsonb)
     `;
 
     for (let i = 0; i < lineItems.length; i++) {
@@ -639,8 +1118,19 @@ async function saveLineItems(client, invoiceId, lineItems) {
         
         // Handle both flat format {description: "x", quantity: "y"} 
         // and nested format {fields: {item_description: {value: "x", bbox: [...], confidence: 0.9}}}
-        let description, quantity, unit_price, amount, hs_code, country_of_origin, net_weight, gross_weight;
+        let description, quantity, unit_price, amount, hs_code, country_of_origin, net_weight, gross_weight, item_code;
         let descConf, qtyConf, priceConf, amountConf;
+        let itemBboxes = {};
+        
+        // Helper to extract bbox from field
+        const getBbox = (field) => {
+            if (!field) return null;
+            if (field.bbox && Array.isArray(field.bbox) && field.bbox.length === 4) {
+                const [left, top, right, bottom] = field.bbox;
+                return { x: left, y: top, width: right - left, height: bottom - top, page: field.page || 1 };
+            }
+            return null;
+        };
         
         if (item.fields) {
             // Nested format from ML service
@@ -652,26 +1142,46 @@ async function saveLineItems(client, invoiceId, lineItems) {
             country_of_origin = getValue(item.fields.item_country_of_origin);
             net_weight = getValue(item.fields.item_net_weight);
             gross_weight = getValue(item.fields.item_gross_weight);
+            item_code = getValue(item.fields.item_code);
             
             descConf = getConfidence(item.fields.item_description);
             qtyConf = getConfidence(item.fields.item_quantity);
             priceConf = getConfidence(item.fields.item_unit_price);
             amountConf = getConfidence(item.fields.item_total_value);
+            
+            // Extract bboxes for each field
+            itemBboxes = {
+                description: getBbox(item.fields.item_description),
+                quantity: getBbox(item.fields.item_quantity),
+                unit_price: getBbox(item.fields.item_unit_price),
+                amount: getBbox(item.fields.item_total_value),
+                hs_code: getBbox(item.fields.item_hs_code),
+                country_of_origin: getBbox(item.fields.item_country_of_origin),
+                net_weight: getBbox(item.fields.item_net_weight),
+                gross_weight: getBbox(item.fields.item_gross_weight),
+                item_code: getBbox(item.fields.item_code)
+            };
         } else {
             // Flat format (legacy or manually entered)
             description = item.description || null;
             quantity = item.quantity || null;
             unit_price = item.unit_price || null;
-            amount = item.amount || null;
+            amount = item.amount || item.total_value || null;
             hs_code = item.hs_code || null;
             country_of_origin = item.country_of_origin || null;
             net_weight = item.net_weight || null;
             gross_weight = item.gross_weight || null;
+            item_code = item.item_code || null;
             
             descConf = item.descriptionConfidence || 0;
             qtyConf = item.quantityConfidence || 0;
             priceConf = item.unitPriceConfidence || 0;
             amountConf = item.amountConfidence || 0;
+            
+            // Check if flat format has bboxes
+            if (item.bboxes) {
+                itemBboxes = item.bboxes;
+            }
         }
         
         const itemConfidence = JSON.stringify({
@@ -692,7 +1202,9 @@ async function saveLineItems(client, invoiceId, lineItems) {
             country_of_origin,
             net_weight,
             gross_weight,
-            itemConfidence
+            itemConfidence,
+            item_code,
+            JSON.stringify(itemBboxes)
         ]);
     }
 }

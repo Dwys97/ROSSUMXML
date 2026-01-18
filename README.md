@@ -10,17 +10,17 @@
 
 ## 🚀 Quick Start
 
-### 🆕 SmolDocling + NuExtract-v1.5 Architecture (Recommended)
+### 🆕 SmolDocling + Qwen2.5-1.5B Architecture (Recommended)
 
-**Complete invoice extraction with SmolDocling v2, NuExtract-v1.5 GGUF, and HITL:**
+**Complete invoice extraction with SmolDocling v2, Qwen2.5-1.5B-Instruct Q8_0, and HITL:**
 
 ```bash
 # One-command setup
-bash start-nuextract.sh
+bash start-qwen-system.sh
 
 # Services will be available at:
 # - SmolDocling (Document):  http://localhost:5004
-# - NuExtract (Extraction):  http://localhost:5005
+# - Qwen2.5 (Extraction):    http://localhost:5006
 # - Orchestrator (Pipeline): http://localhost:8000
 # - Label Studio (HITL):     http://localhost:8080
 
@@ -30,15 +30,15 @@ curl -X POST http://localhost:8000/api/v1/invoice/upload \
 ```
 
 **📚 Architecture Documentation:** 
-- [`NUEXTRACT_IMPLEMENTATION.md`](NUEXTRACT_IMPLEMENTATION.md) - Complete implementation guide
-- [`SMOLDOCLING_QWEN_ARCHITECTURE.md`](SMOLDOCLING_QWEN_ARCHITECTURE.md) - Architecture reference
+- [`SMOLDOCLING_QWEN_ARCHITECTURE.md`](SMOLDOCLING_QWEN_ARCHITECTURE.md) - Complete architecture guide
+- [`MIGRATION_GLINER_TO_QWEN.md`](MIGRATION_GLINER_TO_QWEN.md) - Migration from NuExtract
 
-**🎯 Why This Architecture?**
-- ⬇️ **53% less memory**: 800MB vs 1.7GB (old Qwen stack)
-- 🧠 **Purpose-built**: NuExtract designed for structured extraction
-- 🚀 **70% faster startup**: 3min vs 10min
-- 🔄 **Schema-driven**: Customizable extraction templates
-- ✅ **CPU-only**: No GPU required
+**🎯 Why Qwen2.5-1.5B-Instruct Q8_0?**
+- 🎯 **Better accuracy**: 8-bit quantization preserves quality
+- 🧠 **General-purpose**: Handles diverse extraction tasks
+- 🚀 **Proven performance**: Production-tested on CPU
+- 🔄 **Flexible prompting**: Customizable extraction templates
+- ✅ **CPU-only**: No GPU required (~1.7GB RAM)
 
 ---
 
@@ -119,7 +119,7 @@ SCHEMABRIDGE is an enterprise-grade XML transformation platform that enables:
 
 ## 🏗️ Architecture
 
-### SmolDocling + NuExtract-v1.5 Architecture (Production)
+### SmolDocling + Qwen2.5-1.5B Architecture (Production)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -139,12 +139,12 @@ SCHEMABRIDGE is an enterprise-grade XML transformation platform that enables:
 │  └──────────────────────────────────────────────────────────┘  │
 │         ↓                                                        │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ P2: NuExtract-v1.5 GGUF Q4_K_M (Port 5005)              │  │
-│  │     • Schema-driven field extraction                     │  │
+│  │ P2: Qwen2.5-1.5B-Instruct Q8_0 (Port 5006)              │  │
+│  │     • Instruction-following LLM                          │  │
 │  │     • llama.cpp inference                                │  │
-│  │     • Custom extraction templates                        │  │
-│  │     • CPU-only (4-bit quantized)                         │  │
-│  │     Memory: ~800MB                                       │  │
+│  │     • Custom extraction prompts                          │  │
+│  │     • CPU-only (8-bit quantized)                         │  │
+│  │     Memory: ~1.7GB                                       │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │         ↓                                                        │
 │  ┌─────────────────────┬────────────────────────────────────┐  │
@@ -161,11 +161,11 @@ SCHEMABRIDGE is an enterprise-grade XML transformation platform that enables:
 
 **Key Features:**
 - 🔍 **SmolDocling v2**: All-in-one document processing (~1GB RAM)
-- 🤖 **NuExtract-v1.5 GGUF**: Purpose-built structured extraction (~800MB RAM)
+- 🤖 **Qwen2.5-1.5B-Instruct Q8_0**: General-purpose LLM extraction (~1.7GB RAM)
 - 🎯 **FastAPI Orchestrator**: Pipeline coordination + HITL routing
 - 📝 **Label Studio**: Human-in-the-Loop + active learning
 
-**Total Memory: ~1.8GB** (vs 3GB with old Qwen-VL stack)
+**Total Memory: ~2.7GB** (CPU-only, production-ready)
 
 ---
 

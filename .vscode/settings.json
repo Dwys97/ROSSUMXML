@@ -1,4 +1,10 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+
+    // --- Copilot / Editor Settings for Careful Interaction ---
+    "editor.inlineSuggest.minShowDelay": 500,
+    "github.copilot.nextEditSuggestions.enabled": false,
+    "github.copilot.internal.editor.inlineSuggest.debounce": 200,
+    "github.copilot.nextEditSuggestions.fixes": false
 }

@@ -13,6 +13,7 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
     const [scale, setScale] = useState(1.5);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
     const canvasRef = useRef(null);
     const renderTaskRef = useRef(null);
     const documentRef = useRef(null);
@@ -115,6 +116,10 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
                 const viewport = page.getViewport({ scale });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                
+                // Update canvas dimensions state for bounding box overlay
+                setCanvasDimensions({ width: viewport.width, height: viewport.height });
+                
                 const renderContext = {
                     canvasContext: context,
                     viewport: viewport
@@ -202,6 +207,9 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
         );
     }
 
+    // Get current canvas dimensions for bounding box overlay
+    const { width: canvasWidth, height: canvasHeight } = canvasDimensions;
+
     return (
         <div className={styles.container}>
             <div className={styles.toolbar}>
@@ -227,8 +235,9 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
                     )}
                     {React.Children.map(children, child => 
                         child ? React.cloneElement(child, {
-                            containerWidth: canvasRef.current?.width,
-                            containerHeight: canvasRef.current?.height
+                            containerWidth: canvasWidth,
+                            containerHeight: canvasHeight,
+                            scale: scale
                         }) : null
                     )}
                 </div>

@@ -1,13 +1,19 @@
 #!/bin/bash
 
-# Start Extraction Worker
-# Processes background extraction jobs from Bull queue
+# Start Extraction Worker + Socket.io Server
+# These services work together for real-time extraction updates
 
 echo "=========================================="
-echo "Starting Extraction Worker"
+echo "Starting Socket.io + Extraction Worker"
 echo "=========================================="
 
-cd "$(dirname "$0")/backend"
+cd "$(dirname "$0")"
+
+# Function to check if port is in use
+check_port() {
+    lsof -i :$1 >/dev/null 2>&1
+    return $?
+}
 
 # Function to check if Redis is accessible
 check_redis() {
@@ -81,10 +87,43 @@ echo "  Socket.io: ${SOCKET_SERVER_URL}"
 echo "  PostgreSQL: ${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
 echo "  Environment: ${NODE_ENV}"
 echo ""
+
+# --- Start Socket.io Server in background ---
+if check_port 3001; then
+    echo "✅ Socket.io server already running on port 3001"
+else
+    echo "🔌 Starting Socket.io server on port 3001..."
+    cd backend
+    node socketServer.js > ../socket-server.log 2>&1 &
+    SOCKET_PID=$!
+    cd ..
+    sleep 2
+    if check_port 3001; then
+        echo "✅ Socket.io server started (PID: $SOCKET_PID)"
+    else
+        echo "⚠️  Socket.io server may have failed to start. Check socket-server.log"
+    fi
+fi
+
+echo ""
 echo "🚀 Starting worker process..."
-echo "Press Ctrl+C to stop"
+echo "Press Ctrl+C to stop both services"
 echo "=========================================="
 echo ""
 
-# Start worker
+# Cleanup function
+cleanup() {
+    echo ""
+    echo "🛑 Shutting down..."
+    if [ ! -z "$SOCKET_PID" ]; then
+        kill $SOCKET_PID 2>/dev/null
+        echo "Socket.io server stopped"
+    fi
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+# Start worker (foreground)
+cd backend
 node workers/extractionWorker.js

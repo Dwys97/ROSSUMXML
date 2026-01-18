@@ -17,9 +17,11 @@ RUN pip install --no-cache-dir \
     huggingface-hub==0.20.2 \
     requests==2.31.0
 
-# Install llama-cpp-python without AVX2 (compatible with older CPUs)
-ENV CMAKE_ARGS="-DLLAMA_AVX=ON -DLLAMA_AVX2=OFF -DLLAMA_FMA=OFF -DLLAMA_F16C=OFF"
-RUN pip install --no-cache-dir llama-cpp-python==0.2.27
+# Install llama-cpp-python with Qwen2 support (0.3.x) and CPU-friendly flags
+#  - Qwen2 architectures require >=0.3.0
+#  - Disable AVX2/F16C for broad CPU compatibility in Codespaces
+ENV CMAKE_ARGS="-DLLAMA_AVX=ON -DLLAMA_AVX2=OFF -DLLAMA_F16C=OFF -DLLAMA_FMA=OFF"
+RUN pip install --no-cache-dir "llama-cpp-python==0.3.2"
 
 COPY app.py .
 
