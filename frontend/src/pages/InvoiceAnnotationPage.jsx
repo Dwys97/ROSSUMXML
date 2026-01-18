@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
@@ -30,6 +30,7 @@ const InvoiceAnnotationPage = () => {
     const [extracting, setExtracting] = useState(false);
     const [extractionProgress, setExtractionProgress] = useState(0);
     const [extractionStage, setExtractionStage] = useState('Initializing...');
+    const extractionProgressRef = useRef(0);
     const [ocrPreview, setOcrPreview] = useState(null); // OCR text preview while waiting for LLM
     const [extractedFields, setExtractedFields] = useState({}); // Progressive field updates
     const [boundingBoxes, setBoundingBoxes] = useState({}); // Field bounding boxes
@@ -200,8 +201,12 @@ const InvoiceAnnotationPage = () => {
         const unsubscribe = onExtractionProgress((data) => {
             if (data.invoiceId === id) {
                 console.log('[Extraction Progress]', data);
-                setExtractionProgress(data.progress);
-                setExtractionStage(data.stage || 'Processing...');
+                const nextProgress = typeof data.progress === 'number' ? data.progress : extractionProgressRef.current;
+                if (nextProgress >= extractionProgressRef.current) {
+                    extractionProgressRef.current = nextProgress;
+                    setExtractionProgress(nextProgress);
+                    setExtractionStage(data.stage || 'Processing...');
+                }
                 setExtracting(true);
             }
         });
@@ -386,12 +391,69 @@ const InvoiceAnnotationPage = () => {
                 return;
             }
             
+            // Handle per-line item field updates (item_description_1, hs_code_2, etc.)
+            const lineItemMatch = field.match(/^(item_description|item_quantity|item_unit_price|item_total_value|item_unit|item_no|material_no|hs_code|country_of_origin)_(\d+)$/);
+            if (lineItemMatch) {
+                const [, rawKey, indexStr] = lineItemMatch;
+                const lineIndex = Number(indexStr) - 1;
+
+                const keyMap = {
+                    item_description: 'description',
+                    item_quantity: 'quantity',
+                    item_unit_price: 'unit_price',
+                    item_total_value: 'total_value',
+                    item_unit: 'unit',
+                    item_no: 'item_no',
+                    material_no: 'item_code',
+                    hs_code: 'hs_code',
+                    country_of_origin: 'country_of_origin'
+                };
+
+                const mappedKey = keyMap[rawKey] || rawKey;
+
+                setLineItems(prevItems => {
+                    const updated = [...prevItems];
+                    while (updated.length <= lineIndex) {
+                        updated.push({
+                            id: `temp-${Date.now()}-${updated.length}`,
+                            line_number: updated.length + 1,
+                            description: '',
+                            hs_code: '',
+                            country_of_origin: '',
+                            quantity: '',
+                            unit: '',
+                            unit_price: '',
+                            total_value: '',
+                            net_weight: '',
+                            gross_weight: '',
+                            item_no: '',
+                            item_code: ''
+                        });
+                    }
+
+                    updated[lineIndex] = {
+                        ...updated[lineIndex],
+                        [mappedKey]: value
+                    };
+
+                    return updated;
+                });
+
+                // Still track extracted fields for debug panel
+                setExtractedFields(prev => ({
+                    ...prev,
+                    [field]: value
+                }));
+
+                return;
+            }
+
             // Update extracted fields state
             setExtractedFields(prev => ({
                 ...prev,
                 [field]: value
             }));
-            
+
             // Also update invoice state for immediate display
             setInvoice(prev => {
                 if (!prev) return prev;
@@ -400,6 +462,40 @@ const InvoiceAnnotationPage = () => {
                     [field]: value
                 };
             });
+            
+            // Update parties for seller/buyer fields in real-time
+            const sellerFields = ['seller_name', 'seller_address', 'seller_vat_number', 'seller_vat', 'seller_country', 'seller_tax_id'];
+            const buyerFields = ['buyer_name', 'buyer_address', 'buyer_vat_number', 'buyer_vat', 'buyer_country', 'buyer_tax_id'];
+            
+            if (sellerFields.includes(field)) {
+                const fieldKey = field.replace('seller_', '');
+                const mappedKey = fieldKey === 'vat_number' || fieldKey === 'vat' ? 'vat_number' : fieldKey === 'tax_id' ? 'tax_id' : fieldKey;
+                setParties(prev => {
+                    const sellerIndex = prev.findIndex(p => p.party_type === 'vendor' || p.party_type === 'seller');
+                    if (sellerIndex >= 0) {
+                        const updated = [...prev];
+                        updated[sellerIndex] = { ...updated[sellerIndex], [mappedKey]: value };
+                        return updated;
+                    } else {
+                        // Create new vendor party
+                        return [...prev, { party_type: 'vendor', [mappedKey]: value }];
+                    }
+                });
+            } else if (buyerFields.includes(field)) {
+                const fieldKey = field.replace('buyer_', '');
+                const mappedKey = fieldKey === 'vat_number' || fieldKey === 'vat' ? 'vat_number' : fieldKey === 'tax_id' ? 'tax_id' : fieldKey;
+                setParties(prev => {
+                    const buyerIndex = prev.findIndex(p => p.party_type === 'buyer');
+                    if (buyerIndex >= 0) {
+                        const updated = [...prev];
+                        updated[buyerIndex] = { ...updated[buyerIndex], [mappedKey]: value };
+                        return updated;
+                    } else {
+                        // Create new buyer party
+                        return [...prev, { party_type: 'buyer', [mappedKey]: value }];
+                    }
+                });
+            }
         });
         
         return unsubscribe;
@@ -659,6 +755,29 @@ const InvoiceAnnotationPage = () => {
     const buyer = parties.find(p => p.party_type === 'buyer');
     const seller = parties.find(p => p.party_type === 'vendor' || p.party_type === 'seller');
     
+    const liveInvoice = {
+        ...invoice,
+        ...extractedFields
+    };
+    
+    const liveSeller = {
+        ...(seller || { party_type: 'vendor' }),
+        name: extractedFields.seller_name || seller?.name,
+        address: extractedFields.seller_address || seller?.address,
+        vat_number: extractedFields.seller_vat_number || extractedFields.seller_vat || seller?.vat_number,
+        tax_id: extractedFields.seller_tax_id || seller?.tax_id,
+        country: extractedFields.seller_country || seller?.country
+    };
+    
+    const liveBuyer = {
+        ...(buyer || { party_type: 'buyer' }),
+        name: extractedFields.buyer_name || buyer?.name,
+        address: extractedFields.buyer_address || buyer?.address,
+        vat_number: extractedFields.buyer_vat_number || extractedFields.buyer_vat || buyer?.vat_number,
+        tax_id: extractedFields.buyer_tax_id || buyer?.tax_id,
+        country: extractedFields.buyer_country || buyer?.country
+    };
+    
     return (
         <div className={styles.container}>
             {/* Header */}
@@ -668,9 +787,9 @@ const InvoiceAnnotationPage = () => {
                         ← Back
                     </button>
                     <div className={styles.headerInfo}>
-                        <h1 className={styles.title}>{invoice.file_name}</h1>
+                        <h1 className={styles.title}>{liveInvoice.file_name}</h1>
                         <span className={styles.invoiceNumber}>
-                            {invoice.invoice_number || 'No Invoice Number'}
+                            {liveInvoice.invoice_number || 'No Invoice Number'}
                         </span>
                     </div>
                 </div>
@@ -728,18 +847,6 @@ const InvoiceAnnotationPage = () => {
                             </div>
                         </div>
                     </div>
-                    {Object.keys(extractedFields).length > 0 && (
-                        <div className={styles.progressFields}>
-                            {Object.entries(extractedFields)
-                                .filter(([, value]) => typeof value === 'string' || typeof value === 'number')
-                                .map(([field, value]) => (
-                                    <span key={field} className={styles.progressField}>
-                                        ✅ {field}: {value}
-                                    </span>
-                                ))
-                            }
-                        </div>
-                    )}
                     {/* OCR Preview while waiting for LLM */}
                     {ocrPreview && Object.keys(extractedFields).length === 0 && (
                         <div className={styles.ocrPreview}>
@@ -776,9 +883,9 @@ const InvoiceAnnotationPage = () => {
                 {/* Right Panel - Fields */}
                 <div className={styles.rightPanel}>
                     <FieldsPanel
-                        invoice={invoice}
-                        buyer={buyer}
-                        seller={seller}
+                        invoice={liveInvoice}
+                        buyer={liveBuyer}
+                        seller={liveSeller}
                         onAccept={handleAcceptField}
                         onQuery={handleQueryField}
                         onReject={handleRejectField}

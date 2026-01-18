@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from inference_pipeline import build_dynamic_prompt
 import os
 import json
 import logging
@@ -107,46 +108,11 @@ def extract_headers():
         
         # Take only first 3000 chars for header extraction (headers are at top)
         header_text = document_text[:3000]
+        field_manager = data.get('field_manager')
         
         logger.info(f"📄 Extracting headers for {invoice_id} ({len(header_text)} chars)")
         
-        prompt = f"""<|im_start|>system
-Extract ONLY header/metadata fields from this invoice. Do NOT extract line items.
-Return a JSON object with these fields (use null if not found):
-
-INVOICE INFO:
-- invoice_number: Invoice/Reference number
-- invoice_date: Date in YYYY-MM-DD format
-- due_date: Payment due date
-- currency: 3-letter code (EUR, USD, GBP)
-
-SELLER/VENDOR (the company sending the invoice):
-- vendor_name: Seller/Exporter company name
-- vendor_address: Full seller address
-- vendor_vat: Seller VAT/Tax ID
-
-BUYER/CONSIGNEE (the company receiving goods):
-- buyer_name: Buyer/Importer company name
-- buyer_address: Full buyer address  
-- buyer_vat: Buyer VAT/Tax ID
-
-TOTALS:
-- subtotal: Net amount before tax
-- tax_amount: VAT/Tax amount
-- total_amount: Total invoice value
-- total_gross_weight: Total gross weight
-- total_net_weight: Total net weight
-- total_packages: Number of packages
-
-TERMS:
-- incoterms: Trade term (EXW, FOB, CIF, DDP, DAP)
-- payment_terms: Payment conditions
-
-Return ONLY valid JSON. No markdown.<|im_end|>
-<|im_start|>user
-{header_text}<|im_end|>
-<|im_start|>assistant
-"""
+        prompt = build_dynamic_prompt(header_text, field_manager=field_manager, mode="headers")
         
         response = llm(
             prompt,
@@ -209,75 +175,10 @@ def extract_line_items():
         if not document_text:
             return jsonify({'success': False, 'error': 'Missing document_text'}), 400
         
-        logger.info(f"📄 Extracting line items for {invoice_id} ({len(document_text)} chars)")
+        logger.info(f"📄 Processing invoice {invoice_id} ({len(document_text)} chars)")
+        field_manager = data.get('field_manager')
         
-        prompt = f"""<|im_start|>system
-Extract ONLY line items/product rows from this invoice as a JSON array.
-Each line item should have these fields (use null if not found):
-- item_no: Line/Item number
-- material_no: SKU/Material/Part code
-- description: Product description
-- hs_code: 6-10 digit HS/Commodity/Tariff code
-- origin: 2-letter country code (FR, DE, CN, CZ, PL)
-- quantity: Number of units
-- unit: Unit of measure (kg, pcs, CU, EA)
-- unit_price: Price per unit
-- total_price: Line total amount
-- net_weight: Net weight for this line
-- gross_weight: Gross weight for this line
-
-Return ONLY a JSON array of line items. No markdown, no wrapper object.<|im_end|>
-<|im_start|>user
-{document_text}<|im_end|>
-<|im_start|>assistant
-"""
-        
-        response = llm(
-            prompt,
-            max_tokens=2048,  # Line items can be large
-            temperature=0.1,
-            top_p=0.95,
-            stop=["<|im_end|>", "<|endoftext|>"],
-            echo=False
-        )
-        
-        extracted_json = response['choices'][0]['text'].strip()
-        
-        try:
-            line_items = json.loads(extracted_json)
-            if not isinstance(line_items, list):
-                line_items = [line_items] if line_items else []
-        except json.JSONDecodeError:
-            if "```json" in extracted_json:
-                json_start = extracted_json.find("```json") + 7
-                json_end = extracted_json.find("```", json_start)
-                extracted_json = extracted_json[json_start:json_end].strip()
-                line_items = json.loads(extracted_json)
-            elif "```" in extracted_json:
-                json_start = extracted_json.find("```") + 3
-                json_end = extracted_json.find("```", json_start)
-                extracted_json = extracted_json[json_start:json_end].strip()
-                line_items = json.loads(extracted_json)
-            else:
-                raise
-        
-        if not isinstance(line_items, list):
-            line_items = [line_items] if line_items else []
-        
-        logger.info(f"✅ Line items extraction completed: {len(line_items)} items for {invoice_id}")
-        
-        return jsonify({
-            'success': True,
-            'line_items': line_items,
-            'item_count': len(line_items),
-            'confidence': 0.85,
-            'extraction_type': 'line_items'
-        })
-        
-    except Exception as e:
-        logger.error(f"❌ Line items extraction failed: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
+        prompt = build_dynamic_prompt(document_text, field_manager=field_manager, mode="full")
 # ==========================================
 # FIELD EXTRACTION ENDPOINT (FULL)
 # ==========================================

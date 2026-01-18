@@ -412,6 +412,8 @@ async function processExtractionJob(job) {
         const textForExtraction = markdown.length > 0 ? markdown : text;
         logger.info(`Sending ${textForExtraction.length} chars of ${markdown.length > 0 ? 'markdown' : 'plain text'} to Qwen`);
 
+        const fieldManager = await fetchFieldManagerConfig(invoiceId);
+
         // Step 2: Call Qwen2.5 Service for field extraction
         // === PARALLEL EXTRACTION: Headers + Line Items simultaneously ===
         const useParallelExtraction = process.env.PARALLEL_EXTRACTION !== 'false';
@@ -426,7 +428,7 @@ async function processExtractionJob(job) {
             const [headersPromise, lineItemsPromise] = [
                 axios.post(
                     `${QWEN_SERVICE_URL}/extract-headers`,
-                    { document_text: textForExtraction, invoice_id: invoiceId },
+                    { document_text: textForExtraction, invoice_id: invoiceId, field_manager: fieldManager },
                     { headers: { 'Content-Type': 'application/json' }, timeout: 120000 }
                 ).catch(err => {
                     logger.warn(`Header extraction failed: ${err.message}, falling back to full extraction`);
@@ -434,7 +436,7 @@ async function processExtractionJob(job) {
                 }),
                 axios.post(
                     `${QWEN_SERVICE_URL}/extract-line-items`,
-                    { document_text: textForExtraction, invoice_id: invoiceId },
+                    { document_text: textForExtraction, invoice_id: invoiceId, field_manager: fieldManager },
                     { headers: { 'Content-Type': 'application/json' }, timeout: 180000 }
                 ).catch(err => {
                     logger.warn(`Line items extraction failed: ${err.message}`);
@@ -444,13 +446,18 @@ async function processExtractionJob(job) {
             
             // Emit header fields as soon as they arrive
             const headersResponse = await headersPromise;
+            logger.info(`Headers response received: success=${headersResponse?.data?.success}`);
+            
             if (headersResponse?.data?.success) {
                 const headerFields = headersResponse.data.extracted_fields || {};
                 const headerConfidence = headersResponse.data.confidence_scores || {};
                 
+                logger.info(`Emitting ${Object.keys(headerFields).length} header fields progressively`);
+                
                 // Emit each header field progressively
                 for (const [fieldName, fieldValue] of Object.entries(headerFields)) {
                     if (fieldValue) {
+                        logger.info(`Emitting field update: ${fieldName} = ${fieldValue}`);
                         socketEvents.emitFieldUpdate(invoiceId, fieldName, fieldValue, headerConfidence[fieldName] || 0.9);
                         extractedFields[fieldName] = fieldValue;
                         confidenceScores[fieldName] = headerConfidence[fieldName] || 0.9;
@@ -477,7 +484,7 @@ async function processExtractionJob(job) {
                 logger.warn('Parallel extraction failed, falling back to full extraction');
                 const qwenResponse = await axios.post(
                     `${QWEN_SERVICE_URL}/extract-customs-fields`,
-                    { document_text: textForExtraction, invoice_id: invoiceId },
+                    { document_text: textForExtraction, invoice_id: invoiceId, field_manager: fieldManager },
                     { headers: { 'Content-Type': 'application/json' }, timeout: 180000 }
                 );
                 
@@ -495,6 +502,7 @@ async function processExtractionJob(job) {
                 {
                     document_text: textForExtraction,
                     invoice_id: invoiceId,
+                    field_manager: fieldManager,
                     temperature: 0.1,
                     max_tokens: 2048
                 },
@@ -669,58 +677,211 @@ async function processExtractionJob(job) {
         socketEvents.emitExtractionProgress(invoiceId, 90, 'Finalizing result structure');
 
         // === MATCH FIELD VALUES TO OCR BBOXES ===
-        // Create a lookup map from OCR text to bbox (normalized)
+        // Create lookup maps from OCR text to bbox (normalized)
         const textToBbox = {};
+        const textToBboxNormalized = {};
+        const textToBboxCompact = {};
+        const digitsToBbox = {};
+        const textToBboxes = {};
+        const textToBboxesNormalized = {};
+        const textToBboxesCompact = {};
+        const digitsToBboxes = {};
         const allOcrTexts = [];  // For fuzzy matching
-        
+
+        const normalizeText = (text) => {
+            return String(text || '')
+                .toLowerCase()
+                .replace(/[^\p{L}\p{N}]+/gu, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        const compactText = (text) => normalizeText(text).replace(/\s+/g, '');
+
         ocrResults.forEach(ocr => {
-            const normalizedText = (ocr.text || '').trim().toLowerCase();
+            const rawText = (ocr.text || '').trim();
+            const normalizedText = rawText.toLowerCase();
+            const normalizedClean = normalizeText(rawText);
+            const compact = compactText(rawText);
+            const digits = rawText.replace(/[^\d]/g, '');
+
             if (normalizedText && ocr.bbox_normalized) {
-                textToBbox[normalizedText] = {
+                const data = {
                     bbox: ocr.bbox_normalized,  // [left, top, right, bottom] 0-1
                     page: ocr.page || 1,
                     confidence: ocr.confidence || 0.9,
                     originalText: ocr.text
                 };
-                allOcrTexts.push({ text: normalizedText, data: textToBbox[normalizedText] });
+
+                textToBbox[normalizedText] = data;
+                if (normalizedClean) textToBboxNormalized[normalizedClean] = data;
+                if (compact) textToBboxCompact[compact] = data;
+                if (digits && digits.length >= 3 && !digitsToBbox[digits]) digitsToBbox[digits] = data;
+                if (!textToBboxes[normalizedText]) textToBboxes[normalizedText] = [];
+                textToBboxes[normalizedText].push(data);
+                if (normalizedClean) {
+                    if (!textToBboxesNormalized[normalizedClean]) textToBboxesNormalized[normalizedClean] = [];
+                    textToBboxesNormalized[normalizedClean].push(data);
+                }
+                if (compact) {
+                    if (!textToBboxesCompact[compact]) textToBboxesCompact[compact] = [];
+                    textToBboxesCompact[compact].push(data);
+                }
+                if (digits && digits.length >= 3) {
+                    if (!digitsToBboxes[digits]) digitsToBboxes[digits] = [];
+                    digitsToBboxes[digits].push(data);
+                }
+                allOcrTexts.push({ text: normalizedClean || normalizedText, data });
             }
         });
         
         logger.info(`Built textToBbox map with ${Object.keys(textToBbox).length} entries from ${ocrResults.length} OCR results`);
         
         // Function to find bbox for a field value with improved matching
+        const pickByIndex = (list, index) => {
+            if (!Array.isArray(list) || list.length === 0) return null;
+            const sorted = [...list].sort((a, b) => {
+                const ay = a.bbox?.[1] ?? 0;
+                const by = b.bbox?.[1] ?? 0;
+                if (ay !== by) return ay - by;
+                const ax = a.bbox?.[0] ?? 0;
+                const bx = b.bbox?.[0] ?? 0;
+                return ax - bx;
+            });
+            return sorted[Math.min(index, sorted.length - 1)] || null;
+        };
+
+        const getDateVariants = (dateStr) => {
+            const variants = new Set();
+            const value = String(dateStr || '').trim();
+            if (!value) return [];
+            variants.add(value);
+
+            const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (iso) {
+                const [, y, m, d] = iso;
+                variants.add(`${d}.${m}.${y}`);
+                variants.add(`${d}/${m}/${y}`);
+                variants.add(`${d}-${m}-${y}`);
+                variants.add(`${d}.${m}.${y.slice(2)}`);
+                variants.add(`${d}/${m}/${y.slice(2)}`);
+            }
+            return Array.from(variants);
+        };
+
+        const getNumberVariants = (num) => {
+            const variants = new Set();
+            const str = String(num ?? '').trim();
+            if (!str) return [];
+            variants.add(str);
+            const normalized = str.replace(/,/g, '').trim();
+            variants.add(normalized);
+            if (normalized.includes('.')) {
+                const [intPart, decPart] = normalized.split('.');
+                variants.add(`${intPart},${decPart}`);
+                variants.add(`${intPart}.${decPart}`);
+                variants.add(intPart);
+            }
+            // thousands separators
+            if (/^\d{5,}$/.test(normalized)) {
+                variants.add(normalized.replace(/\B(?=(\d{3})+(?!\d))/g, ','));
+                variants.add(normalized.replace(/\B(?=(\d{3})+(?!\d))/g, ' '));
+            }
+            return Array.from(variants);
+        };
+
         const findBboxForValue = (value, fieldName = '') => {
             if (!value) return null;
             const strValue = String(value).trim();
             if (!strValue || strValue === 'null' || strValue === 'undefined') return null;
             
             const normalizedValue = strValue.toLowerCase();
+            const normalizedCleanValue = normalizeText(strValue);
+            const compactValue = compactText(strValue);
+
+            // Row-aware matching for line item fields with suffix (e.g., item_unit_5)
+            const rowMatch = fieldName.match(/_(\d+)$/);
+            if (rowMatch) {
+                const rowIndex = Math.max(0, Number(rowMatch[1]) - 1);
+                if (normalizedCleanValue && textToBboxesNormalized[normalizedCleanValue]) {
+                    const byRow = pickByIndex(textToBboxesNormalized[normalizedCleanValue], rowIndex);
+                    if (byRow) return byRow;
+                }
+                if (compactValue && textToBboxesCompact[compactValue]) {
+                    const byRow = pickByIndex(textToBboxesCompact[compactValue], rowIndex);
+                    if (byRow) return byRow;
+                }
+                if (textToBboxes[normalizedValue]) {
+                    const byRow = pickByIndex(textToBboxes[normalizedValue], rowIndex);
+                    if (byRow) return byRow;
+                }
+                const digits = strValue.replace(/[^\d]/g, '');
+                if (digits && digits.length >= 3 && digitsToBboxes[digits]) {
+                    const byRow = pickByIndex(digitsToBboxes[digits], rowIndex);
+                    if (byRow) return byRow;
+                }
+            }
+
+            // Date variants (invoice_date, due_date)
+            if (fieldName.includes('date')) {
+                const variants = getDateVariants(strValue);
+                for (const v of variants) {
+                    const nv = normalizeText(v);
+                    const cv = compactText(v);
+                    if (nv && textToBboxNormalized[nv]) return textToBboxNormalized[nv];
+                    if (cv && textToBboxCompact[cv]) return textToBboxCompact[cv];
+                }
+            }
+
+            // Number formatting variants (totals, amounts, packages)
+            if (fieldName.includes('total') || fieldName.includes('amount') || fieldName.includes('subtotal') || fieldName.includes('tax') || fieldName.includes('packages')) {
+                const variants = getNumberVariants(strValue);
+                for (const v of variants) {
+                    const nv = normalizeText(v);
+                    const cv = compactText(v);
+                    if (nv && textToBboxNormalized[nv]) return textToBboxNormalized[nv];
+                    if (cv && textToBboxCompact[cv]) return textToBboxCompact[cv];
+                }
+            }
             
             // 1. Exact match
             if (textToBbox[normalizedValue]) {
                 return textToBbox[normalizedValue];
             }
+
+            // 1b. Exact match on normalized/compact
+            if (normalizedCleanValue && textToBboxNormalized[normalizedCleanValue]) {
+                return textToBboxNormalized[normalizedCleanValue];
+            }
+            if (compactValue && textToBboxCompact[compactValue]) {
+                return textToBboxCompact[compactValue];
+            }
             
             // 2. First word match (e.g., "Great Bear" -> find "great")
-            const firstWord = normalizedValue.split(/\s+/)[0];
+            const firstWord = normalizedCleanValue.split(/\s+/)[0] || normalizedValue.split(/\s+/)[0];
             if (firstWord && firstWord.length > 2 && textToBbox[firstWord]) {
                 return textToBbox[firstWord];
             }
+            if (firstWord && firstWord.length > 2 && textToBboxNormalized[firstWord]) {
+                return textToBboxNormalized[firstWord];
+            }
             
             // 3. Last word match (useful for company names like "Wilkinson Sword GmbH")
-            const words = normalizedValue.split(/\s+/);
+            const words = normalizedCleanValue.split(/\s+/).filter(Boolean);
             const lastWord = words[words.length - 1];
             if (lastWord && lastWord.length > 2 && textToBbox[lastWord]) {
                 return textToBbox[lastWord];
+            }
+            if (lastWord && lastWord.length > 2 && textToBboxNormalized[lastWord]) {
+                return textToBboxNormalized[lastWord];
             }
             
             // 4. Number match (for invoice numbers, amounts, dates)
             const digits = strValue.replace(/[^\d]/g, '');
             if (digits && digits.length >= 3) {
-                for (const [text, bboxData] of Object.entries(textToBbox)) {
-                    const textDigits = text.replace(/[^\d]/g, '');
-                    if (textDigits === digits || 
-                        (textDigits.length >= 3 && (textDigits.includes(digits) || digits.includes(textDigits)))) {
+                if (digitsToBbox[digits]) return digitsToBbox[digits];
+                for (const [textDigits, bboxData] of Object.entries(digitsToBbox)) {
+                    if (textDigits.length >= 3 && (textDigits.includes(digits) || digits.includes(textDigits))) {
                         return bboxData;
                     }
                 }
@@ -733,8 +894,16 @@ async function processExtractionJob(job) {
                 if (textToBbox[word]) {
                     return textToBbox[word];
                 }
+                if (textToBboxNormalized[word]) {
+                    return textToBboxNormalized[word];
+                }
                 // Check if OCR text contains this significant word
                 for (const [text, bboxData] of Object.entries(textToBbox)) {
+                    if (text.includes(word)) {
+                        return bboxData;
+                    }
+                }
+                for (const [text, bboxData] of Object.entries(textToBboxNormalized)) {
                     if (text.includes(word)) {
                         return bboxData;
                     }
@@ -742,7 +911,13 @@ async function processExtractionJob(job) {
             }
             
             // 6. Partial match - OCR text contains value or vice versa (minimum 4 chars)
-            if (normalizedValue.length >= 4) {
+            if (normalizedCleanValue.length >= 4 || normalizedValue.length >= 4) {
+                for (const [text, bboxData] of Object.entries(textToBboxNormalized)) {
+                    if (text.length < 3) continue;
+                    if (text.includes(normalizedCleanValue) || normalizedCleanValue.includes(text)) {
+                        return bboxData;
+                    }
+                }
                 for (const [text, bboxData] of Object.entries(textToBbox)) {
                     if (text.length < 3) continue;
                     if (text.includes(normalizedValue) || normalizedValue.includes(text)) {
@@ -757,6 +932,19 @@ async function processExtractionJob(job) {
                 for (const [text, bboxData] of Object.entries(textToBbox)) {
                     if (text === normalizedValue || text.startsWith(normalizedValue + ' ')) {
                         return bboxData;
+                    }
+                }
+            }
+
+            // 9. total_packages label proximity
+            if (fieldName.includes('total_packages')) {
+                const digits = strValue.replace(/[^\d]/g, '');
+                if (digits && digitsToBboxes[digits] && digitsToBboxes[digits].length > 0) {
+                    const labelCandidates = allOcrTexts.filter(t => t.text.includes('package'));
+                    if (labelCandidates.length > 0) {
+                        const labelY = labelCandidates[0].data?.bbox?.[1] ?? 0;
+                        const best = [...digitsToBboxes[digits]].sort((a, b) => Math.abs((a.bbox?.[1] ?? 0) - labelY) - Math.abs((b.bbox?.[1] ?? 0) - labelY))[0];
+                        if (best) return best;
                     }
                 }
             }
@@ -809,6 +997,64 @@ async function processExtractionJob(job) {
                 page: bboxMatch?.page || 1,
                 source: 'ml_extraction'
             };
+        }
+
+        // Heuristic fill for missing line item bboxes using row/column stats
+        const rowAnchors = {};
+        const columnStats = {};
+        const collectStat = (prefix, bbox) => {
+            if (!bbox) return;
+            if (!columnStats[prefix]) columnStats[prefix] = [];
+            columnStats[prefix].push({ x: bbox.x, width: bbox.width });
+        };
+
+        for (const [fieldName, fieldData] of Object.entries(fieldsWithBboxes)) {
+            const match = fieldName.match(/^(.*)_(\d+)$/);
+            if (!match || !fieldData.bbox) continue;
+            const [, prefix, idx] = match;
+            const rowIndex = Number(idx);
+            if (!rowAnchors[rowIndex]) rowAnchors[rowIndex] = [];
+            rowAnchors[rowIndex].push({ y: fieldData.bbox.y, height: fieldData.bbox.height });
+            collectStat(prefix, fieldData.bbox);
+        }
+
+        const median = (arr, key) => {
+            if (!arr || arr.length === 0) return null;
+            const sorted = [...arr].sort((a, b) => a[key] - b[key]);
+            return sorted[Math.floor(sorted.length / 2)][key];
+        };
+
+        const columnMedians = {};
+        for (const [prefix, arr] of Object.entries(columnStats)) {
+            columnMedians[prefix] = {
+                x: median(arr, 'x'),
+                width: median(arr, 'width')
+            };
+        }
+
+        const rowMedians = {};
+        for (const [rowIndex, arr] of Object.entries(rowAnchors)) {
+            rowMedians[rowIndex] = {
+                y: median(arr, 'y'),
+                height: median(arr, 'height')
+            };
+        }
+
+        for (const [fieldName, fieldData] of Object.entries(fieldsWithBboxes)) {
+            if (fieldData.bbox) continue;
+            const match = fieldName.match(/^(.*)_(\d+)$/);
+            if (!match) continue;
+            const [, prefix, idx] = match;
+            const row = rowMedians[idx];
+            const col = columnMedians[prefix];
+            if (row && col) {
+                fieldData.bbox = {
+                    x: col.x,
+                    y: row.y,
+                    width: col.width,
+                    height: row.height
+                };
+            }
         }
         
         logger.info(`Matched ${matchedCount}/${Object.keys(fieldsWithBboxes).length} fields to bboxes`);
@@ -1219,6 +1465,62 @@ async function saveOCRCache(invoiceId, filePath, ocrData) {
         logger.info(`OCR cache saved for invoice ${invoiceId}`);
     } catch (error) {
         logger.warn(`Failed to save OCR cache for invoice ${invoiceId}:`, error.message);
+    }
+}
+
+/**
+ * Fetch Field Manager configuration for dynamic prompt building
+ */
+async function fetchFieldManagerConfig(invoiceId) {
+    try {
+        const orgResult = await pool.query(
+            'SELECT organization_id FROM invoices WHERE id = $1',
+            [invoiceId]
+        );
+
+        const organizationId = orgResult.rows[0]?.organization_id || null;
+
+        const templateResult = await pool.query(
+            `SELECT id, name
+             FROM extraction_field_templates
+             WHERE is_active = true
+               AND (organization_id = $1 OR is_default = true)
+             ORDER BY is_default DESC, updated_at DESC
+             LIMIT 1`,
+            [organizationId]
+        );
+
+        if (templateResult.rows.length === 0) {
+            return null;
+        }
+
+        const template = templateResult.rows[0];
+
+        const fieldsResult = await pool.query(
+            `SELECT field_key, field_label, field_description, field_type,
+                    is_required, format_hint, nested_schema
+             FROM extraction_fields
+             WHERE template_id = $1
+             ORDER BY display_order`,
+            [template.id]
+        );
+
+        return {
+            template_id: template.id,
+            template_name: template.name,
+            fields: fieldsResult.rows.map(row => ({
+                field_key: row.field_key,
+                field_label: row.field_label,
+                field_description: row.field_description,
+                field_type: row.field_type,
+                is_required: row.is_required,
+                format_hint: row.format_hint,
+                nested_schema: row.nested_schema
+            }))
+        };
+    } catch (error) {
+        logger.warn(`Failed to fetch Field Manager config for invoice ${invoiceId}:`, error.message);
+        return null;
     }
 }
 
