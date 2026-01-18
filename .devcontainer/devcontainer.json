@@ -1,6 +1,7 @@
 {
   "name": "AWS Serverless App",
   "image": "mcr.microsoft.com/devcontainers/universal:2",
+  },
   "containerEnv": {
     "AWS_ACCESS_KEY_ID": "testing",
     "AWS_SECRET_ACCESS_KEY": "testing",
@@ -46,7 +47,7 @@
       "protocol": "http"
     }
   },
-  "postCreateCommand": "pip install aws-sam-cli requests && npm install && (cd backend && npm install) && (cd frontend && npm install)",
+  "postCreateCommand": "pip install aws-sam-cli requests && npm install && npm install --prefix backend && npm install --prefix frontend",
   "postStartCommand": "npm run dev",
   "customizations": {
     "vscode": {
