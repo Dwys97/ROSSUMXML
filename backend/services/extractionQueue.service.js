@@ -37,7 +37,7 @@ const extractionQueue = new Queue('invoice-extraction', {
         }
     },
     settings: {
-        lockDuration: 120000, // 2 minutes - Qwen can take 60-90s on CPU
+        lockDuration: 300000, // 5 minutes - align with longer ML timeouts
         stalledInterval: 60000, // Check for stalled jobs every 60s
         maxStalledCount: 2 // Allow 2 stalls before failing
     },

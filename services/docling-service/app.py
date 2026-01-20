@@ -19,7 +19,7 @@ import tempfile
 from rapidocr_onnxruntime import RapidOCR
 from pdf2image import convert_from_path
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps, ImageEnhance
 
 # Configure logging
 logging.basicConfig(
@@ -315,15 +315,22 @@ def extract_ocr_with_bbox(pdf_path):
     ocr_results = []
     
     try:
+        # Allow tuning DPI via env for tougher docs; higher DPI sharpens small text
+        ocr_dpi = int(os.getenv('OCR_DPI', '400'))
+        logger.info(f"Using OCR DPI {ocr_dpi}")
+
         # Convert PDF pages to images
-        images = convert_from_path(pdf_path, dpi=300)
+        images = convert_from_path(pdf_path, dpi=ocr_dpi)
         
         for page_num, image in enumerate(images, start=1):
+            # Preprocess page to boost OCR accuracy
+            processed = preprocess_image(image)
+
             # Get page dimensions for normalization
-            page_width, page_height = image.size
-            
+            page_width, page_height = processed.size
+
             # Convert PIL Image to numpy array
-            img_array = np.array(image)
+            img_array = np.array(processed)
             
             # Run RapidOCR
             result, elapse = ocr_engine(img_array)
@@ -361,6 +368,28 @@ def extract_ocr_with_bbox(pdf_path):
         logger.error(f"Error extracting OCR bbox: {e}", exc_info=True)
     
     return ocr_results
+
+
+def preprocess_image(image):
+    """Lightweight image cleanup to improve OCR signal."""
+    # Convert to grayscale to simplify signal
+    img = image.convert('L')
+
+    # Stretch contrast and normalize histogram
+    img = ImageOps.autocontrast(img, cutoff=1)
+
+    # Mild sharpening via contrast enhancer (avoid new deps)
+    img = ImageEnhance.Contrast(img).enhance(1.3)
+
+    # Upscale small pages to help tiny text; keep memory modest
+    min_width = 1800
+    if img.width < min_width:
+        scale = min_width / img.width
+        new_size = (int(img.width * scale), int(img.height * scale))
+        # Use LANCZOS for quality; fall back to PIL alias for compatibility
+        img = img.resize(new_size, resample=Image.LANCZOS)
+
+    return img
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5004))

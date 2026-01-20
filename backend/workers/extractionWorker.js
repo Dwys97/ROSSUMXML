@@ -68,19 +68,52 @@ function convertMicroservicesResponse(microservicesData) {
     const lineItemsContainer = fields.line_items?.value || fields.line_items || fields.Product_Line_Items;
 
     if (lineItemsContainer && Array.isArray(lineItemsContainer) && lineItemsContainer.length > 0) {
-        extractedLineItems = lineItemsContainer.map(item => ({
-            description: item.description?.value ?? item.description ?? null,
-            hs_code: item.hs_code?.value ?? item.hs_code ?? item.HS_Code ?? null,
-            item_code: item.item_no?.value ?? item.item_no ?? item.material_no?.value ?? item.material_no ?? item.item_code ?? item.Identifier ?? null,
-            quantity: item.quantity?.value ?? item.quantity ?? null,
-            unit_price: item.unit_price?.value ?? item.unit_price ?? item.Value ?? null,
-            total_value: item.total_price?.value ?? item.total_price ?? item.total_value?.value ?? item.total_value ?? null,
-            gross_weight: item.gross_weight?.value ?? item.gross_weight ?? null,
-            net_weight: item.net_weight?.value ?? item.net_weight ?? null,
-            country_of_origin: item.origin?.value ?? item.origin ?? item.country_of_origin?.value ?? item.country_of_origin ?? null,
-            unit_of_measure: item.unit?.value ?? item.unit ?? item.unit_of_measure?.value ?? item.unit_of_measure ?? null,
-            packages: item.packages?.value ?? item.packages ?? null
-        }));
+        extractedLineItems = lineItemsContainer.map((item, idx) => {
+            const suffix = `_${idx + 1}`;
+
+            const pickWithBbox = (baseKey, fallbackVal) => {
+                const bboxEntry = fieldsWithBboxes[`${baseKey}${suffix}`] || {};
+                const v = bboxEntry.value ?? fallbackVal ?? null;
+                const c = bboxEntry.confidence ?? 0;
+                let bboxArr = null;
+                if (bboxEntry.bbox) {
+                    const { x, y, width, height } = bboxEntry.bbox;
+                    bboxArr = [x, y, x + width, y + height];
+                }
+                return { value: v, confidence: c, bbox: bboxArr, page: bboxEntry.page || 1 };
+            };
+
+            const fields = {
+                item_description: pickWithBbox('item_description', item.description?.value ?? item.description),
+                item_hs_code: pickWithBbox('hs_code', item.hs_code?.value ?? item.hs_code ?? item.HS_Code),
+                item_code: pickWithBbox('item_code', item.item_no?.value ?? item.item_no ?? item.material_no?.value ?? item.material_no ?? item.item_code ?? item.Identifier),
+                item_quantity: pickWithBbox('item_quantity', item.quantity?.value ?? item.quantity),
+                item_unit_price: pickWithBbox('item_unit_price', item.unit_price?.value ?? item.unit_price ?? item.Value),
+                item_total_value: pickWithBbox('item_total_value', item.total_price?.value ?? item.total_price ?? item.total_value?.value ?? item.total_value),
+                item_gross_weight: pickWithBbox('item_gross_weight', item.gross_weight?.value ?? item.gross_weight),
+                item_net_weight: pickWithBbox('item_net_weight', item.net_weight?.value ?? item.net_weight),
+                country_of_origin: pickWithBbox('country_of_origin', item.origin?.value ?? item.origin ?? item.country_of_origin?.value ?? item.country_of_origin),
+                item_unit_of_measure: pickWithBbox('item_unit_of_measure', item.unit?.value ?? item.unit ?? item.unit_of_measure?.value ?? item.unit_of_measure),
+                item_packages: pickWithBbox('item_packages', item.packages?.value ?? item.packages)
+            };
+
+            const flatten = (entry) => entry?.value ?? null;
+
+            return {
+                description: flatten(fields.item_description),
+                hs_code: flatten(fields.item_hs_code),
+                item_code: flatten(fields.item_code),
+                quantity: flatten(fields.item_quantity),
+                unit_price: flatten(fields.item_unit_price),
+                total_value: flatten(fields.item_total_value),
+                gross_weight: flatten(fields.item_gross_weight),
+                net_weight: flatten(fields.item_net_weight),
+                country_of_origin: flatten(fields.country_of_origin),
+                unit_of_measure: flatten(fields.item_unit_of_measure),
+                packages: flatten(fields.item_packages),
+                fields
+            };
+        });
     } else {
         // Fallback to legacy flat-field extraction
         extractedLineItems = extractLineItems(fields);
@@ -381,7 +414,7 @@ async function processExtractionJob(job) {
             formData,
             {
                 headers: { ...formData.getHeaders() },
-                timeout: 120000 // 2 minutes
+                timeout: 300000 // allow up to 5 minutes for heavy OCR
             }
         );
 
@@ -429,7 +462,7 @@ async function processExtractionJob(job) {
                 axios.post(
                     `${QWEN_SERVICE_URL}/extract-headers`,
                     { document_text: textForExtraction, invoice_id: invoiceId, field_manager: fieldManager },
-                    { headers: { 'Content-Type': 'application/json' }, timeout: 120000 }
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 240000 }
                 ).catch(err => {
                     logger.warn(`Header extraction failed: ${err.message}, falling back to full extraction`);
                     return null;
@@ -437,7 +470,7 @@ async function processExtractionJob(job) {
                 axios.post(
                     `${QWEN_SERVICE_URL}/extract-line-items`,
                     { document_text: textForExtraction, invoice_id: invoiceId, field_manager: fieldManager },
-                    { headers: { 'Content-Type': 'application/json' }, timeout: 180000 }
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 300000 }
                 ).catch(err => {
                     logger.warn(`Line items extraction failed: ${err.message}`);
                     return null;
@@ -485,7 +518,7 @@ async function processExtractionJob(job) {
                 const qwenResponse = await axios.post(
                     `${QWEN_SERVICE_URL}/extract-customs-fields`,
                     { document_text: textForExtraction, invoice_id: invoiceId, field_manager: fieldManager },
-                    { headers: { 'Content-Type': 'application/json' }, timeout: 180000 }
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 300000 }
                 );
                 
                 if (qwenResponse.data.success) {
@@ -508,7 +541,7 @@ async function processExtractionJob(job) {
                 },
                 {
                     headers: { 'Content-Type': 'application/json' },
-                    timeout: 180000
+                    timeout: 300000
                 }
             );
 
@@ -755,6 +788,10 @@ async function processExtractionJob(job) {
         
         logger.info(`Built textToBbox map with ${Object.keys(textToBbox).length} entries from ${ocrResults.length} OCR results`);
         
+        // Debug: Log OCR texts containing numbers (for bbox matching debugging)
+        const numericOcrTexts = Object.keys(textToBboxNormalized).filter(t => /\d/.test(t)).slice(0, 60);
+        logger.debug(`OCR numeric texts (${numericOcrTexts.length}): ${numericOcrTexts.join(' | ')}`);
+        
         // Function to find bbox for a field value with improved matching
         const pickByIndex = (list, index) => {
             if (!Array.isArray(list) || list.length === 0) return null;
@@ -977,12 +1014,194 @@ async function processExtractionJob(job) {
                 }
             }
             
+            // 9. Levenshtein-like fuzzy match for short strings (typos, OCR errors)
+            if (normalizedCleanValue.length >= 4 && normalizedCleanValue.length <= 20) {
+                for (const [text, bboxData] of Object.entries(textToBboxNormalized)) {
+                    if (text.length < 4 || Math.abs(text.length - normalizedCleanValue.length) > 2) continue;
+                    // Simple similarity: count matching characters
+                    let matches = 0;
+                    const shorter = normalizedCleanValue.length <= text.length ? normalizedCleanValue : text;
+                    const longer = normalizedCleanValue.length > text.length ? normalizedCleanValue : text;
+                    for (let i = 0; i < shorter.length; i++) {
+                        if (longer.includes(shorter[i])) matches++;
+                    }
+                    const similarity = matches / longer.length;
+                    if (similarity >= 0.85) {
+                        return bboxData;
+                    }
+                }
+            }
+            
+            // 10. Match by weight/dimension patterns (e.g., "1234.56" for weights)
+            if (fieldName.includes('weight') || fieldName.includes('gross') || fieldName.includes('net')) {
+                const numMatch = strValue.match(/[\d,.]+/);
+                if (numMatch) {
+                    const numStr = numMatch[0].replace(/,/g, '.');
+                    const cleanNum = numStr.replace(/[^\d.]/g, '');
+                    for (const [text, bboxData] of Object.entries(textToBboxNormalized)) {
+                        const textNum = text.replace(/[^\d.]/g, '');
+                        if (textNum === cleanNum && textNum.length >= 3) {
+                            return bboxData;
+                        }
+                    }
+                    // Try matching with different decimal separators
+                    for (const [text, bboxData] of Object.entries(textToBbox)) {
+                        const textClean = text.replace(/\s+/g, '').replace(/,/g, '.');
+                        if (textClean.includes(cleanNum) || cleanNum.includes(textClean)) {
+                            return bboxData;
+                        }
+                    }
+                }
+            }
+            
+            // 11. Match HS codes (6-10 digit patterns)
+            if (fieldName.includes('hs_code') || fieldName.includes('tariff') || fieldName.includes('commodity')) {
+                const hsDigits = strValue.replace(/[^\d]/g, '');
+                if (hsDigits.length >= 6) {
+                    for (const [textDigits, bboxData] of Object.entries(digitsToBbox)) {
+                        // Check if HS code matches (may have dots/spaces in OCR)
+                        if (textDigits.startsWith(hsDigits) || hsDigits.startsWith(textDigits)) {
+                            return bboxData;
+                        }
+                    }
+                    // Also check text with spaces/dots removed
+                    for (const [text, bboxData] of Object.entries(textToBbox)) {
+                        const textDigits = text.replace(/[^\d]/g, '');
+                        if (textDigits.length >= 6 && (textDigits.startsWith(hsDigits) || hsDigits.startsWith(textDigits))) {
+                            return bboxData;
+                        }
+                    }
+                }
+            }
+            
+            // 12. Country of origin 2-letter codes with row awareness
+            if (fieldName.includes('country_of_origin') || fieldName.includes('origin')) {
+                const code = normalizedValue.toUpperCase();
+                if (code.length === 2 && /^[A-Z]{2}$/.test(code)) {
+                    const rowMatch = fieldName.match(/_(\d+)$/);
+                    if (rowMatch) {
+                        // For line items, find all occurrences sorted by Y position
+                        const matches = [];
+                        for (const [text, bboxData] of Object.entries(textToBbox)) {
+                            if (text.toUpperCase() === code || text.toUpperCase() === code.toLowerCase()) {
+                                matches.push(bboxData);
+                            }
+                        }
+                        if (matches.length > 0) {
+                            const rowIndex = Math.max(0, Number(rowMatch[1]) - 1);
+                            const sorted = matches.sort((a, b) => (a.bbox?.[1] ?? 0) - (b.bbox?.[1] ?? 0));
+                            return sorted[Math.min(rowIndex, sorted.length - 1)] || sorted[0];
+                        }
+                    }
+                    // Simple match for header fields
+                    for (const [text, bboxData] of Object.entries(textToBbox)) {
+                        if (text.toUpperCase() === code) {
+                            return bboxData;
+                        }
+                    }
+                }
+            }
+            
+            // 13. Total amounts/weights - find in TOTALS row by proximity to "TOTALS" label
+            if (fieldName.includes('total_') && !fieldName.includes('_value')) {
+                const digits = strValue.replace(/[^\d]/g, '');
+                // Find TOTALS label position
+                let totalsY = null;
+                for (const [text, bboxData] of Object.entries(textToBbox)) {
+                    if (text.toLowerCase() === 'totals' || text.toLowerCase() === 'total') {
+                        totalsY = bboxData.bbox?.[1];
+                        break;
+                    }
+                }
+                if (totalsY !== null && digits.length >= 3) {
+                    // Find numbers on same row (within 0.02 Y tolerance)
+                    const candidates = [];
+                    for (const [text, bboxData] of Object.entries(textToBbox)) {
+                        const y = bboxData.bbox?.[1] ?? 0;
+                        if (Math.abs(y - totalsY) < 0.02) {
+                            const textDigits = text.replace(/[^\d]/g, '');
+                            if (textDigits.includes(digits) || digits.includes(textDigits)) {
+                                candidates.push(bboxData);
+                            }
+                        }
+                    }
+                    if (candidates.length > 0) {
+                        return candidates[0];
+                    }
+                }
+            }
+            
+            return null;
+        };
+        
+        // Function to merge multiple bboxes into one encompassing bbox
+        const mergeBboxes = (bboxes) => {
+            if (!bboxes || bboxes.length === 0) return null;
+            if (bboxes.length === 1) return bboxes[0];
+            
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let page = 1;
+            
+            for (const bbox of bboxes) {
+                if (!bbox?.bbox || !Array.isArray(bbox.bbox)) continue;
+                const [left, top, right, bottom] = bbox.bbox;
+                minX = Math.min(minX, left);
+                minY = Math.min(minY, top);
+                maxX = Math.max(maxX, right);
+                maxY = Math.max(maxY, bottom);
+                page = bbox.page || 1;
+            }
+            
+            if (minX === Infinity) return null;
+            return {
+                bbox: [minX, minY, maxX, maxY],
+                page,
+                confidence: 0.9
+            };
+        };
+        
+        // Function to find all bboxes for multi-word values and merge them
+        const findMergedBboxForValue = (value, fieldName = '') => {
+            if (!value) return null;
+            const strValue = String(value).trim();
+            if (!strValue) return null;
+            
+            // First try exact match
+            const exactMatch = findBboxForValue(value, fieldName);
+            if (exactMatch) return exactMatch;
+            
+            // For multi-word values, try to find and merge individual word bboxes
+            const words = strValue.toLowerCase().split(/[\s,]+/).filter(w => w.length >= 3);
+            if (words.length <= 1) return null;
+            
+            const foundBboxes = [];
+            for (const word of words) {
+                const normalized = normalizeText(word);
+                if (textToBboxNormalized[normalized]) {
+                    foundBboxes.push(textToBboxNormalized[normalized]);
+                } else {
+                    // Try partial match
+                    for (const [text, bboxData] of Object.entries(textToBboxNormalized)) {
+                        if (text.includes(normalized) || normalized.includes(text)) {
+                            foundBboxes.push(bboxData);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // If we found at least 50% of words, merge their bboxes
+            if (foundBboxes.length >= Math.ceil(words.length / 2)) {
+                return mergeBboxes(foundBboxes);
+            }
+            
             return null;
         };
         
         // Add bboxes to normalized fields
         const fieldsWithBboxes = {};
         let matchedCount = 0;
+        const missedFields = [];
         
         for (const [fieldName, fieldData] of Object.entries(normalizedFields)) {
             // Skip complex objects like line_items
@@ -993,7 +1212,11 @@ async function processExtractionJob(job) {
             const value = typeof fieldData === 'object' ? fieldData.value : fieldData;
             const confidence = typeof fieldData === 'object' ? fieldData.confidence : 0;
             
-            const bboxMatch = findBboxForValue(value, fieldName);
+            // Try exact match first, then merged match for multi-word values
+            let bboxMatch = findBboxForValue(value, fieldName);
+            if (!bboxMatch) {
+                bboxMatch = findMergedBboxForValue(value, fieldName);
+            }
             
             // Convert normalized [left, top, right, bottom] to {x, y, width, height} format
             let bboxObj = null;
@@ -1006,6 +1229,12 @@ async function processExtractionJob(job) {
                     height: bottom - top
                 };
                 matchedCount++;
+            } else {
+                // Track missed bboxes for debugging
+                const strValue = String(value || '').trim();
+                if (strValue && strValue.length >= 2) {
+                    missedFields.push({ field: fieldName, value: strValue.substring(0, 40) });
+                }
             }
             
             fieldsWithBboxes[fieldName] = {
@@ -1015,6 +1244,11 @@ async function processExtractionJob(job) {
                 page: bboxMatch?.page || 1,
                 source: 'ml_extraction'
             };
+        }
+        
+        logger.info(`[BBOX] Matched ${matchedCount}/${Object.keys(normalizedFields).length - 1} field bboxes (excluding line_items)`);
+        if (missedFields.length > 0) {
+            logger.warn(`[BBOX MISSED] ${missedFields.length} fields: ${missedFields.map(f => `${f.field}="${f.value}"`).join(', ')}`);
         }
 
         // Heuristic fill for missing line item bboxes using row/column stats
@@ -1101,7 +1335,20 @@ async function processExtractionJob(job) {
             }
         }
         
-        logger.info(`Matched ${matchedCount}/${Object.keys(fieldsWithBboxes).length} fields to bboxes`);
+        // Final bbox statistics
+        let finalMatchedCount = 0;
+        let missingBboxFields = [];
+        for (const [fieldName, fieldData] of Object.entries(fieldsWithBboxes)) {
+            if (fieldData.bbox) {
+                finalMatchedCount++;
+            } else {
+                missingBboxFields.push(fieldName);
+            }
+        }
+        logger.info(`[BBOX FINAL] ${finalMatchedCount}/${Object.keys(fieldsWithBboxes).length} fields have bboxes after heuristic fill`);
+        if (missingBboxFields.length > 0 && missingBboxFields.length <= 20) {
+            logger.debug(`[BBOX MISSING] Fields without bbox: ${missingBboxFields.join(', ')}`);
+        }
 
         // Wrap response in expected format
         const microservicesData = {
@@ -1172,6 +1419,36 @@ async function processExtractionJob(job) {
         if (totalsOverride?.total_net_weight !== null && totalsOverride?.total_net_weight !== undefined) {
             extractedData.total_net_weight = totalsOverride.total_net_weight;
         }
+
+        // Ensure totals-like fields get bboxes after overrides
+        const ensureFinalFieldBbox = (key, value) => {
+            if (value === null || value === undefined || value === '') return;
+            const bboxMatch = findBboxForValue(value, key);
+            let bboxObj = null;
+            if (bboxMatch?.bbox && Array.isArray(bboxMatch.bbox) && bboxMatch.bbox.length === 4) {
+                const [left, top, right, bottom] = bboxMatch.bbox;
+                bboxObj = { x: left, y: top, width: right - left, height: bottom - top };
+            }
+
+            if (!extractedData.final_fields) extractedData.final_fields = {};
+            if (!extractedData.final_fields[key]) extractedData.final_fields[key] = {};
+
+            extractedData.final_fields[key] = {
+                ...extractedData.final_fields[key],
+                value,
+                confidence: extractedData.confidence || extractedData.final_fields[key].confidence || 0,
+                bbox: extractedData.final_fields[key].bbox || bboxObj,
+                page: extractedData.final_fields[key].page || bboxMatch?.page || 1,
+                source: extractedData.final_fields[key].source || 'ml_extraction'
+            };
+        };
+
+        ensureFinalFieldBbox('total_amount', extractedData.total_amount);
+        ensureFinalFieldBbox('subtotal', extractedData.subtotal);
+        ensureFinalFieldBbox('tax_amount', extractedData.tax_amount);
+        ensureFinalFieldBbox('total_gross_weight', extractedData.total_gross_weight);
+        ensureFinalFieldBbox('total_net_weight', extractedData.total_net_weight);
+        ensureFinalFieldBbox('total_packages', extractedData.total_packages);
 
         if (Array.isArray(extractedData.lineItems) && tableTotals?.lineItemWeights) {
             extractedData.lineItems = extractedData.lineItems.map((item, index) => {

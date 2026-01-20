@@ -19,12 +19,7 @@
                 "9. Start Worker",
                 "10. Start Frontend"
             ],
-            "problemMatcher": [],
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "focus": true
-            }
+            "problemMatcher": []
         },
         
         // ==========================================
@@ -35,13 +30,11 @@
             "type": "shell",
             "command": "docker-compose up db",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "infrastructure"
+                "showReuseMessage": false
             }
         },
         {
@@ -49,13 +42,11 @@
             "type": "shell",
             "command": "docker-compose up redis",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "infrastructure"
+                "showReuseMessage": false
             }
         },
         
@@ -67,13 +58,11 @@
             "type": "shell",
             "command": "docker-compose up docling-service",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "microservices"
+                "showReuseMessage": false
             }
         },
         {
@@ -81,13 +70,11 @@
             "type": "shell",
             "command": "docker-compose up qwen-service",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "microservices"
+                "showReuseMessage": false
             }
         },
         {
@@ -95,13 +82,11 @@
             "type": "shell",
             "command": "docker-compose up orchestrator-service",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "microservices"
+                "showReuseMessage": false
             }
         },
         {
@@ -109,13 +94,11 @@
             "type": "shell",
             "command": "docker-compose up label-studio",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "microservices"
+                "showReuseMessage": false
             }
         },
         
@@ -127,13 +110,11 @@
             "type": "shell",
             "command": "echo '🔧 Starting Backend (Express + XML transformation)...' && sleep 3 && docker-compose up backend",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "application"
+                "showReuseMessage": false
             }
         },
         {
@@ -141,13 +122,11 @@
             "type": "shell",
             "command": "bash start-socket-server.sh",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "application"
+                "showReuseMessage": false
             }
         },
         {
@@ -155,13 +134,11 @@
             "type": "shell",
             "command": "bash start-worker.sh",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": false,
-                "showReuseMessage": false,
-                "group": "application"
+                "showReuseMessage": false
             }
         },
         {
@@ -169,13 +146,11 @@
             "type": "shell",
             "command": "bash start-frontend.sh",
             "problemMatcher": [],
-            "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "new",
                 "focus": true,
-                "showReuseMessage": false,
-                "group": "application"
+                "showReuseMessage": false
             }
         },
         
@@ -349,11 +324,13 @@
         {
             "label": "Utility: Health Check All Services",
             "type": "shell",
-            "command": "echo '🏥 Checking service health...' && echo '' && echo '📦 Infrastructure:' && curl -sf http://localhost:5432 >/dev/null && echo '✅ PostgreSQL' || echo '❌ PostgreSQL' && curl -sf http://localhost:6379 >/dev/null && echo '✅ Redis' || echo '❌ Redis' && echo '' && echo '🤖 SmolDocling + Qwen2.5 Microservices:' && curl -sf http://localhost:5004/health >/dev/null && echo '✅ SmolDocling Service' || echo '❌ SmolDocling Service' && curl -sf http://localhost:5005/health >/dev/null && echo '✅ Qwen2.5 Service' || echo '❌ Qwen2.5 Service' && curl -sf http://localhost:8000/health >/dev/null && echo '✅ Orchestrator' || echo '❌ Orchestrator' && curl -sf http://localhost:8080/health >/dev/null && echo '✅ Label Studio' || echo '❌ Label Studio' && echo '' && echo '🌐 Application:' && curl -sf http://localhost:3000 >/dev/null && echo '✅ Backend' || echo '❌ Backend' && curl -sf http://localhost:3001 >/dev/null && echo '✅ Socket.io' || echo '❌ Socket.io' && curl -sf http://localhost:5173 >/dev/null && echo '✅ Frontend' || echo '❌ Frontend'",
+            "command": "bash health-check.sh",
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated"
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
             }
         }
     ],

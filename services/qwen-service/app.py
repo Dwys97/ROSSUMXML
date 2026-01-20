@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from inference_pipeline import build_dynamic_prompt
 import os
 import json
+import re
 import logging
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
@@ -16,14 +17,78 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def robust_json_parse(text: str, logger, context: str = "") -> dict:
+    """
+    Robust JSON parsing with multiple fallback strategies for LLM output.
+    Handles common issues: unterminated strings, trailing commas, code blocks.
+    """
+    text = text.strip()
+    
+    # Strategy 1: Direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    
+    # Strategy 2: Extract from code blocks
+    if "```json" in text:
+        match = re.search(r"```json\s*([\s\S]*?)\s*```", text)
+        if match:
+            try:
+                return json.loads(match.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+    if "```" in text:
+        match = re.search(r"```\s*([\s\S]*?)\s*```", text)
+        if match:
+            try:
+                return json.loads(match.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+    
+    # Strategy 3: Find JSON object boundaries
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        json_candidate = text[start:end+1]
+        try:
+            return json.loads(json_candidate)
+        except json.JSONDecodeError:
+            # Strategy 4: Fix common issues
+            fixed = json_candidate
+            # Remove trailing commas
+            fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
+            # Fix unterminated strings by adding closing quote
+            fixed = re.sub(r':\s*"([^"]*?)(\s*[,}])', r': "\1"\2', fixed)
+            try:
+                return json.loads(fixed)
+            except json.JSONDecodeError:
+                pass
+    
+    # Strategy 5: Try to find JSON array
+    start = text.find('[')
+    end = text.rfind(']')
+    if start != -1 and end != -1 and end > start:
+        json_candidate = text[start:end+1]
+        try:
+            result = json.loads(json_candidate)
+            return {"line_items": result} if isinstance(result, list) else result
+        except json.JSONDecodeError:
+            pass
+    
+    logger.warning(f"[{context}] Failed all JSON parse strategies. Raw text (first 500 chars): {text[:500]}")
+    raise ValueError(f"Could not parse JSON from LLM output")
+
+
 # ==========================================
-# MODEL CONFIGURATION - Qwen2.5-1.5B-Instruct Q8_0
+# MODEL CONFIGURATION - Qwen2.5-3B-Instruct Q8_0 (better table extraction)
 # ==========================================
-MODEL_REPO = "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
-MODEL_FILENAME = "qwen2.5-1.5b-instruct-q8_0.gguf"  # Highest quality quantization (~1.9GB)
+MODEL_REPO = "Qwen/Qwen2.5-3B-Instruct-GGUF"
+MODEL_FILENAME = "qwen2.5-3b-instruct-q8_0.gguf"  # High quality single file (~3.2GB)
 MODEL_PATH = f"/app/models/{MODEL_FILENAME}"
 N_CTX = 8192  # Context window (Qwen2.5 supports up to 32K)
-N_THREADS = 4  # CPU threads
+N_THREADS = 6  # Threads for 3B model
 
 # Global model instance
 llm = None
@@ -32,7 +97,7 @@ def download_model():
     """Download model from Hugging Face Hub if not cached"""
     if not os.path.exists(MODEL_PATH):
         logger.info(f"📥 Downloading {MODEL_REPO}/{MODEL_FILENAME}...")
-        logger.info("⏳ This may take 3-5 minutes (~1.9GB)...")
+        logger.info("⏳ This may take 5-10 minutes (~4.7GB)...")
         try:
             hf_hub_download(
                 repo_id=MODEL_REPO,
@@ -56,7 +121,7 @@ def load_model():
             logger.info("🔄 Downloading model if needed...")
             download_model()
             
-            logger.info(f"🔄 Loading Qwen2.5-1.5B-Instruct Q8_0 model...")
+            logger.info(f"🔄 Loading Qwen2.5-7B-Instruct Q4_K_M model...")
             llm = Llama(
                 model_path=MODEL_PATH,
                 n_ctx=N_CTX,
@@ -78,7 +143,7 @@ def health():
     """Health check endpoint"""
     return jsonify({
         'service': 'qwen-service',
-        'model': 'Qwen2.5-1.5B-Instruct-Q8_0',
+        'model': 'Qwen2.5-7B-Instruct-Q4_K_M',
         'format': 'GGUF',
         'status': 'ready' if llm is not None else 'initializing',
         'model_loaded': llm is not None,
@@ -112,6 +177,13 @@ def extract_headers():
         
         logger.info(f"📄 Extracting headers for {invoice_id} ({len(header_text)} chars)")
         
+        # Log field_manager content for debugging
+        if field_manager:
+            field_keys = [f.get('field_key') for f in field_manager.get('fields', [])]
+            logger.info(f"📋 Field Manager has {len(field_keys)} fields: {field_keys}")
+        else:
+            logger.info("⚠️ No field_manager provided - using defaults")
+        
         prompt = build_dynamic_prompt(header_text, field_manager=field_manager, mode="headers")
         
         response = llm(
@@ -125,21 +197,37 @@ def extract_headers():
         
         extracted_json = response['choices'][0]['text'].strip()
         
-        try:
-            extracted_data = json.loads(extracted_json)
-        except json.JSONDecodeError:
-            if "```json" in extracted_json:
-                json_start = extracted_json.find("```json") + 7
-                json_end = extracted_json.find("```", json_start)
-                extracted_json = extracted_json[json_start:json_end].strip()
-                extracted_data = json.loads(extracted_json)
-            elif "```" in extracted_json:
-                json_start = extracted_json.find("```") + 3
-                json_end = extracted_json.find("```", json_start)
-                extracted_json = extracted_json[json_start:json_end].strip()
-                extracted_data = json.loads(extracted_json)
+        extracted_data = robust_json_parse(extracted_json, logger, "headers")
+        
+        # Handle case where LLM returns a list instead of dict
+        if isinstance(extracted_data, list):
+            if len(extracted_data) > 0 and isinstance(extracted_data[0], dict):
+                extracted_data = extracted_data[0]
             else:
-                raise
+                extracted_data = {}
+        
+        # Flatten nested structure: if LLM returns {line_items: [{...}], totals: {...}}
+        # we need to extract header fields from line_items[0] and totals
+        if isinstance(extracted_data, dict):
+            flattened = {}
+            # First get any top-level scalar fields
+            for k, v in extracted_data.items():
+                if not isinstance(v, (list, dict)):
+                    flattened[k] = v
+            # Extract from line_items[0] if it exists (header data often misplaced there)
+            if 'line_items' in extracted_data and isinstance(extracted_data['line_items'], list):
+                if len(extracted_data['line_items']) > 0 and isinstance(extracted_data['line_items'][0], dict):
+                    for k, v in extracted_data['line_items'][0].items():
+                        if k not in flattened and not isinstance(v, (list, dict)):
+                            flattened[k] = v
+            # Extract from totals if it exists
+            if 'totals' in extracted_data and isinstance(extracted_data['totals'], dict):
+                for k, v in extracted_data['totals'].items():
+                    if k not in flattened and not isinstance(v, (list, dict)):
+                        flattened[k] = v
+            # Only use flattened if we got something
+            if flattened:
+                extracted_data = flattened
         
         confidence_scores = {k: 0.90 if v else 0.3 for k, v in extracted_data.items()}
         
@@ -182,7 +270,7 @@ def extract_line_items():
 
         response = llm(
             prompt,
-            max_tokens=data.get('max_tokens', 1200),
+            max_tokens=data.get('max_tokens', 2000),  # Increased for 10+ line items
             temperature=data.get('temperature', 0.1),
             top_p=0.95,
             stop=["<|im_end|>", "<|endoftext|>"],
@@ -191,21 +279,7 @@ def extract_line_items():
 
         extracted_json = response['choices'][0]['text'].strip()
 
-        try:
-            extracted_data = json.loads(extracted_json)
-        except json.JSONDecodeError:
-            if "```json" in extracted_json:
-                json_start = extracted_json.find("```json") + 7
-                json_end = extracted_json.find("```", json_start)
-                extracted_json = extracted_json[json_start:json_end].strip()
-                extracted_data = json.loads(extracted_json)
-            elif "```" in extracted_json:
-                json_start = extracted_json.find("```") + 3
-                json_end = extracted_json.find("```", json_start)
-                extracted_json = extracted_json[json_start:json_end].strip()
-                extracted_data = json.loads(extracted_json)
-            else:
-                raise
+        extracted_data = robust_json_parse(extracted_json, logger, "line_items")
 
         if isinstance(extracted_data, dict) and isinstance(extracted_data.get('line_items'), list):
             line_items = extracted_data.get('line_items') or []
@@ -222,13 +296,18 @@ def extract_line_items():
             'confidence': confidence,
             'extraction_type': 'line_items'
         })
+        
+    except Exception as e:
+        logger.error(f"❌ Line items extraction failed: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # ==========================================
 # FIELD EXTRACTION ENDPOINT (FULL)
 # ==========================================
 @app.route('/extract-customs-fields', methods=['POST'])
 def extract_customs_fields():
     """
-    Extract customs invoice fields using Qwen2.5-1.5B-Instruct Q8_0.
+    Extract customs invoice fields using Qwen2.5-7B-Instruct Q4_K_M.
     
     Expected payload:
     {
@@ -262,15 +341,15 @@ def extract_customs_fields():
                 'error': 'Missing document_text'
             }), 400
         
-                logger.info(f"📄 Processing invoice {invoice_id} ({len(document_text)} chars)")
+        logger.info(f"📄 Processing invoice {invoice_id} ({len(document_text)} chars)")
 
-                field_manager = data.get('field_manager')
-                prompt = build_dynamic_prompt(document_text, field_manager=field_manager, mode="full")
+        field_manager = data.get('field_manager')
+        prompt = build_dynamic_prompt(document_text, field_manager=field_manager, mode="full")
 
-                response = llm(
-                        prompt,
-                        max_tokens=data.get('max_tokens', 2048),
-                        temperature=data.get('temperature', 0.1),
+        response = llm(
+            prompt,
+            max_tokens=data.get('max_tokens', 2048),
+            temperature=data.get('temperature', 0.1),
             top_p=0.95,
             stop=["<|im_end|>", "<|endoftext|>"],
             echo=False
@@ -327,7 +406,7 @@ def extract_customs_fields():
             'success': True,
             'extracted_fields': extracted_data,
             'confidence_scores': confidence_scores,
-            'model': 'Qwen2.5-1.5B-Instruct-Q8_0',
+            'model': 'Qwen2.5-7B-Instruct-Q4_K_M',
             'invoice_id': invoice_id
         })
         
@@ -347,14 +426,14 @@ def extract_customs_fields():
         }), 500
 
 # ==========================================
+# ==========================================
 # STARTUP: PRELOAD MODEL
 # ==========================================
-# Preload model on startup (optional - can also load on first request)
-# Uncomment to preload:
-# with app.app_context():
-#     load_model()
+# Preload model on startup for gunicorn
+logger.info("🚀 Preloading model at startup...")
+load_model()
+logger.info("✅ Model preloaded and ready")
 
 if __name__ == '__main__':
     # For development only
-    load_model()
     app.run(host='0.0.0.0', port=5006, debug=False)

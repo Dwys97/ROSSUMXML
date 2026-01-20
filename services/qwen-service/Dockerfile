@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir \
 ENV CMAKE_ARGS="-DLLAMA_AVX=ON -DLLAMA_AVX2=OFF -DLLAMA_F16C=OFF -DLLAMA_FMA=OFF"
 RUN pip install --no-cache-dir "llama-cpp-python==0.3.2"
 
-COPY app.py .
+COPY app.py inference_pipeline.py ./
 
 # Create models directory
 RUN mkdir -p /app/models
