@@ -80,13 +80,15 @@ echo -e "${YELLOW}Phase 2: CIR Deterministic Extraction${NC}"
 echo -e "${YELLOW}========================================${NC}"
 
 # Test 2.1: Extract invoice number and date
+# Use jq to properly escape JSON for multi-line text
 TEST_TEXT='Invoice #INV-12345
 Date: 2024-01-15
 Total: $1,234.56
 VAT: GB123456789'
 
+TEST_JSON=$(jq -n --arg text "$TEST_TEXT" '{text: $text}')
 test_endpoint "CIR - Extract structured fields" "POST" "$CIR_URL/extract" \
-    "{\"text\": \"$TEST_TEXT\"}" 200
+    "$TEST_JSON" 200
 
 # Test 2.2: Extract with missing fields (should return ambiguous list)
 test_endpoint "CIR - Missing fields detection" "POST" "$CIR_URL/extract" \
