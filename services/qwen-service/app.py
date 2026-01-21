@@ -186,6 +186,8 @@ def extract_headers():
         
         prompt = build_dynamic_prompt(header_text, field_manager=field_manager, mode="headers")
         
+        logger.info(f"🤖 Calling LLM for header extraction (prompt length: {len(prompt)} chars)")
+        
         response = llm(
             prompt,
             max_tokens=768,  # Headers need more space
@@ -196,8 +198,17 @@ def extract_headers():
         )
         
         extracted_json = response['choices'][0]['text'].strip()
+        logger.info(f"📝 LLM response length: {len(extracted_json)} chars")
+        logger.info(f"📝 LLM response preview: {extracted_json[:200]}...")
         
-        extracted_data = robust_json_parse(extracted_json, logger, "headers")
+        # Try to parse JSON, but don't fail if it's invalid for headers
+        try:
+            extracted_data = robust_json_parse(extracted_json, logger, "headers")
+        except ValueError as e:
+            logger.warning(f"⚠️ JSON parsing failed for headers: {str(e)}")
+            logger.warning(f"⚠️ Returning empty result - this may indicate the LLM didn't output valid JSON")
+            # Return empty dict instead of failing - headers extraction is optional
+            extracted_data = {}
         
         # Handle case where LLM returns a list instead of dict
         if isinstance(extracted_data, list):
@@ -232,6 +243,8 @@ def extract_headers():
         confidence_scores = {k: 0.90 if v else 0.3 for k, v in extracted_data.items()}
         
         logger.info(f"✅ Header extraction completed for {invoice_id}: {len(extracted_data)} fields")
+        if len(extracted_data) == 0:
+            logger.warning(f"⚠️ No header fields extracted - worker should fall back to full extraction")
         
         return jsonify({
             'success': True,
@@ -241,7 +254,7 @@ def extract_headers():
         })
         
     except Exception as e:
-        logger.error(f"❌ Header extraction failed: {str(e)}")
+        logger.error(f"❌ Header extraction failed: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==========================================

@@ -105,6 +105,30 @@ def _field_line(field: Dict[str, Any]) -> str:
 
 def build_dynamic_field_rules(field_manager: Optional[Dict[str, Any]], mode: str) -> str:
     fields = (field_manager or {}).get("fields", [])
+    
+    # Special case: if mode is "headers" and we have no non-line_items fields,
+    # provide default header fields to extract
+    if mode == "headers":
+        has_header_fields = any(
+            f.get("field_key") and f.get("field_key") != "line_items" 
+            for f in fields
+        )
+        if not has_header_fields:
+            # Return default header fields when none are specified
+            return """- invoice_number: Invoice or reference number
+- invoice_date: Invoice date
+- seller_name: Seller/vendor/exporter name
+- seller_address: Seller/vendor address
+- seller_vat_number: Seller VAT or tax ID
+- buyer_name: Buyer/consignee/importer name
+- buyer_address: Buyer address
+- buyer_vat_number: Buyer VAT or tax ID
+- total_amount: Total invoice amount
+- subtotal: Subtotal before tax
+- tax_amount: Tax or VAT amount
+- currency: Currency code
+- Use null for any field not found in the document."""
+    
     if not fields:
         return "- Use provided field keys and return null when not found."
 
