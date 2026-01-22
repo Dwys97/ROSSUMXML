@@ -48,17 +48,58 @@ services:
     environment:
       PORT: 8000
       DOCLING_SERVICE_URL: http://docling-service:5004
+      CIR_SERVICE_URL: http://cir-service:5007
+      VALIDATION_SERVICE_URL: http://validation-service:5008
       QWEN_SERVICE_URL: http://qwen-service:5006
       LABEL_STUDIO_URL: http://label-studio:8080
       LABEL_STUDIO_API_KEY: ${LABEL_STUDIO_API_KEY:-}
       LABEL_STUDIO_PROJECT_ID: ${LABEL_STUDIO_PROJECT_ID:-1}
       CONFIDENCE_THRESHOLD: 0.90
+      DETERMINISTIC_THRESHOLD: 0.80
     depends_on:
       - docling-service
+      - cir-service
+      - validation-service
       - qwen-service
       - label-studio
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # ==========================================
+  # CIR Service (Deterministic Extraction)
+  # ==========================================
+  cir-service:
+    build: ./services/cir-service
+    ports:
+      - "5007:5007"
+    environment:
+      PORT: 5007
+      PYTHONUNBUFFERED: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5007/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # ==========================================
+  # Validation Service (Confidence Engine)
+  # ==========================================
+  validation-service:
+    build: ./services/validation-service
+    ports:
+      - "5008:5008"
+    environment:
+      PORT: 5008
+      PYTHONUNBUFFERED: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5008/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
