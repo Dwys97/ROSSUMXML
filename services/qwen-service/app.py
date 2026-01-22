@@ -4,6 +4,7 @@ import os
 import json
 import re
 import logging
+from typing import Optional
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 
