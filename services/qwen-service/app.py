@@ -81,6 +81,48 @@ def robust_json_parse(text: str, logger, context: str = "") -> dict:
     raise ValueError(f"Could not parse JSON from LLM output")
 
 
+def ensure_all_fields_present(extracted_data: dict, field_manager: Optional[dict], mode: str = "full") -> dict:
+    """
+    Ensure all fields defined in field_manager are present in extracted_data.
+    Missing fields are added with null values.
+    
+    Args:
+        extracted_data: The data extracted by LLM
+        field_manager: Field manager configuration
+        mode: "full", "headers", or "line_items"
+    
+    Returns:
+        Updated extracted_data with all expected fields
+    """
+    if not field_manager:
+        return extracted_data
+    
+    fields = field_manager.get("fields", [])
+    if not fields:
+        return extracted_data
+    
+    result = extracted_data.copy()
+    
+    for field in fields:
+        field_key = field.get("field_key")
+        if not field_key:
+            continue
+        
+        # Skip line_items in headers mode
+        if mode == "headers" and field_key == "line_items":
+            continue
+        
+        # Skip non-line_items in line_items mode
+        if mode == "line_items" and field_key != "line_items":
+            continue
+        
+        # Add field with null if not present
+        if field_key not in result:
+            result[field_key] = None
+    
+    return result
+
+
 # ==========================================
 # MODEL CONFIGURATION - Qwen2.5-3B-Instruct Q8_0 (better table extraction)
 # ==========================================
@@ -239,6 +281,9 @@ def extract_headers():
             # Only use flattened if we got something
             if flattened:
                 extracted_data = flattened
+        
+        # Ensure all field_manager fields are present
+        extracted_data = ensure_all_fields_present(extracted_data, field_manager, mode="headers")
         
         confidence_scores = {k: 0.90 if v else 0.3 for k, v in extracted_data.items()}
         
@@ -402,6 +447,9 @@ def extract_customs_fields():
                 extracted_data = json.loads(extracted_json)
             else:
                 raise
+        
+        # Ensure all field_manager fields are present
+        extracted_data = ensure_all_fields_present(extracted_data, field_manager, mode="full")
         
         # Calculate confidence scores (Qwen doesn't provide logprobs, use heuristics)
         confidence_scores = {}

@@ -133,6 +133,8 @@ def build_dynamic_field_rules(field_manager: Optional[Dict[str, Any]], mode: str
         return "- Use provided field keys and return null when not found."
 
     lines: List[str] = []
+    field_count = 0
+    
     for field in fields:
         key = field.get("field_key")
         if not key:
@@ -150,10 +152,19 @@ def build_dynamic_field_rules(field_manager: Optional[Dict[str, Any]], mode: str
                 line = f"  - {nested_key}: {label}. {desc}".strip()
                 lines.append(line)
             lines.append("  - For each line item, include ALL listed keys and use null when missing.")
+            field_count += 1
             continue
         lines.append(_field_line(field))
-
-    return "\n".join(lines) if lines else "- Use provided field keys and return null when not found."
+        field_count += 1
+    
+    if not lines:
+        return "- Use provided field keys and return null when not found."
+    
+    # Add explicit instruction to include ALL fields
+    result = "\n".join(lines)
+    result += f"\n\nIMPORTANT: Your output MUST include ALL {field_count} fields listed above. Set any field to null if not found in the document. Do not omit any fields from the output."
+    
+    return result
 
 
 def build_dynamic_prompt(document_text: str, field_manager: Optional[Dict[str, Any]] = None, mode: str = "full") -> str:
