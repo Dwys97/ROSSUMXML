@@ -56,6 +56,7 @@ class ExtractionJob(BaseModel):
     confidence_score: Optional[float] = None
     fields: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    extraction_metadata: Optional[Dict[str, Any]] = None  # Performance metrics
 
 class ExtractionResult(BaseModel):
     job_id: str
@@ -64,6 +65,7 @@ class ExtractionResult(BaseModel):
     fields: Optional[Dict[str, Any]] = None
     needs_review: bool = False
     label_studio_task_id: Optional[int] = None
+    extraction_metadata: Optional[Dict[str, Any]] = None  # Performance metrics
 
 class UploadRequest(BaseModel):
     """Request model for upload with optional custom schema"""
@@ -84,14 +86,15 @@ async def upload_invoice(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     template_id: Optional[str] = None,
-    schema: Optional[str] = None  # JSON string of custom schema
+    schema: Optional[str] = None,  # JSON string of custom schema
+    vendor_context: Optional[str] = None  # JSON string of vendor context for adaptive extraction
 ):
     """
     Upload invoice and start extraction pipeline
     
     Pipeline:
     1. SmolDocling: Parse document → markdown + tables
-    2. Qwen2.5-1.5B: Extract structured fields → JSON (with custom schema)
+    2. Qwen2.5-1.5B: Extract structured fields → JSON (with custom schema and vendor hints)
     3. Confidence check: If < threshold → send to Label Studio
     4. Return results or HITL task ID
     
@@ -99,6 +102,7 @@ async def upload_invoice(
         file: Invoice file (PDF, image)
         template_id: Optional template ID to fetch schema from backend
         schema: Optional JSON string of custom schema for extraction
+        vendor_context: Optional JSON string with vendor-specific patterns and hints
     """
     try:
         job_id = str(uuid.uuid4())
@@ -112,6 +116,15 @@ async def upload_invoice(
                 logger.info(f"[{job_id}] Using custom schema with {len(custom_schema)} fields")
             except json.JSONDecodeError:
                 logger.warning(f"[{job_id}] Invalid schema JSON, using default")
+        
+        # Parse vendor context if provided
+        vendor_ctx = None
+        if vendor_context:
+            try:
+                vendor_ctx = json.loads(vendor_context)
+                logger.info(f"[{job_id}] Using vendor context for {vendor_ctx.get('vendor_name', 'unknown')}")
+            except json.JSONDecodeError:
+                logger.warning(f"[{job_id}] Invalid vendor_context JSON, ignoring")
         
         # Create job
         job = ExtractionJob(
@@ -127,7 +140,8 @@ async def upload_invoice(
             job_id,
             file_bytes,
             file.filename,
-            custom_schema
+            custom_schema,
+            vendor_ctx
         )
         
         logger.info(f"[{job_id}] Upload started for {file.filename}")
@@ -156,34 +170,46 @@ async def get_extraction_result(job_id: str):
         confidence_score=job.confidence_score,
         fields=job.fields,
         needs_review=job.status == 'needs_review',
-        label_studio_task_id=None  # TODO: Store task ID
+        label_studio_task_id=None,  # TODO: Store task ID
+        extraction_metadata=job.extraction_metadata
     )
 
 async def process_invoice_pipeline(
     job_id: str,
     file_bytes: bytes,
     filename: str,
-    custom_schema: Optional[Dict[str, Any]] = None
+    custom_schema: Optional[Dict[str, Any]] = None,
+    vendor_context: Optional[Dict[str, Any]] = None
 ):
     """
-    CPU-First Deterministic Pipeline:
-    Document → Parse (Docling) → Deterministic Extract (CIR) → Validate → 
-    LLM Disambiguation (Qwen2.5, only for ambiguous fields) → Route (HITL or Complete)
+    CPU-First Deterministic Pipeline with Vendor Context:
+    Document → Parse (Docling) → Deterministic Extract (CIR) → Vendor Pattern Match → 
+    Validate → LLM Disambiguation (Qwen2.5, with vendor hints) → Route (HITL or Complete)
+    
+    Args:
+        vendor_context: Optional vendor-specific patterns and hints for improved extraction
     """
+    import time
+    
     try:
         job = jobs[job_id]
         logger.info(f"[{job_id}] CPU-first pipeline started for {filename}")
+        
+        pipeline_start_time = time.time()
+        service_timings = {}
         
         async with httpx.AsyncClient(timeout=180.0) as client:
             
             # Step 1: Document Processing (SmolDocling - OCR + Layout)
             logger.info(f"[{job_id}] Step 1: Document processing with SmolDocling")
+            docling_start = time.time()
             files = {'file': (filename, file_bytes)}
             
             docling_response = await client.post(
                 f'{DOCLING_SERVICE_URL}/process-document',
                 files=files
             )
+            service_timings['docling_ms'] = int((time.time() - docling_start) * 1000)
             
             if docling_response.status_code != 200:
                 raise Exception(f"Docling service failed: {docling_response.text}")
@@ -200,6 +226,7 @@ async def process_invoice_pipeline(
             
             # Step 2: Deterministic Extraction (CIR - CPU-only, regex + spatial)
             logger.info(f"[{job_id}] Step 2: Deterministic extraction with CIR")
+            cir_start = time.time()
             
             cir_payload = {
                 'text': document_text,
@@ -211,6 +238,7 @@ async def process_invoice_pipeline(
                 f'{CIR_SERVICE_URL}/extract',
                 json=cir_payload
             )
+            service_timings['cir_ms'] = int((time.time() - cir_start) * 1000)
             
             if cir_response.status_code != 200:
                 logger.warning(f"[{job_id}] CIR service failed, skipping deterministic extraction")
@@ -227,18 +255,30 @@ async def process_invoice_pipeline(
                     cir_fields = {}
                     ambiguous_fields = []
             
+            # Step 2.5: Vendor Pattern Matching (if vendor context provided)
+            if vendor_context and ambiguous_fields:
+                logger.info(f"[{job_id}] Step 2.5: Applying vendor-specific patterns")
+                vendor_enhanced_fields = apply_vendor_patterns(
+                    cir_fields, ambiguous_fields, document_text, vendor_context, job_id
+                )
+                cir_fields.update(vendor_enhanced_fields['resolved'])
+                ambiguous_fields = vendor_enhanced_fields['still_ambiguous']
+                logger.info(f"[{job_id}] Vendor patterns resolved {len(vendor_enhanced_fields['resolved'])} fields")
+            
             # Step 3: Validation Engine
             logger.info(f"[{job_id}] Step 3: Field validation")
+            validation_start = time.time()
             
             validation_payload = {
                 'fields': cir_fields,
-                'vendor_rules': None  # TODO: Fetch from database if vendor known
+                'vendor_rules': vendor_context.get('validation_rules') if vendor_context else None
             }
             
             validation_response = await client.post(
                 f'{VALIDATION_SERVICE_URL}/validate',
                 json=validation_payload
             )
+            service_timings['validation_ms'] = int((time.time() - validation_start) * 1000)
             
             if validation_response.status_code != 200:
                 logger.warning(f"[{job_id}] Validation service failed, using CIR results as-is")
@@ -265,9 +305,11 @@ async def process_invoice_pipeline(
             # Step 4: LLM Disambiguation (Qwen2.5 - only for ambiguous/low-confidence fields)
             final_fields = validated_fields.copy()
             llm_used = False
+            llm_fields_list = []
             
             if needs_llm:
                 logger.info(f"[{job_id}] Step 4: LLM disambiguation for {len(needs_llm)} fields")
+                qwen_start = time.time()
                 
                 # Create targeted prompt for ambiguous fields only
                 extraction_payload = {
@@ -279,10 +321,15 @@ async def process_invoice_pipeline(
                     filtered_schema = {k: v for k, v in custom_schema.items() if k in needs_llm}
                     extraction_payload['schema'] = filtered_schema
                 
+                # Add vendor hints if available
+                if vendor_context:
+                    extraction_payload['vendor_hints'] = extract_vendor_hints(vendor_context, needs_llm)
+                
                 qwen_response = await client.post(
                     f'{QWEN_SERVICE_URL}/extract',
                     json=extraction_payload
                 )
+                service_timings['qwen_ms'] = int((time.time() - qwen_start) * 1000)
                 
                 if qwen_response.status_code == 200:
                     qwen_data = qwen_response.json()
@@ -293,9 +340,11 @@ async def process_invoice_pipeline(
                         # Merge LLM results with deterministic results
                         for field_name, field_data in llm_fields.items():
                             final_fields[field_name] = field_data
+                            llm_fields_list.append(field_name)
                             # Mark as LLM-extracted
                             if isinstance(field_data, dict):
-                                field_data['method'] = 'llm'
+                                field_data['method'] = 'qwen'
+                                field_data['source'] = 'qwen'
                         
                         llm_used = True
                 else:
@@ -303,23 +352,44 @@ async def process_invoice_pipeline(
             else:
                 logger.info(f"[{job_id}] Step 4: Skipped LLM - all fields extracted deterministically")
             
-            # Step 5: Calculate final confidence and route
+            # Step 5: Calculate final confidence and build metadata
             confidence_scores = []
-            for field_data in final_fields.values():
+            field_sources = {}
+            for field_name, field_data in final_fields.items():
                 if isinstance(field_data, dict):
                     confidence_scores.append(field_data.get('confidence', 0.0))
+                    source = field_data.get('source') or field_data.get('method', 'unknown')
+                    field_sources[field_name] = source
             
             final_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
             
             # Calculate method distribution for metrics
-            deterministic_count = sum(1 for f in final_fields.values() 
-                                     if isinstance(f, dict) and f.get('method') in ['regex', 'spatial', 'dict_lookup'])
-            llm_count = sum(1 for f in final_fields.values() 
-                           if isinstance(f, dict) and f.get('method') == 'llm')
+            deterministic_fields = [k for k, v in final_fields.items() 
+                                   if isinstance(v, dict) and v.get('source', '').startswith('cir')]
+            deterministic_count = len(deterministic_fields)
+            llm_count = len(llm_fields_list)
+            total_fields = len(final_fields)
             
-            logger.info(f"[{job_id}] Extraction complete: {len(final_fields)} fields")
+            # Build extraction metadata
+            total_time_ms = int((time.time() - pipeline_start_time) * 1000)
+            extraction_metadata = {
+                'deterministic_fields': deterministic_fields,
+                'llm_fields': llm_fields_list,
+                'deterministic_count': deterministic_count,
+                'llm_count': llm_count,
+                'total_fields': total_fields,
+                'deterministic_rate': deterministic_count / total_fields if total_fields > 0 else 0,
+                'llm_rate': llm_count / total_fields if total_fields > 0 else 0,
+                'processing_time_ms': total_time_ms,
+                'service_timings': service_timings,
+                'field_sources': field_sources,
+                'vendor_context_used': vendor_context is not None
+            }
+            
+            logger.info(f"[{job_id}] Extraction complete: {total_fields} fields")
             logger.info(f"[{job_id}] Method distribution: {deterministic_count} deterministic, {llm_count} LLM")
             logger.info(f"[{job_id}] Final confidence: {final_confidence:.3f}")
+            logger.info(f"[{job_id}] Deterministic extraction rate: {extraction_metadata['deterministic_rate']:.1%}")
             
             # Step 6: Confidence-based routing
             if final_confidence < CONFIDENCE_THRESHOLD:
@@ -337,11 +407,113 @@ async def process_invoice_pipeline(
                 job.status = 'needs_review'
                 job.confidence_score = final_confidence
                 job.fields = final_fields
+                job.extraction_metadata = extraction_metadata
                 job.completed_at = datetime.utcnow().isoformat()
                 
                 logger.info(f"[{job_id}] Created Label Studio task: {task_id}")
             else:
                 logger.info(f"[{job_id}] High confidence ({final_confidence:.3f}), auto-approved")
+                
+                job.status = 'completed'
+                job.confidence_score = final_confidence
+                job.fields = final_fields
+                job.extraction_metadata = extraction_metadata
+                job.completed_at = datetime.utcnow().isoformat()
+        
+        logger.info(f"[{job_id}] Pipeline completed successfully")
+        
+    except Exception as e:
+        logger.error(f"[{job_id}] Pipeline error: {str(e)}", exc_info=True)
+        job.status = 'failed'
+        job.error = str(e)
+        job.completed_at = datetime.utcnow().isoformat()
+
+def apply_vendor_patterns(
+    cir_fields: Dict[str, Any],
+    ambiguous_fields: list,
+    document_text: str,
+    vendor_context: Dict[str, Any],
+    job_id: str
+) -> Dict[str, Any]:
+    """
+    Apply vendor-specific patterns to resolve ambiguous fields before routing to LLM.
+    
+    Returns:
+        dict: {'resolved': {field: value}, 'still_ambiguous': [field_names]}
+    """
+    import re
+    
+    resolved = {}
+    still_ambiguous = []
+    known_patterns = vendor_context.get('known_patterns', {})
+    
+    for field_name in ambiguous_fields:
+        pattern_key = f"{field_name}_format"
+        location_key = f"{field_name}_location"
+        
+        # Check if vendor has a known pattern for this field
+        if pattern_key in known_patterns:
+            pattern = known_patterns[pattern_key]
+            try:
+                # Try to extract using vendor pattern
+                match = re.search(pattern, document_text)
+                if match:
+                    value = match.group(0) if match.groups() == () else match.group(1)
+                    resolved[field_name] = {
+                        'value': value,
+                        'confidence': 0.85,  # High confidence for vendor-matched patterns
+                        'source': 'cir-regex',
+                        'method': 'vendor_pattern'
+                    }
+                    logger.info(f"[{job_id}] Vendor pattern matched for {field_name}: {value}")
+                    continue
+            except re.error as e:
+                logger.warning(f"[{job_id}] Invalid vendor pattern for {field_name}: {e}")
+        
+        # If pattern matching failed, keep as ambiguous
+        still_ambiguous.append(field_name)
+    
+    return {
+        'resolved': resolved,
+        'still_ambiguous': still_ambiguous
+    }
+
+def extract_vendor_hints(vendor_context: Dict[str, Any], field_names: list) -> Dict[str, str]:
+    """
+    Extract vendor-specific hints for LLM prompt enhancement.
+    
+    Returns:
+        dict: {field_name: hint_text}
+    """
+    hints = {}
+    field_corrections = vendor_context.get('field_corrections', {})
+    known_patterns = vendor_context.get('known_patterns', {})
+    
+    for field_name in field_names:
+        hint_parts = []
+        
+        # Add extraction hint if available
+        if field_name in field_corrections:
+            extraction_hint = field_corrections[field_name].get('extraction_hint')
+            if extraction_hint:
+                hint_parts.append(f"Hint: {extraction_hint}")
+        
+        # Add common mistakes to avoid
+        if field_name in field_corrections:
+            common_mistakes = field_corrections[field_name].get('common_mistakes', [])
+            if common_mistakes:
+                hint_parts.append(f"Avoid: {', '.join(common_mistakes)}")
+        
+        # Add typical format if available
+        format_key = f"{field_name}_format"
+        if format_key in known_patterns:
+            hint_parts.append(f"Format: {known_patterns[format_key]}")
+        
+        if hint_parts:
+            hints[field_name] = ' | '.join(hint_parts)
+    
+    return hints
+
                 
                 job.status = 'completed'
                 job.confidence_score = final_confidence

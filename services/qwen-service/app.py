@@ -21,27 +21,27 @@ logger = logging.getLogger(__name__)
 
 def robust_json_parse(text: str, logger, context: str = "") -> dict:
     """
-    Robust JSON parsing with multiple fallback strategies for LLM output.
-    Handles common issues: unterminated strings, trailing commas, code blocks.
+    Enhanced robust JSON parsing with better handling of:
+    - Multi-line strings in field values
+    - Escaped quotes in company names
+    - Unterminated arrays from LLM
+    - Special characters in addresses
     """
     text = text.strip()
     
     # Strategy 1: Direct parse
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as e:
+        logger.debug(f"[{context}] Direct parse failed: {e}")
     
     # Strategy 2: Extract from code blocks
-    if "```json" in text:
-        match = re.search(r"```json\s*([\s\S]*?)\s*```", text)
-        if match:
-            try:
-                return json.loads(match.group(1).strip())
-            except json.JSONDecodeError:
-                pass
-    if "```" in text:
-        match = re.search(r"```\s*([\s\S]*?)\s*```", text)
+    code_block_patterns = [
+        r"```json\s*([\s\S]*?)\s*```",
+        r"```\s*([\s\S]*?)\s*```"
+    ]
+    for pattern in code_block_patterns:
+        match = re.search(pattern, text)
         if match:
             try:
                 return json.loads(match.group(1).strip())
@@ -53,19 +53,37 @@ def robust_json_parse(text: str, logger, context: str = "") -> dict:
     end = text.rfind('}')
     if start != -1 and end != -1 and end > start:
         json_candidate = text[start:end+1]
+        
+        # Try direct parse
         try:
             return json.loads(json_candidate)
         except json.JSONDecodeError:
-            # Strategy 4: Fix common issues
-            fixed = json_candidate
-            # Remove trailing commas
-            fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
-            # Fix unterminated strings by adding closing quote
-            fixed = re.sub(r':\s*"([^"]*?)(\s*[,}])', r': "\1"\2', fixed)
-            try:
-                return json.loads(fixed)
-            except json.JSONDecodeError:
-                pass
+            pass
+        
+        # Strategy 4: Fix common LLM issues
+        fixed = json_candidate
+        
+        # Fix 1: Remove trailing commas before closing braces/brackets
+        fixed = re.sub(r',(\s*[}\]])', r'\1', fixed)
+        
+        # Fix 2: Handle multi-line values (replace literal newlines with \n)
+        # Match strings that contain literal newlines
+        fixed = re.sub(r':\s*"([^"]*)\n([^"]*)"', lambda m: f': "{m.group(1)}\\n{m.group(2)}"', fixed)
+        
+        # Fix 3: Complete unterminated arrays
+        if fixed.count('[') > fixed.count(']'):
+            fixed += ']' * (fixed.count('[') - fixed.count(']'))
+        
+        # Fix 4: Complete unterminated objects
+        if fixed.count('{') > fixed.count('}'):
+            fixed += '}' * (fixed.count('{') - fixed.count('}'))
+        
+        try:
+            result = json.loads(fixed)
+            logger.info(f"[{context}] Successfully parsed after fixes")
+            return result
+        except json.JSONDecodeError as e:
+            logger.warning(f"[{context}] Parse failed after fixes: {e}")
     
     # Strategy 5: Try to find JSON array
     start = text.find('[')
@@ -78,8 +96,8 @@ def robust_json_parse(text: str, logger, context: str = "") -> dict:
         except json.JSONDecodeError:
             pass
     
-    logger.warning(f"[{context}] Failed all JSON parse strategies. Raw text (first 500 chars): {text[:500]}")
-    raise ValueError(f"Could not parse JSON from LLM output")
+    logger.error(f"[{context}] All JSON parse strategies failed. Raw text (first 500): {text[:500]}")
+    raise ValueError(f"Could not parse JSON from LLM output after all strategies")
 
 
 def ensure_all_fields_present(extracted_data: dict, field_manager: Optional[dict], mode: str = "full") -> dict:
@@ -486,6 +504,100 @@ def extract_customs_fields():
             'success': False,
             'error': str(e)
         }), 500
+
+# ==========================================
+# /extract ENDPOINT - For Orchestrator with Vendor Hints
+# ==========================================
+@app.route('/extract', methods=['POST'])
+def extract_with_hints():
+    """
+    Extract fields from document with optional vendor hints for improved accuracy.
+    Used by orchestrator service for context-aware extraction.
+    
+    Expected payload:
+    {
+        "text": "Document text",
+        "fields": ["field1", "field2"],  # Optional: specific fields to extract
+        "schema": {...},                  # Optional: custom schema
+        "vendor_hints": {                 # Optional: vendor-specific hints
+            "field1": "hint for field1",
+            "field2": "hint for field2"
+        }
+    }
+    """
+    try:
+        if llm is None:
+            load_model()
+        
+        data = request.json
+        document_text = data.get('text', '')
+        target_fields = data.get('fields', [])
+        custom_schema = data.get('schema')
+        vendor_hints = data.get('vendor_hints', {})
+        
+        if not document_text:
+            return jsonify({'success': False, 'error': 'Missing text'}), 400
+        
+        logger.info(f"📄 Extracting fields with vendor hints: {list(vendor_hints.keys())}")
+        
+        # Build prompt with vendor hints
+        from inference_pipeline import build_dynamic_prompt
+        
+        # If specific fields requested, filter schema
+        if target_fields and custom_schema:
+            custom_schema = {k: v for k, v in custom_schema.items() if k in target_fields}
+        
+        # Add vendor hints to field descriptions
+        if vendor_hints and custom_schema:
+            for field_name, hint in vendor_hints.items():
+                if field_name in custom_schema:
+                    if 'description' in custom_schema[field_name]:
+                        custom_schema[field_name]['description'] += f" [{hint}]"
+                    else:
+                        custom_schema[field_name]['description'] = hint
+        
+        prompt = build_dynamic_prompt(document_text, field_manager={'fields': [{'field_key': k, **v} for k, v in (custom_schema or {}).items()]}, mode="full")
+        
+        response = llm(
+            prompt,
+            max_tokens=1024,
+            temperature=0.1,
+            top_p=0.95,
+            stop=["<|im_end|>", "<|endoftext|>"],
+            echo=False
+        )
+        
+        extracted_json = response['choices'][0]['text'].strip()
+        extracted_data = robust_json_parse(extracted_json, logger, "extract_with_hints")
+        
+        # Calculate confidence scores
+        confidence_scores = {}
+        fields = {}
+        for key, value in extracted_data.items():
+            if value is not None and value != "":
+                confidence = 0.90 if key in vendor_hints else 0.85  # Higher confidence with vendor hints
+                confidence_scores[key] = confidence
+                fields[key] = {
+                    'value': value,
+                    'confidence': confidence,
+                    'source': 'qwen',
+                    'method': 'llm_with_hints' if key in vendor_hints else 'llm'
+                }
+            else:
+                confidence_scores[key] = 0.3
+                fields[key] = {'value': None, 'confidence': 0.3, 'source': 'qwen', 'method': 'llm'}
+        
+        logger.info(f"✅ Extraction with hints completed: {len(fields)} fields")
+        
+        return jsonify({
+            'success': True,
+            'fields': fields,
+            'confidence_scores': confidence_scores
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Extraction with hints failed: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==========================================
 # ==========================================
