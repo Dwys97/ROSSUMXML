@@ -50,7 +50,8 @@ COMMENT ON COLUMN invoices.bbox_data IS 'Complete OCR bbox data from SmolDocling
 COMMENT ON COLUMN invoices.ocr_region_count IS 'Total number of OCR regions detected';
 
 -- Add update timestamp trigger
-CREATE OR REPLACE TRIGGER update_invoice_field_bboxes_modtime
+DROP TRIGGER IF EXISTS update_invoice_field_bboxes_modtime ON invoice_field_bboxes;
+CREATE TRIGGER update_invoice_field_bboxes_modtime
     BEFORE UPDATE ON invoice_field_bboxes
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
