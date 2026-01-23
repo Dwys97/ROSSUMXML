@@ -727,6 +727,25 @@ router.post('/:id/corrections', authenticate, requirePermission('invoice:update'
         
         await client.query('COMMIT');
         
+        // Capture corrections for adaptive learning (async, don't block response)
+        const selfLearningService = require('../services/selfLearning.service');
+        const correctedFields = {};
+        for (const correction of corrections) {
+            if (correction.correction_type === 'manual_edit' || correction.correction_type === 'field_accept') {
+                correctedFields[correction.field_path] = correction.corrected_value;
+            }
+        }
+        
+        // Run async without blocking response
+        selfLearningService.captureCorrections(id, extractedData, correctedFields, userId)
+            .then(count => {
+                console.log(`✅ Captured ${count} corrections for adaptive learning`);
+            })
+            .catch(err => {
+                console.error('⚠️ Failed to capture corrections for learning:', err);
+                // Non-critical, don't fail the request
+            });
+        
         res.json({
             success: true,
             message: `${correctionCount} correction(s) saved successfully`,

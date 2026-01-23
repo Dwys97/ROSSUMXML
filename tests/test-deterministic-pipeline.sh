@@ -2,11 +2,16 @@
 
 # Test CPU-First Deterministic Extraction Pipeline
 # Tests CIR, Validation, and Orchestrator services
+# Usage: bash test-deterministic-pipeline.sh [num_requests] [concurrent]
 
 set -e
 
+NUM_REQUESTS=${1:-1}
+CONCURRENT=${2:-1}
+
 echo "========================================"
 echo "Testing CPU-First Deterministic Pipeline"
+echo "Requests: $NUM_REQUESTS | Concurrency: $CONCURRENT"
 echo "========================================"
 
 # Colors for output
@@ -158,6 +163,56 @@ test_endpoint "Orchestrator - Health check" "GET" "$ORCHESTRATOR_URL/health" "" 
 
 echo -e "\n${YELLOW}Note: Full pipeline upload test requires invoice file${NC}"
 echo -e "${YELLOW}Use: curl -X POST $ORCHESTRATOR_URL/api/v1/invoice/upload -F 'file=@sample.pdf'${NC}"
+
+# ========================================
+# Phase 5: Load Test (if requested)
+# ========================================
+if [ $NUM_REQUESTS -gt 1 ]; then
+    echo -e "\n${YELLOW}========================================${NC}"
+    echo -e "${YELLOW}Phase 5: Load Testing${NC}"
+    echo -e "${YELLOW}========================================${NC}"
+    
+    echo "Running $NUM_REQUESTS requests with $CONCURRENT concurrent workers"
+    
+    # Simple load test function
+    run_load_test() {
+        local request_id=$1
+        echo "[$request_id] Testing CIR extraction..."
+        
+        TEST_JSON=$(jq -n --arg text "Invoice #INV-${request_id} Date: 2024-01-15 Total: \$1,234.56" '{text: $text}')
+        
+        START=$(date +%s%3N)
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$CIR_URL/extract" \
+            -H "Content-Type: application/json" \
+            -d "$TEST_JSON")
+        END=$(date +%s%3N)
+        
+        STATUS=$(echo "$RESPONSE" | tail -n1)
+        TIME=$((END - START))
+        
+        if [ "$STATUS" -eq 200 ]; then
+            echo "[$request_id] ✓ Success in ${TIME}ms"
+        else
+            echo "[$request_id] ✗ Failed with status $STATUS"
+        fi
+    }
+    
+    export -f run_load_test
+    export CIR_URL
+    
+    # Run tests
+    if [ $CONCURRENT -eq 1 ]; then
+        # Sequential
+        for i in $(seq 1 $NUM_REQUESTS); do
+            run_load_test $i
+        done
+    else
+        # Parallel using xargs
+        seq 1 $NUM_REQUESTS | xargs -P $CONCURRENT -I {} bash -c 'run_load_test {}'
+    fi
+    
+    echo -e "${GREEN}✅ Load test completed${NC}"
+fi
 
 # ========================================
 # Test Summary
