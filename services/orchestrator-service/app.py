@@ -514,21 +514,6 @@ def extract_vendor_hints(vendor_context: Dict[str, Any], field_names: list) -> D
     
     return hints
 
-                
-                job.status = 'completed'
-                job.confidence_score = final_confidence
-                job.fields = final_fields
-                job.completed_at = datetime.utcnow().isoformat()
-        
-        logger.info(f"[{job_id}] Pipeline completed successfully")
-        logger.info(f"[{job_id}] Deterministic extraction rate: {deterministic_count}/{len(final_fields)} = {deterministic_count/len(final_fields)*100:.1f}%")
-        
-    except Exception as e:
-        logger.error(f"[{job_id}] Pipeline error: {str(e)}", exc_info=True)
-        job.status = 'failed'
-        job.error = str(e)
-        job.completed_at = datetime.utcnow().isoformat()
-
 async def create_label_studio_task(
     client: httpx.AsyncClient,
     job_id: str,
