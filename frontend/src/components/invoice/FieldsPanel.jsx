@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 import ConfidenceIndicator from './ConfidenceIndicator';
 import styles from './FieldsPanel.module.css';
 
-const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject, onCorrect }) => {
+const FieldsPanel = forwardRef(({ invoice, buyer, seller, onAccept, onQuery, onReject, onCorrect }, ref) => {
     const [editingField, setEditingField] = useState(null);
     const [editValue, setEditValue] = useState('');
 
@@ -72,7 +72,7 @@ const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject, onCo
         const isEditing = editingField?.fieldPath === fieldPath;
         
         return (
-            <div className={styles.fieldRow}>
+            <div className={styles.fieldRow} data-field={fieldPath}>
                 <div className={styles.fieldHeader}>
                     <span className={styles.fieldLabel}>{label}</span>
                     <ConfidenceIndicator confidence={confidence} />
@@ -155,7 +155,7 @@ const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject, onCo
     };
     
     return (
-        <div className={styles.container}>
+        <div className={styles.container} ref={ref}>
             <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>Invoice Details</h3>
                 
@@ -304,6 +304,8 @@ const FieldsPanel = ({ invoice, buyer, seller, onAccept, onQuery, onReject, onCo
             </div>
         </div>
     );
-};
+});
+
+FieldsPanel.displayName = 'FieldsPanel';
 
 export default FieldsPanel;
