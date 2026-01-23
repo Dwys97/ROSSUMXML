@@ -192,6 +192,9 @@ function convertMicroservicesResponse(microservicesData) {
         hitl_required: microservicesData.hitl_required || false,
         label_studio_task_id: microservicesData.label_studio_task_id || null,
         
+        // Extraction metadata for analytics (from orchestrator)
+        extraction_metadata: microservicesData.extraction_metadata || null,
+        
         // Bounding boxes for visual highlighting
         final_fields: fieldsWithBboxes  // Fields with bbox coordinates for UI
     };
@@ -1971,6 +1974,11 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
         } else {
             logger.warn(`⚠️ No line items in extractedData. Keys: ${Object.keys(extractedData)}`);
         }
+        
+        // Save extraction metadata if available
+        if (extractedData.extraction_metadata) {
+            await saveExtractionMetadata(client, invoiceId, extractedData.extraction_metadata, vendorProfileId);
+        }
 
         await client.query('COMMIT');
 
@@ -2167,6 +2175,70 @@ async function saveLineItems(client, invoiceId, lineItems) {
             item_code,
             JSON.stringify(itemBboxes)
         ]);
+    }
+}
+
+/**
+ * Save extraction metadata for analytics
+ */
+async function saveExtractionMetadata(client, invoiceId, metadata, vendorId) {
+    try {
+        // Build field_sources from metadata
+        const field_sources = metadata.field_sources || {};
+        
+        // Calculate counts
+        const deterministic_count = metadata.deterministic_count || 0;
+        const llm_count = metadata.llm_count || 0;
+        const manual_count = 0; // Will be updated when user makes corrections
+        const total_fields = metadata.total_fields || 0;
+        
+        // Get service timings
+        const service_timings = metadata.service_timings || {};
+        const processing_time_ms = metadata.processing_time_ms || 0;
+        const cir_service_time_ms = service_timings.cir_ms || null;
+        const validation_service_time_ms = service_timings.validation_ms || null;
+        const qwen_service_time_ms = service_timings.qwen_ms || null;
+        
+        // Insert or update extraction metadata
+        const query = `
+            INSERT INTO invoice_extraction_metadata (
+                invoice_id, field_sources, deterministic_count, llm_count, 
+                manual_count, total_fields, processing_time_ms, cir_service_time_ms,
+                validation_service_time_ms, qwen_service_time_ms, vendor_id
+            )
+            VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ON CONFLICT (invoice_id) 
+            DO UPDATE SET
+                field_sources = EXCLUDED.field_sources,
+                deterministic_count = EXCLUDED.deterministic_count,
+                llm_count = EXCLUDED.llm_count,
+                total_fields = EXCLUDED.total_fields,
+                processing_time_ms = EXCLUDED.processing_time_ms,
+                cir_service_time_ms = EXCLUDED.cir_service_time_ms,
+                validation_service_time_ms = EXCLUDED.validation_service_time_ms,
+                qwen_service_time_ms = EXCLUDED.qwen_service_time_ms,
+                vendor_id = EXCLUDED.vendor_id
+        `;
+        
+        await client.query(query, [
+            invoiceId,
+            JSON.stringify(field_sources),
+            deterministic_count,
+            llm_count,
+            manual_count,
+            total_fields,
+            processing_time_ms,
+            cir_service_time_ms,
+            validation_service_time_ms,
+            qwen_service_time_ms,
+            vendorId
+        ]);
+        
+        logger.info(`✅ Saved extraction metadata for invoice ${invoiceId}: ${deterministic_count} deterministic, ${llm_count} LLM`);
+        
+    } catch (error) {
+        logger.error(`Failed to save extraction metadata for invoice ${invoiceId}:`, error);
+        // Don't throw - metadata saving is not critical
     }
 }
 
