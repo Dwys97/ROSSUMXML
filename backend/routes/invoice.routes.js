@@ -247,6 +247,42 @@ router.get('/:id', authenticate, requirePermission('invoice:review'), async (req
             lineItemsWithBboxes = invoice.extracted_data.lineItems;
         }
         
+        // Get field bboxes for all extracted fields
+        const fieldBboxesResult = await db.query(
+            `SELECT 
+                field_name, 
+                field_type, 
+                line_item_index,
+                bbox_coordinates,
+                bbox_normalized,
+                ocr_text,
+                confidence,
+                page_number,
+                extraction_method
+            FROM invoice_field_bboxes 
+            WHERE invoice_id = $1
+            ORDER BY 
+                CASE WHEN field_type = 'header' THEN 0 ELSE 1 END,
+                line_item_index NULLS FIRST,
+                field_name`,
+            [id]
+        );
+        
+        // Transform field bboxes into a map for easy lookup
+        const fieldBboxMap = {};
+        for (const row of fieldBboxesResult.rows) {
+            fieldBboxMap[row.field_name] = {
+                bbox: row.bbox_coordinates,
+                bboxNormalized: row.bbox_normalized,
+                ocrText: row.ocr_text,
+                confidence: parseFloat(row.confidence) || 0,
+                page: row.page_number,
+                method: row.extraction_method,
+                fieldType: row.field_type,
+                lineItemIndex: row.line_item_index
+            };
+        }
+        
         // Get corrections/audit trail
         const correctionsResult = await db.query(
             `SELECT 
@@ -264,6 +300,9 @@ router.get('/:id', authenticate, requirePermission('invoice:review'), async (req
             parties: partiesResult.rows,
             lineItems: lineItemsResult.rows,
             lineItemsWithBboxes: lineItemsWithBboxes,  // Nested format with bboxes from ML extraction
+            fieldBboxes: fieldBboxMap,  // NEW: Comprehensive bbox map for all fields
+            ocrRegions: invoice.bbox_data || [],  // NEW: All OCR regions from SmolDocling
+            ocrRegionCount: invoice.ocr_region_count || 0,  // NEW: Total OCR region count
             corrections: correctionsResult.rows
         });
         

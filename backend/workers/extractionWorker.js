@@ -1509,7 +1509,7 @@ async function processExtractionJob(job) {
         // Save extraction results to database
         await job.progress(95);
         socketEvents.emitExtractionProgress(invoiceId, 95, 'Saving to database');
-        await saveExtractionResults(invoiceId, extractedData, vendorProfileId);
+        await saveExtractionResults(invoiceId, extractedData, vendorProfileId, ocrResults, fieldsWithBboxes);
 
         // Extraction completed - status already set to 'completed' in saveExtractionResults
         await job.progress(98);
@@ -1895,7 +1895,7 @@ function parseTablesForHeaderFields(tables) {
 /**
  * Save extraction results to database
  */
-async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) {
+async function saveExtractionResults(invoiceId, extractedData, vendorProfileId, ocrResults = [], fieldsWithBboxes = {}) {
     const client = await pool.connect();
 
     try {
@@ -1924,8 +1924,10 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
                 incoterms = $17,
                 payment_terms = $18,
                 bank_details = $19,
+                bbox_data = $20::jsonb,
+                ocr_region_count = $21,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $20
+            WHERE id = $22
         `;
 
         // Normalize date to ISO format before saving
@@ -1955,6 +1957,8 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
             extractedData.incoterms || null,
             extractedData.payment_terms || null,
             extractedData.bank_details || null,
+            JSON.stringify(ocrResults || []), // Store all OCR regions
+            ocrResults?.length || 0, // Store count
             invoiceId
         ]);
 
@@ -1970,6 +1974,12 @@ async function saveExtractionResults(invoiceId, extractedData, vendorProfileId) 
             await saveLineItems(client, invoiceId, extractedData.lineItems);
         } else {
             logger.warn(`⚠️ No line items in extractedData. Keys: ${Object.keys(extractedData)}`);
+        }
+
+        // Save field bboxes for UI highlighting
+        if (fieldsWithBboxes && Object.keys(fieldsWithBboxes).length > 0) {
+            logger.info(`📦 Saving ${Object.keys(fieldsWithBboxes).length} field bboxes to database`);
+            await saveFieldBboxes(client, invoiceId, fieldsWithBboxes);
         }
 
         await client.query('COMMIT');
@@ -2167,6 +2177,83 @@ async function saveLineItems(client, invoiceId, lineItems) {
             item_code,
             JSON.stringify(itemBboxes)
         ]);
+    }
+}
+
+/**
+ * Save field bboxes to invoice_field_bboxes table for comprehensive bbox tracking
+ */
+async function saveFieldBboxes(client, invoiceId, fieldsWithBboxes) {
+    try {
+        // Delete existing field bboxes for this invoice
+        await client.query('DELETE FROM invoice_field_bboxes WHERE invoice_id = $1', [invoiceId]);
+
+        const insertQuery = `
+            INSERT INTO invoice_field_bboxes (
+                invoice_id, field_name, field_type, line_item_index,
+                bbox_coordinates, bbox_normalized, ocr_text, confidence,
+                page_number, extraction_method, matched_by
+            )
+            VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $10, $11)
+        `;
+
+        let insertedCount = 0;
+
+        for (const [fieldName, fieldData] of Object.entries(fieldsWithBboxes)) {
+            if (!fieldData || !fieldData.bbox) continue;
+
+            // Determine field type and line item index
+            let fieldType = 'header';
+            let lineItemIndex = null;
+            
+            // Check if it's a line item field (e.g., item_description_1, hs_code_2)
+            const lineItemMatch = fieldName.match(/^(.+)_(\d+)$/);
+            if (lineItemMatch) {
+                fieldType = 'line_item';
+                lineItemIndex = parseInt(lineItemMatch[2], 10);
+            }
+
+            // Prepare bbox coordinates in multiple formats for flexibility
+            const bbox = fieldData.bbox;
+            const bboxCoordinates = {
+                x: bbox.x,
+                y: bbox.y,
+                width: bbox.width,
+                height: bbox.height,
+                page: fieldData.page || 1
+            };
+
+            // Also store as [x1, y1, x2, y2] format
+            const bboxNormalized = {
+                x1: bbox.x,
+                y1: bbox.y,
+                x2: bbox.x + bbox.width,
+                y2: bbox.y + bbox.height,
+                page: fieldData.page || 1
+            };
+
+            await client.query(insertQuery, [
+                invoiceId,
+                fieldName,
+                fieldType,
+                lineItemIndex,
+                JSON.stringify(bboxCoordinates),
+                JSON.stringify(bboxNormalized),
+                fieldData.originalText || null,
+                fieldData.confidence || 0,
+                fieldData.page || 1,
+                fieldData.source || 'ml_extraction',
+                'bbox_matcher'
+            ]);
+
+            insertedCount++;
+        }
+
+        logger.info(`✅ Saved ${insertedCount} field bboxes for invoice ${invoiceId}`);
+
+    } catch (error) {
+        logger.error(`Failed to save field bboxes for invoice ${invoiceId}:`, error);
+        throw error;
     }
 }
 
