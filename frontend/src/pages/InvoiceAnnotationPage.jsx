@@ -7,6 +7,8 @@ import FieldsPanel from '../components/invoice/FieldsPanel';
 import LineItemsTable from '../components/invoice/LineItemsTable';
 import QueryRejectModal from '../components/invoice/QueryRejectModal';
 import BoundingBoxOverlay from '../components/invoice/BoundingBoxOverlay';
+import BboxHighlighter from '../components/invoice/BboxHighlighter';
+import ReviewMode from '../components/invoice/ReviewMode';
 import * as correctionsApi from '../services/correctionsApi';
 import styles from './InvoiceAnnotationPage.module.css';
 
@@ -36,6 +38,14 @@ const InvoiceAnnotationPage = () => {
     const [boundingBoxes, setBoundingBoxes] = useState({}); // Field bounding boxes
     const [corrections, setCorrections] = useState([]); // Pending corrections to submit
     const [showFieldManager, setShowFieldManager] = useState(false); // Field manager modal
+    
+    // New bbox enhancement state
+    const [fieldBboxes, setFieldBboxes] = useState({}); // Field→bbox map from API
+    const [ocrRegions, setOcrRegions] = useState([]); // All OCR regions
+    const [selectedBboxFields, setSelectedBboxFields] = useState([]); // Selected fields for review
+    const [reviewMode, setReviewMode] = useState(false); // Review mode active
+    const fieldPanelRef = useRef(null);
+    const pdfContainerRef = useRef(null);
     
     const formatDecimal = (value, decimals) => {
         if (value === null || value === undefined || value === '') return '';
@@ -193,6 +203,17 @@ const InvoiceAnnotationPage = () => {
                 
                 setBoundingBoxes(bboxes);
                 console.log(`[Loaded Bboxes] ${Object.keys(bboxes).length} bounding boxes from extracted_data`);
+            }
+            
+            // NEW: Extract fieldBboxes and ocrRegions from API response
+            if (data.fieldBboxes) {
+                setFieldBboxes(data.fieldBboxes);
+                console.log(`[New Bbox System] ${Object.keys(data.fieldBboxes).length} field bboxes loaded`);
+            }
+            
+            if (data.ocrRegions) {
+                setOcrRegions(data.ocrRegions);
+                console.log(`[OCR Regions] ${data.ocrRegions.length} OCR regions loaded`);
             }
             
         } catch (err) {
@@ -763,6 +784,36 @@ const InvoiceAnnotationPage = () => {
         navigate('/invoices');
     };
     
+    // NEW: Handle bbox click for review mode
+    const handleBboxClick = (fieldName, event) => {
+        if (event.ctrlKey || event.metaKey) {
+            // Multi-select with Ctrl+Click
+            setSelectedBboxFields(prev => 
+                prev.includes(fieldName) 
+                    ? prev.filter(f => f !== fieldName)
+                    : [...prev, fieldName]
+            );
+        } else {
+            // Single select
+            setSelectedBboxFields([fieldName]);
+        }
+        setReviewMode(true);
+    };
+    
+    // NEW: Handle review accept
+    const handleReviewAccept = () => {
+        console.log('[Review] Accepted fields:', selectedBboxFields);
+        setReviewMode(false);
+        setSelectedBboxFields([]);
+    };
+    
+    // NEW: Handle review cancel
+    const handleReviewCancel = () => {
+        console.log('[Review] Cancelled review');
+        setReviewMode(false);
+        setSelectedBboxFields([]);
+    };
+    
     if (loading) {
         return (
             <div className={styles.loading}>
@@ -903,25 +954,35 @@ const InvoiceAnnotationPage = () => {
             {/* Main Content */}
             <div className={styles.content}>
                 {/* Left Panel - PDF Viewer */}
-                <div className={styles.leftPanel}>
+                <div className={styles.leftPanel} ref={pdfContainerRef}>
                     <PDFViewer
                         invoiceId={id}
                         fileName={invoice.file_name}
                         fileType={invoice.file_type}
                         selectedField={selectedField}
                     >
-                        {/* Bounding Box Overlay */}
+                        {/* Legacy Bounding Box Overlay (editable) */}
                         <BoundingBoxOverlay
                             boundingBoxes={boundingBoxes}
                             selectedField={selectedField}
                             onBoundingBoxUpdate={handleBoundingBoxUpdate}
                         />
+                        
+                        {/* NEW: Orange Bbox Highlighter (read-only, clickable) */}
+                        {Object.keys(fieldBboxes).length > 0 && (
+                            <BboxHighlighter
+                                fieldBboxes={fieldBboxes}
+                                selectedFields={selectedBboxFields}
+                                onBboxClick={handleBboxClick}
+                            />
+                        )}
                     </PDFViewer>
                 </div>
                 
                 {/* Right Panel - Fields */}
                 <div className={styles.rightPanel}>
                     <FieldsPanel
+                        ref={fieldPanelRef}
                         invoice={liveInvoice}
                         buyer={liveBuyer}
                         seller={liveSeller}
@@ -1032,6 +1093,18 @@ const InvoiceAnnotationPage = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            
+            {/* NEW: Review Mode Component */}
+            {reviewMode && selectedBboxFields.length > 0 && (
+                <ReviewMode
+                    selectedFields={selectedBboxFields}
+                    fieldBboxes={fieldBboxes}
+                    fieldPanelRef={fieldPanelRef}
+                    onAccept={handleReviewAccept}
+                    onCancel={handleReviewCancel}
+                    containerRef={pdfContainerRef}
+                />
             )}
         </div>
     );
