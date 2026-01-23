@@ -4845,6 +4845,54 @@ exports.handler = async (event) => {
         // Organization-specific analytics for transformation stats, mapping usage, and custom reports
         // Available to all authenticated users (shows organization-level data)
         // ============================================================================
+        
+        // GET /api/analytics/extraction-performance - Extraction performance metrics
+        if (path === '/api/analytics/extraction-performance' && method === 'GET') {
+            try {
+                const user = await verifyJWT(event);
+                if (!user) {
+                    return createResponse(401, JSON.stringify({ error: 'Unauthorized' }));
+                }
+                
+                const { timeRange = '30d', vendorId } = event.queryStringParameters || {};
+                
+                const invoiceAudit = require('./services/invoiceAudit.service');
+                
+                const [performance, fieldBreakdown, corrections] = await Promise.all([
+                    invoiceAudit.getExtractionPerformance(timeRange, vendorId),
+                    invoiceAudit.getFieldBreakdown(timeRange),
+                    invoiceAudit.getHumanCorrectionRate(timeRange)
+                ]);
+                
+                // Calculate human correction rate
+                const totalInvoices = parseInt(performance.total_invoices) || 0;
+                const humanCorrectionRate = totalInvoices > 0 
+                    ? corrections.total_corrections / totalInvoices 
+                    : 0;
+                
+                return createResponse(200, JSON.stringify({
+                    time_range: timeRange,
+                    metrics: {
+                        total_invoices: totalInvoices,
+                        deterministic_rate: parseFloat(performance.avg_deterministic_rate || 0),
+                        llm_fallback_rate: parseFloat(performance.avg_llm_rate || 0),
+                        manual_rate: parseFloat(performance.avg_manual_rate || 0),
+                        human_correction_rate: humanCorrectionRate,
+                        avg_processing_time_ms: parseInt(performance.avg_processing_time_ms) || 0,
+                        median_processing_time_ms: parseInt(performance.median_processing_time_ms) || 0,
+                        p95_processing_time_ms: parseInt(performance.p95_processing_time_ms) || 0
+                    },
+                    field_breakdown: fieldBreakdown,
+                    corrections: corrections
+                }));
+            } catch (error) {
+                console.error('Error fetching extraction performance:', error);
+                return createResponse(500, JSON.stringify({ 
+                    error: 'Failed to fetch extraction performance',
+                    details: error.message 
+                }));
+            }
+        }
 
         // GET /api/analytics/dashboard/summary - Main dashboard overview
         if (path === '/api/analytics/dashboard/summary' && method === 'GET') {

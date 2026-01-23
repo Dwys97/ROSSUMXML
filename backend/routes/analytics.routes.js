@@ -1,10 +1,58 @@
 // backend/routes/analytics.routes.js
 // User Analytics Dashboard API Routes
 
+const express = require('express');
+const router = express.Router();
+const { authenticateToken, requirePermission } = require('../middleware/auth.middleware');
+const invoiceAudit = require('../services/invoiceAudit.service');
+
 /**
  * User Analytics Dashboard Endpoints
  * Provides detailed transformation statistics, mapping activity, and custom reporting
  */
+
+// GET /api/analytics/extraction-performance
+router.get('/extraction-performance', authenticateToken, async (req, res) => {
+    try {
+        const { timeRange = '30d', vendorId } = req.query;
+        
+        // Check permissions
+        if (!req.user.permissions?.includes('view_analytics')) {
+            return res.status(403).json({ error: 'Insufficient permissions' });
+        }
+        
+        const [performance, fieldBreakdown, corrections] = await Promise.all([
+            invoiceAudit.getExtractionPerformance(timeRange, vendorId),
+            invoiceAudit.getFieldBreakdown(timeRange),
+            invoiceAudit.getHumanCorrectionRate(timeRange)
+        ]);
+        
+        // Calculate human correction rate
+        const totalInvoices = parseInt(performance.total_invoices) || 0;
+        const humanCorrectionRate = totalInvoices > 0 
+            ? corrections.total_corrections / totalInvoices 
+            : 0;
+        
+        res.json({
+            time_range: timeRange,
+            metrics: {
+                total_invoices: totalInvoices,
+                deterministic_rate: parseFloat(performance.avg_deterministic_rate || 0),
+                llm_fallback_rate: parseFloat(performance.avg_llm_rate || 0),
+                manual_rate: parseFloat(performance.avg_manual_rate || 0),
+                human_correction_rate: humanCorrectionRate,
+                avg_processing_time_ms: parseInt(performance.avg_processing_time_ms) || 0,
+                median_processing_time_ms: parseInt(performance.median_processing_time_ms) || 0,
+                p95_processing_time_ms: parseInt(performance.p95_processing_time_ms) || 0
+            },
+            field_breakdown: fieldBreakdown,
+            corrections: corrections
+        });
+    } catch (error) {
+        console.error('Error fetching extraction performance:', error);
+        res.status(500).json({ error: 'Failed to fetch extraction performance' });
+    }
+});
 
 /**
  * Get transformation statistics for user's organization
@@ -525,10 +573,5 @@ async function getDashboardSummary(pool, userId) {
     }
 }
 
-module.exports = {
-    getTransformationStats,
-    getMappingActivity,
-    getCustomReport,
-    getTransformationHistory,
-    getDashboardSummary
-};
+// Export router
+module.exports = router;

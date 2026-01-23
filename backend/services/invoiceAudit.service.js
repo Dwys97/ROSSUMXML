@@ -5,6 +5,75 @@
  */
 
 const db = require('../db');
+const pool = require('../db/pool');
+
+/**
+ * Get extraction performance metrics
+ * @param {string} timeRange - Time range (e.g., '30d', '7d', '24h')
+ * @param {string} vendorId - Optional vendor filter
+ * @returns {Promise<Object>} Performance metrics
+ */
+async function getExtractionPerformance(timeRange = '30d', vendorId = null) {
+    const query = `
+        SELECT 
+            COUNT(DISTINCT invoice_id) as total_invoices,
+            AVG(deterministic_count::float / NULLIF(total_fields, 0)) as avg_deterministic_rate,
+            AVG(llm_count::float / NULLIF(total_fields, 0)) as avg_llm_rate,
+            AVG(manual_count::float / NULLIF(total_fields, 0)) as avg_manual_rate,
+            AVG(processing_time_ms) as avg_processing_time_ms,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY processing_time_ms) as median_processing_time_ms,
+            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY processing_time_ms) as p95_processing_time_ms
+        FROM invoice_extraction_metadata
+        WHERE created_at >= NOW() - INTERVAL '${timeRange}'
+        ${vendorId ? 'AND vendor_id = $1' : ''}
+    `;
+    
+    const result = await pool.query(query, vendorId ? [vendorId] : []);
+    return result.rows[0];
+}
+
+/**
+ * Get field-level extraction breakdown
+ * @param {string} timeRange - Time range
+ * @returns {Promise<Array>} Field breakdown
+ */
+async function getFieldBreakdown(timeRange = '30d') {
+    const query = `
+        SELECT 
+            jsonb_object_keys(field_sources) as field_name,
+            COUNT(*) as occurrences,
+            AVG(CASE WHEN field_sources->>jsonb_object_keys(field_sources) LIKE 'cir%' THEN 1 ELSE 0 END) as cir_rate,
+            AVG(CASE WHEN field_sources->>jsonb_object_keys(field_sources) = 'qwen' THEN 1 ELSE 0 END) as llm_rate
+        FROM invoice_extraction_metadata
+        WHERE created_at >= NOW() - INTERVAL '${timeRange}'
+        GROUP BY field_name
+        ORDER BY occurrences DESC
+    `;
+    
+    const result = await pool.query(query);
+    return result.rows;
+}
+
+/**
+ * Get human correction rate
+ * @param {string} timeRange - Time range
+ * @returns {Promise<Object>} Correction statistics
+ */
+async function getHumanCorrectionRate(timeRange = '30d') {
+    const query = `
+        SELECT 
+            COUNT(DISTINCT invoice_id) as corrected_invoices,
+            COUNT(*) as total_corrections,
+            COUNT(*) FILTER (WHERE extraction_source LIKE 'cir%') as cir_corrections,
+            COUNT(*) FILTER (WHERE extraction_source = 'qwen') as llm_corrections
+        FROM extraction_learning_queue
+        WHERE created_at >= NOW() - INTERVAL '${timeRange}'
+    `;
+    
+    const result = await pool.query(query);
+    return result.rows[0];
+}
+
 
 /**
  * Get audit trail for an invoice
@@ -257,5 +326,8 @@ module.exports = {
     getInvoiceAuditSummary,
     getOrganizationAuditStats,
     getUserActivity,
-    generateComplianceReport
+    generateComplianceReport,
+    getExtractionPerformance,
+    getFieldBreakdown,
+    getHumanCorrectionRate
 };

@@ -428,6 +428,176 @@ async function getBboxCorrectionStats() {
     }
 }
 
+/**
+ * Capture user corrections for adaptive learning
+ * @param {string} invoiceId - Invoice UUID
+ * @param {Object} originalFields - Original extracted fields with metadata
+ * @param {Object} correctedFields - User-corrected field values
+ * @param {string} userId - User UUID who made corrections
+ * @returns {Promise<number>} Number of corrections captured
+ */
+async function captureCorrections(invoiceId, originalFields, correctedFields, userId) {
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        const learningData = [];
+        
+        // Get invoice metadata for vendor_id
+        const invoiceQuery = await client.query(
+            'SELECT vendor_profile_id FROM invoices WHERE id = $1',
+            [invoiceId]
+        );
+        const vendorId = invoiceQuery.rows[0]?.vendor_profile_id || null;
+        
+        // Compare original vs corrected fields
+        for (const [fieldName, correctedValue] of Object.entries(correctedFields)) {
+            const original = originalFields[fieldName];
+            
+            // Skip if no change
+            if (original?.value === correctedValue) continue;
+            
+            // Determine correction type
+            const correctionType = classifyCorrectionType(original?.value, correctedValue);
+            
+            // Extract OCR context (surrounding text) - we'll need to query the invoice text
+            const ocrContext = await extractFieldContext(client, invoiceId, fieldName);
+            
+            learningData.push({
+                invoice_id: invoiceId,
+                field_name: fieldName,
+                extraction_source: original?.source || 'manual',
+                extraction_method: original?.method || null,
+                original_value: original?.value || null,
+                corrected_value: correctedValue,
+                ocr_context: ocrContext,
+                confidence_score: original?.confidence || 0,
+                correction_type: correctionType,
+                vendor_id: vendorId
+            });
+        }
+        
+        if (learningData.length === 0) {
+            await client.query('COMMIT');
+            return 0;
+        }
+        
+        // Bulk insert into learning queue
+        const values = [];
+        const placeholders = [];
+        
+        learningData.forEach((data, i) => {
+            const offset = i * 10;
+            placeholders.push(`($${offset+1}, $${offset+2}, $${offset+3}, $${offset+4}, $${offset+5}, $${offset+6}, $${offset+7}, $${offset+8}, $${offset+9}, $${offset+10})`);
+            values.push(
+                data.invoice_id,
+                data.field_name,
+                data.extraction_source,
+                data.extraction_method,
+                data.original_value,
+                data.corrected_value,
+                data.ocr_context,
+                data.confidence_score,
+                data.correction_type,
+                data.vendor_id
+            );
+        });
+        
+        const insertQuery = `
+            INSERT INTO extraction_learning_queue 
+            (invoice_id, field_name, extraction_source, extraction_method, original_value, 
+             corrected_value, ocr_context, confidence_score, correction_type, vendor_id)
+            VALUES ${placeholders.join(', ')}
+        `;
+        
+        await client.query(insertQuery, values);
+        
+        // Log audit event
+        await client.query(
+            `INSERT INTO invoice_audit_log (invoice_id, user_id, action, metadata)
+             VALUES ($1, $2, 'corrections_captured', $3)`,
+            [invoiceId, userId, JSON.stringify({ field_count: learningData.length })]
+        );
+        
+        await client.query('COMMIT');
+        
+        logger.info(`Captured ${learningData.length} corrections for invoice ${invoiceId}`);
+        return learningData.length;
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        logger.error('Failed to capture corrections:', error);
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+/**
+ * Classify the type of correction
+ * @param {string} original - Original extracted value
+ * @param {string} corrected - Corrected value
+ * @returns {string} Correction type
+ */
+function classifyCorrectionType(original, corrected) {
+    if (!original || original === null || original === '') {
+        return 'missing_extraction';
+    }
+    
+    if (typeof original !== 'string' || typeof corrected !== 'string') {
+        return 'value_error';
+    }
+    
+    // Check if only length differs
+    if (original.length !== corrected.length) {
+        return 'format_error';
+    }
+    
+    // Check if only case differs
+    if (original.toLowerCase() === corrected.toLowerCase()) {
+        return 'case_error';
+    }
+    
+    // Check if numbers are involved
+    if (/\d/.test(original) && /\d/.test(corrected)) {
+        return 'number_error';
+    }
+    
+    // Default to generic value error
+    return 'value_error';
+}
+
+/**
+ * Extract surrounding OCR context for a field (for few-shot learning)
+ * @param {Object} client - Database client
+ * @param {string} invoiceId - Invoice UUID
+ * @param {string} fieldName - Field name
+ * @returns {Promise<string>} OCR context
+ */
+async function extractFieldContext(client, invoiceId, fieldName) {
+    try {
+        // Try to get context from extracted_data metadata
+        const result = await client.query(
+            'SELECT extracted_data FROM invoices WHERE id = $1',
+            [invoiceId]
+        );
+        
+        if (result.rows[0]?.extracted_data) {
+            const extractedData = result.rows[0].extracted_data;
+            
+            // If field has bbox data, we could extract nearby text
+            // For now, return a simple context indicator
+            return `Context for ${fieldName} from document`;
+        }
+        
+        return null;
+    } catch (error) {
+        logger.warn(`Failed to extract context for ${fieldName}:`, error);
+        return null;
+    }
+}
+
 module.exports = {
     getVendorCorrections,
     trainVendorModel,
@@ -436,5 +606,7 @@ module.exports = {
     scheduleVendorTraining,
     getTrainingHistory,
     getGeneralTrainingData,
-    getBboxCorrectionStats
+    getBboxCorrectionStats,
+    captureCorrections,
+    classifyCorrectionType
 };
