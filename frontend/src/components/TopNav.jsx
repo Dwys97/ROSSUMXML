@@ -1,163 +1,71 @@
-import React, { useState, memo, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/useAuth';
-import UserProfile from './profile/UserProfile';
-import ApiSettingsModal from './common/ApiSettingsModal';
-import AnalyticsDashboardModal from './analytics/AnalyticsDashboardModal';
-import styles from './TopNav.module.css';
-import logo from '../assets/logo-light.svg';
+import React, { useState, memo, useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/useAuth";
+import UserProfile from "./profile/UserProfile";
+import ApiSettingsModal from "./common/ApiSettingsModal";
+import AnalyticsDashboardModal from "./analytics/AnalyticsDashboardModal";
+import logo from "../assets/logo-light.svg";
 
 const TopNav = memo(function TopNav() {
-    const { user, checkAuth, logout } = useAuth();
-    const location = useLocation();
-    const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact', '/api-docs'].includes(location.pathname);
-    const isAdminPage = location.pathname.startsWith('/admin');
-    const [isProfileOpen, setIsProfileOpen] = useState(false);
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [showApiSettings, setShowApiSettings] = useState(false);
-    const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+	const { user, checkAuth, logout } = useAuth();
+	const location = useLocation();
+	const isPublicPage = ["/", "/request-demo", "/solutions", "/enterprise", "/about", "/contact", "/api-docs"].includes(location.pathname);
+	const isAdminPage = location.pathname.startsWith("/admin");
+	const [isProfileOpen, setIsProfileOpen] = useState(false);
+	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const [showApiSettings, setShowApiSettings] = useState(false);
+	const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
-    // Check authentication state when entering the page
-    useEffect(() => {
-        const verifyAuth = async () => {
-            if (!user) {
-                await checkAuth();
-            }
-        };
-        verifyAuth();
-    }, [location.pathname, checkAuth, user]);
+	// Check authentication state when entering the page
+	useEffect(() => {
+		const verifyAuth = async () => {
+			if (!user) {
+				await checkAuth();
+			}
+		};
+		verifyAuth();
+	}, [location.pathname, checkAuth, user]);
 
-    // Close mobile menu when route changes
-    useEffect(() => {
-        setIsMobileMenuOpen(false);
-    }, [location.pathname]);
+	// Close mobile menu when route changes
+	useEffect(() => {
+		setIsMobileMenuOpen(false);
+	}, [location.pathname]);
 
-    const handleNavLinkClick = () => {
-        setIsMobileMenuOpen(false);
-    };
+	const handleNavLinkClick = () => {
+		setIsMobileMenuOpen(false);
+	};
 
-    const handleProfileClick = () => {
-        setIsProfileOpen(true);
-        setIsMobileMenuOpen(false);
-    };
+	const handleProfileClick = () => {
+		setIsProfileOpen(true);
+		setIsMobileMenuOpen(false);
+	};
 
-    const handleLogout = () => {
-        setIsMobileMenuOpen(false);
-        setIsProfileOpen(false);
-        
-        // Clear auth data first
-        logout();
-        
-        // Force hard redirect to landing page
-        window.location.href = '/';
-    };
+	const handleLogout = () => {
+		setIsMobileMenuOpen(false);
+		setIsProfileOpen(false);
 
-    const toggleMobileMenu = () => {
-        setIsMobileMenuOpen(!isMobileMenuOpen);
-    };
+		// Clear auth data first
+		logout();
 
-    // Handle keyboard navigation for mobile menu
-    useEffect(() => {
-        const handleKeyDown = (event) => {
-            if (event.key === 'Escape' && isMobileMenuOpen) {
-                setIsMobileMenuOpen(false);
-            }
-        };
+		// Force hard redirect to landing page
+		window.location.href = "/";
+	};
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isMobileMenuOpen]);
+	const toggleMobileMenu = () => {
+		setIsMobileMenuOpen(!isMobileMenuOpen);
+	};
 
-    return (
-        <>
-            <nav className={styles.mainNav}>
-                <div className={styles.navContainer}>
-                    <NavLink to="/" onClick={handleNavLinkClick} aria-label="Home">
-                        <img src={logo} alt="RossumXML Logo" className={styles.logo} />
-                    </NavLink>
+	// Handle keyboard navigation for mobile menu
+	useEffect(() => {
+		const handleKeyDown = (event) => {
+			if (event.key === "Escape" && isMobileMenuOpen) {
+				setIsMobileMenuOpen(false);
+			}
+		};
 
-                    {/* Desktop Navigation */}
-                    <div className={styles.navLinks}>
-                        {isPublicPage ? (
-                            <>
-                                <NavLink to="/solutions" className={styles.navLink}>Solutions</NavLink>
-                                <NavLink to="/enterprise" className={styles.navLink}>Enterprise</NavLink>
-                                <NavLink to="/api-docs" className={styles.navLink}>API Docs</NavLink>
-                                <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
-                                <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
-                                {user ? (
-                                    <NavLink 
-                                        to="/transformer" 
-                                        className={`${styles.navLink} ${styles.transformerButton}`}
-                                        onClick={handleNavLinkClick}
-                                    >
-                                        Dashboard
-                                    </NavLink>
-                                ) : (
-                                    <>
-                                        <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
-                                        <NavLink to="/register" className={styles.loginButton}>Register</NavLink>
-                                    </>
-                                )}
-                            </>
-                        ) : user ? (
-                            <>
-                                {!isAdminPage && (
-                                    <>
-                                        <NavLink to="/" className={styles.navLink} onClick={handleNavLinkClick}>
-                                            🏠 Home
-                                        </NavLink>
-                                        <NavLink to="/invoices" className={styles.navLink} onClick={handleNavLinkClick}>
-                                            📄 Invoice Extractor
-                                        </NavLink>
-                                        {user?.isAdmin && (
-                                            <NavLink to="/admin" className={styles.navLink} onClick={handleNavLinkClick}>
-                                                👨‍💼 Admin
-                                            </NavLink>
-                                        )}
-                                        <button 
-                                            onClick={() => {
-                                                setIsAnalyticsOpen(true);
-                                                setIsMobileMenuOpen(false);
-                                            }} 
-                                            className={styles.navLink}
-                                            aria-label="Analytics Dashboard"
-                                        >
-                                            📊 Analytics
-                                        </button>
-                                        <button 
-                                            onClick={() => setShowApiSettings(true)} 
-                                            className={styles.navLink}
-                                            aria-label="API Settings"
-                                        >
-                                            ⚙️ API Settings
-                                        </button>
-                                    </>
-                                )}
-                                {isAdminPage && (
-                                    <>
-                                        <NavLink to="/transformer" className={styles.navLink} onClick={handleNavLinkClick}>
-                                            🔄 Transformer
-                                        </NavLink>
-                                    </>
-                                )}
-                                <button 
-                                    onClick={handleProfileClick} 
-                                    className={styles.userButton}
-                                    aria-label="User profile"
-                                >
-                                    <div className={styles.userAvatar}>
-                                        {user?.username?.[0]?.toUpperCase() || 'U'}
-                                    </div>
-                                    <span className={styles.userName}>
-                                        {user?.username || 'Profile'}
-                                    </span>
-                                </button>
-                            </>
-                        ) : (
-                            <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
-                        )}
-                    </div>
+		document.addEventListener("keydown", handleKeyDown);
+		return () => document.removeEventListener("keydown", handleKeyDown);
+	}, [isMobileMenuOpen]);
 
 	return (
 		<>
@@ -173,32 +81,32 @@ const TopNav = memo(function TopNav() {
 							<NavLink to="/solutions" className="">
 								Solutions
 							</NavLink>
-							<NavLink to="/enterprise" className={styles.navLink}>
+							<NavLink to="/enterprise" className="text-white hover:text-gray-300 transition">
 								Enterprise
 							</NavLink>
-							<NavLink to="/api-docs" className={styles.navLink}>
+							<NavLink to="/api-docs" className="text-white hover:text-gray-300 transition">
 								API Docs
 							</NavLink>
-							<NavLink to="/about" className={styles.navLink}>
+							<NavLink to="/about" className="text-white hover:text-gray-300 transition">
 								About Us
 							</NavLink>
-							<NavLink to="/contact" className={styles.navLink}>
+							<NavLink to="/contact" className="text-white hover:text-gray-300 transition">
 								Contact Us
 							</NavLink>
 							{user ? (
 								<NavLink
 									to="/transformer"
-									className={`${styles.navLink} ${styles.transformerButton}`}
+									className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
 									onClick={handleNavLinkClick}
 								>
 									Dashboard
 								</NavLink>
 							) : (
 								<>
-									<NavLink to="/login" className={styles.loginButton}>
+									<NavLink to="/login" className="text-white hover:text-gray-300 transition">
 										Login
 									</NavLink>
-									<NavLink to="/register" className={styles.loginButton}>
+									<NavLink to="/register" className="text-white hover:text-gray-300 transition">
 										Register
 									</NavLink>
 								</>
@@ -219,7 +127,11 @@ const TopNav = memo(function TopNav() {
 											Home
 										</NavLink>
 										{user?.isAdmin && (
-											<NavLink to="/admin" className={styles.navLink} onClick={handleNavLinkClick}>
+											<NavLink
+												to="/admin"
+												className="text-white hover:text-gray-300 transition"
+												onClick={handleNavLinkClick}
+											>
 												👨‍💼 Admin
 											</NavLink>
 										)}
@@ -244,7 +156,7 @@ const TopNav = memo(function TopNav() {
 										</NavLink>
 										<button
 											onClick={() => setShowApiSettings(true)}
-											className={styles.navLink}
+											className="text-white hover:text-gray-300 transition"
 											aria-label="API Settings"
 										>
 											⚙️ API Settings
@@ -253,7 +165,11 @@ const TopNav = memo(function TopNav() {
 								)}
 								{isAdminPage && (
 									<>
-										<NavLink to="/transformer" className={styles.navLink} onClick={handleNavLinkClick}>
+										<NavLink
+											to="/transformer"
+											className="text-white hover:text-gray-300 transition"
+											onClick={handleNavLinkClick}
+										>
 											🔄 Transformer
 										</NavLink>
 									</>
@@ -286,34 +202,50 @@ const TopNav = memo(function TopNav() {
 
 				{/* Mobile Menu */}
 				{isMobileMenuOpen && (
-					<div className={styles.mobileMenu}>
+					<div className="bg-gray-800 text-white p-4 space-y-2">
 						{isPublicPage ? (
 							<>
-								<NavLink to="/solutions" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+								<NavLink to="/solutions" className="block py-2 hover:text-gray-300 transition" onClick={handleNavLinkClick}>
 									Solutions
 								</NavLink>
-								<NavLink to="/enterprise" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+								<NavLink
+									to="/enterprise"
+									className="block py-2 hover:text-gray-300 transition"
+									onClick={handleNavLinkClick}
+								>
 									Enterprise
 								</NavLink>
-								<NavLink to="/api-docs" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+								<NavLink to="/api-docs" className="block py-2 hover:text-gray-300 transition" onClick={handleNavLinkClick}>
 									API Docs
 								</NavLink>
-								<NavLink to="/about" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+								<NavLink to="/about" className="block py-2 hover:text-gray-300 transition" onClick={handleNavLinkClick}>
 									About Us
 								</NavLink>
-								<NavLink to="/contact" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+								<NavLink to="/contact" className="block py-2 hover:text-gray-300 transition" onClick={handleNavLinkClick}>
 									Contact Us
 								</NavLink>
 								{user ? (
-									<NavLink to="/transformer" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+									<NavLink
+										to="/transformer"
+										className="block py-2 hover:text-gray-300 transition"
+										onClick={handleNavLinkClick}
+									>
 										Dashboard
 									</NavLink>
 								) : (
 									<>
-										<NavLink to="/login" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+										<NavLink
+											to="/login"
+											className="block py-2 hover:text-gray-300 transition"
+											onClick={handleNavLinkClick}
+										>
 											Login
 										</NavLink>
-										<NavLink to="/register" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+										<NavLink
+											to="/register"
+											className="block py-2 hover:text-gray-300 transition"
+											onClick={handleNavLinkClick}
+										>
 											Register
 										</NavLink>
 									</>
@@ -323,11 +255,15 @@ const TopNav = memo(function TopNav() {
 							<>
 								{!isAdminPage && (
 									<>
-										<NavLink to="/" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+										<NavLink to="/" className="block py-2 hover:text-gray-300 transition" onClick={handleNavLinkClick}>
 											🏠 Home
 										</NavLink>
 										{user?.isAdmin && (
-											<NavLink to="/admin" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+											<NavLink
+												to="/admin"
+												className="block py-2 hover:text-gray-300 transition"
+												onClick={handleNavLinkClick}
+											>
 												👨‍💼 Admin
 											</NavLink>
 										)}
@@ -336,7 +272,7 @@ const TopNav = memo(function TopNav() {
 												setIsAnalyticsOpen(true);
 												setIsMobileMenuOpen(false);
 											}}
-											className={styles.mobileNavLink}
+											className="block py-2 hover:text-gray-300 transition"
 										>
 											📊 Analytics
 										</button>
@@ -345,7 +281,7 @@ const TopNav = memo(function TopNav() {
 												setShowApiSettings(true);
 												setIsMobileMenuOpen(false);
 											}}
-											className={styles.mobileNavLink}
+											className="block py-2 hover:text-gray-300 transition"
 										>
 											⚙️ API Settings
 										</button>
@@ -353,13 +289,19 @@ const TopNav = memo(function TopNav() {
 								)}
 								{isAdminPage && (
 									<>
-										<NavLink to="/transformer" className={styles.mobileNavLink} onClick={handleNavLinkClick}>
+										<NavLink
+											to="/transformer"
+											className="block py-2 hover:text-gray-300 transition"
+											onClick={handleNavLinkClick}
+										>
 											🔄 Transformer
 										</NavLink>
 									</>
 								)}
-								<button onClick={handleProfileClick} className={styles.mobileUserButton}>
-									<div className={styles.userAvatar}>{user?.username?.[0]?.toUpperCase() || "U"}</div>
+								<button onClick={handleProfileClick} className="flex items-center gap-2 py-2">
+									<div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+										{user?.username?.[0]?.toUpperCase() || "U"}
+									</div>
 									<span>{user?.username || "Profile"}</span>
 								</button>
 							</>
