@@ -122,7 +122,7 @@ TOTAL: 10/10 PASSED (100%)
 
 ### Prerequisites
 ```bash
-# 1. Backend running (SAM Local)
+# 1. Backend running (Express via docker-compose)
 bash start-backend.sh
 # Verify: http://localhost:3000
 

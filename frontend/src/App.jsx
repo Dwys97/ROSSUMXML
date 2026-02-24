@@ -1,85 +1,117 @@
-import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
-import { DataPreloadProvider } from "./contexts/DataPreloadContext";
-import ProtectedRoute from "./components/ProtectedRoute";
-import LandingPage from "./pages/LandingPage";
-import EditorPage from "./pages/EditorPage";
-import TransformerPage from "./pages/TransformerPage";
-import LoginPage from "./pages/LoginPage.jsx";
-import RegisterPage from "./pages/RegisterPage.jsx";
-import RequestDemoPage from "./pages/RequestDemoPage";
-import SolutionsPage from "./pages/SolutionsPage";
-import EnterprisePage from "./pages/EnterprisePage";
-import AboutPage from "./pages/AboutPage";
-import ContactPage from "./pages/ContactPage";
-import ApiDocsPage from "./pages/ApiDocsPage";
-import UserProfile from "./components/profile/UserProfile";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
-import "./App.css";
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { DataPreloadProvider } from './contexts/DataPreloadContext';
+import { SocketProvider } from './contexts/SocketContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LandingPage from './pages/LandingPage';
+import EditorPage from './pages/EditorPage';
+import TransformerPage from './pages/TransformerPage';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import RequestDemoPage from './pages/RequestDemoPage';
+import SolutionsPage from './pages/SolutionsPage';
+import EnterprisePage from './pages/EnterprisePage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
+import ApiDocsPage from './pages/ApiDocsPage';
+import UserProfile from './components/profile/UserProfile';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
+import InvoiceWorkflowPage from './pages/InvoiceWorkflowPage';
+import InvoiceAnnotationPage from './pages/InvoiceAnnotationPage';
+import FieldTemplatesPage from './pages/FieldTemplatesPage';
+import './App.css';
 
-export default function App() {
-	return (
-		<BrowserRouter>
-			<AuthProvider>
-				<DataPreloadProvider>
-					<Routes>
-						{/* Публичные маршруты */}
-						<Route path="/" element={<LandingPage />} />
-						<Route path="/login" element={<LoginPage />} />
-						<Route path="/register" element={<RegisterPage />} />
-						<Route path="/request-demo" element={<RequestDemoPage />} />
-						<Route path="/solutions" element={<SolutionsPage />} />
-						<Route path="/enterprise" element={<EnterprisePage />} />
-						<Route path="/about" element={<AboutPage />} />
-						<Route path="/contact" element={<ContactPage />} />
-						<Route path="/api-docs" element={<ApiDocsPage />} />
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <SocketProvider>
+          <DataPreloadProvider>
+            <Routes>
+              {/* Публичные маршруты */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/request-demo" element={<RequestDemoPage />} />
+              <Route path="/solutions" element={<SolutionsPage />} />
+              <Route path="/enterprise" element={<EnterprisePage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/api-docs" element={<ApiDocsPage />} />
+              
+              {/* Защищенные маршруты */}
+              <Route 
+                path="/transformer" 
+                element={
+                  <ProtectedRoute>
+                    <TransformerPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/editor" 
+                element={
+                  <ProtectedRoute>
+                    <EditorPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <UserProfile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/analytics" 
+                element={
+                  <ProtectedRoute>
+                    <AnalyticsDashboardPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/invoices" 
+                element={
+                  <ProtectedRoute>
+                    <InvoiceWorkflowPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/invoices/field-templates" 
+                element={
+                  <ProtectedRoute>
+                    <FieldTemplatesPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/invoices/:id" 
+                element={
+                  <ProtectedRoute>
+                    <InvoiceAnnotationPage />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </DataPreloadProvider>
+        </SocketProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
 
-						{/* Защищенные маршруты */}
-						<Route
-							path="/transformer"
-							element={
-								<ProtectedRoute>
-									<TransformerPage />
-								</ProtectedRoute>
-							}
-						/>
-						<Route
-							path="/editor"
-							element={
-								<ProtectedRoute>
-									<EditorPage />
-								</ProtectedRoute>
-							}
-						/>
-						<Route
-							path="/profile"
-							element={
-								<ProtectedRoute>
-									<UserProfile />
-								</ProtectedRoute>
-							}
-						/>
-						<Route
-							path="/analytics"
-							element={
-								<ProtectedRoute>
-									<AnalyticsDashboardPage />
-								</ProtectedRoute>
-							}
-						/>
-						<Route
-							path="/admin"
-							element={
-								<ProtectedRoute>
-									<AdminDashboard />
-								</ProtectedRoute>
-							}
-						/>
-					</Routes>
-				</DataPreloadProvider>
-			</AuthProvider>
-		</BrowserRouter>
-	)
-};
+export default App;

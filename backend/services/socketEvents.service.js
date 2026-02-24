@@ -122,6 +122,26 @@ function emitFieldUpdate(invoiceId, fieldPath, value, confidence) {
 }
 
 /**
+ * Emit OCR preview event (for showing raw text while LLM processes)
+ * @param {string} invoiceId - Invoice UUID
+ * @param {string} ocrText - Extracted OCR text
+ * @param {number} tableCount - Number of tables detected
+ */
+function emitOCRPreview(invoiceId, ocrText, tableCount) {
+    const socketIo = getIO();
+    if (!socketIo) return;
+    
+    socketIo.to(`invoice:${invoiceId}`).emit('extraction:ocr-preview', {
+        invoiceId,
+        ocrText: ocrText.substring(0, 2000), // Limit to first 2000 chars for preview
+        tableCount,
+        timestamp: Date.now()
+    });
+    
+    console.log(`📡 [Socket] OCR preview sent for ${invoiceId} (${tableCount} tables)`);
+}
+
+/**
  * Emit training started event
  * @param {string} vendorId - Vendor profile ID
  * @param {number} sampleCount - Number of training samples
@@ -183,6 +203,7 @@ module.exports = {
     emitExtractionFailed,
     emitExtractionStarted,
     emitFieldUpdate,
+    emitOCRPreview,
     emitTrainingStarted,
     emitTrainingProgress,
     emitTrainingCompleted

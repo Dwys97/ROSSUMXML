@@ -1,15 +1,20 @@
+/* Invoice Workflow Page Styles */
+
 .container {
+    padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 2rem;
+    min-height: calc(100vh - 80px);
 }
 
+/* Header */
 .header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 2rem;
-    gap: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .headerLeft {
@@ -18,81 +23,101 @@
 
 .headerRight {
     flex-shrink: 0;
+    margin-left: 2rem;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.fieldManagerBtn {
+    padding: 0.65rem 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.fieldManagerBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(29, 114, 243, 0.6);
+    box-shadow: 0 6px 18px rgba(29, 114, 243, 0.15);
 }
 
 .title {
-    font-size: 2rem;
-    font-weight: 600;
-    color: #ffffff;
     margin: 0 0 0.5rem 0;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    font-size: 2rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: linear-gradient(135deg, #ffffff 0%, #a5a9b5 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .subtitle {
+    margin: 0;
     font-size: 1rem;
     color: #a5a9b5;
-    margin: 0;
 }
 
-/* Filters */
+/* Status Filters */
 .filters {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
+    margin-bottom: 1.5rem;
     gap: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    flex-wrap: wrap;
 }
 
 .statusFilters {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
-    flex: 1;
 }
 
 .statusFilter {
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #ffffff;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #a5a9b5;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 .statusFilter:hover {
-    border-color: rgba(29, 114, 243, 0.6);
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 20px rgba(29, 114, 243, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
 }
 
 .statusFilter.active {
     background: rgba(29, 114, 243, 0.2);
+    border-color: #1d72f3;
     color: #1d72f3;
-    border-color: rgba(29, 114, 243, 0.6);
 }
 
 .statusCount {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 0.1rem 0.4rem;
-    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 600;
 }
 
 .statusFilter.active .statusCount {
     background: rgba(29, 114, 243, 0.3);
-    color: #ffffff;
 }
 
 /* View Mode Toggle */
@@ -100,25 +125,24 @@
     display: flex;
     gap: 0.25rem;
     background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border-radius: 8px;
     padding: 0.25rem;
+    border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .viewModeBtn {
     padding: 0.5rem 0.75rem;
-    border: none;
     background: transparent;
-    cursor: pointer;
+    border: none;
     border-radius: 6px;
-    font-size: 1.2rem;
-    transition: all 0.3s ease;
     color: #a5a9b5;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
 }
 
 .viewModeBtn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
 }
 
@@ -127,37 +151,36 @@
     color: #1d72f3;
 }
 
-/* Error Message */
+/* Error State */
 .error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 2rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
 }
 
 .error p {
     margin: 0;
-    color: #fca5a5;
+    color: #f44336;
 }
 
 .error button {
     padding: 0.5rem 1rem;
-    background: #ef4444;
-    border: none;
-    border-radius: 8px;
+    background: rgba(244, 67, 54, 0.2);
+    border: 1px solid rgba(244, 67, 54, 0.4);
+    border-radius: 6px;
+    color: #f44336;
     cursor: pointer;
-    font-weight: 500;
-    color: #ffffff;
-    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    transition: all 0.2s;
 }
 
 .error button:hover {
-    background: #dc2626;
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    background: rgba(244, 67, 54, 0.3);
 }
 
 /* Loading State */
@@ -167,55 +190,213 @@
     align-items: center;
     justify-content: center;
     padding: 4rem 2rem;
-    text-align: center;
+    color: #a5a9b5;
 }
 
 .spinner {
     width: 48px;
     height: 48px;
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top: 4px solid #1d72f3;
+    border: 3px solid rgba(29, 114, 243, 0.2);
+    border-top-color: #1d72f3;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 1rem;
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .loading p {
-    color: #ffffff;
+    margin: 0;
     font-size: 1rem;
 }
 
-/* Responsive Design */
+/* Field Manager Modal */
+.modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 10, 20, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 1.5rem;
+}
+
+.modalContent {
+    width: min(1200px, 95vw);
+    max-height: 90vh;
+    background: rgba(17, 20, 30, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modalHeader h2 {
+    margin: 0 0 0.25rem 0;
+    color: #ffffff;
+    font-size: 1.4rem;
+}
+
+.modalHeader p {
+    margin: 0;
+    color: #a5a9b5;
+    font-size: 0.95rem;
+}
+
+.closeBtn {
+    background: transparent;
+    border: none;
+    color: #a5a9b5;
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: color 0.2s ease;
+}
+
+.closeBtn:hover {
+    color: #ffffff;
+}
+
+.modalBody {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+/* Stats Section */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.statCard {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.statCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.statValue {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 0.25rem;
+}
+
+.statLabel {
+    font-size: 0.9rem;
+    color: #a5a9b5;
+}
+
+.statCard.primary .statValue {
+    color: #1d72f3;
+}
+
+.statCard.success .statValue {
+    color: #4caf50;
+}
+
+.statCard.warning .statValue {
+    color: #ff9800;
+}
+
+.statCard.danger .statValue {
+    color: #f44336;
+}
+
+/* Quick Actions */
+.quickActions {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.actionBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #1d72f3 0%, #0d5bd9 100%);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.actionBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(29, 114, 243, 0.4);
+}
+
+.actionBtn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.actionBtn.secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive */
 @media (max-width: 768px) {
     .container {
         padding: 1rem;
     }
-    
+
     .header {
         flex-direction: column;
-        align-items: flex-start;
         gap: 1rem;
     }
-    
+
     .headerRight {
+        margin-left: 0;
         width: 100%;
     }
-    
+
     .title {
         font-size: 1.5rem;
     }
-    
+
     .filters {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
+    .statusFilters {
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+
     .viewModeToggle {
-        justify-content: flex-end;
+        align-self: flex-end;
     }
 }

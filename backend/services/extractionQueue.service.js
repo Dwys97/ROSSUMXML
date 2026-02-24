@@ -9,9 +9,10 @@ const logger = require('../utils/logger');
 
 // Redis connection configuration
 const redisConfig = {
-    host: process.env.REDIS_HOST || 'localhost',
+    host: process.env.REDIS_HOST || 'localhost',  // Use 'redis' service name in Docker, or localhost for dev
     port: process.env.REDIS_PORT || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
+    family: 4,  // Force IPv4
     maxRetriesPerRequest: null,
     enableReadyCheck: false
 };
@@ -34,6 +35,11 @@ const extractionQueue = new Queue('invoice-extraction', {
             default:
                 return createRedisClient();
         }
+    },
+    settings: {
+        lockDuration: 300000, // 5 minutes - align with longer ML timeouts
+        stalledInterval: 60000, // Check for stalled jobs every 60s
+        maxStalledCount: 2 // Allow 2 stalls before failing
     },
     defaultJobOptions: {
         attempts: 3,

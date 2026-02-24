@@ -1,21 +1,166 @@
 {
     "version": "2.0.0",
     "tasks": [
+        // ==========================================
+        // Master Development Task
+        // ==========================================
+        {
+            "label": "🚀 Start All Dev Services (Separate Terminals)",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "1. Start Database",
+                "2. Start Redis",
+                "3. Start SmolDocling Service",
+                "4. Start Qwen2.5 Service",
+                "5. Start Orchestrator Service",
+                "6. Start Label Studio (HITL)",
+                "7. Start Backend",
+                "8. Start Socket Server",
+                "9. Start Worker",
+                "10. Start Frontend"
+            ],
+            "problemMatcher": []
+        },
+        
+        // ==========================================
+        // Infrastructure Services
+        // ==========================================
         {
             "label": "1. Start Database",
             "type": "shell",
-            "command": "bash start-db.sh",
+            "command": "docker-compose up db",
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
-                "focus": false
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
             }
         },
         {
+            "label": "2. Start Redis",
+            "type": "shell",
+            "command": "docker-compose up redis",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        
+        // ==========================================
+        // SmolDocling + Qwen2.5 Microservices
+        // ==========================================
+        {
+            "label": "3. Start SmolDocling Service",
+            "type": "shell",
+            "command": "docker-compose up docling-service",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "4. Start Qwen2.5 Service",
+            "type": "shell",
+            "command": "docker-compose up qwen-service",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "5. Start Orchestrator Service",
+            "type": "shell",
+            "command": "docker-compose up orchestrator-service",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "6. Start Label Studio (HITL)",
+            "type": "shell",
+            "command": "docker-compose up label-studio",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        
+        // ==========================================
+        // Application Services
+        // ==========================================
+        {
+            "label": "7. Start Backend",
+            "type": "shell",
+            "command": "echo '🔧 Starting Backend (Express + XML transformation)...' && sleep 3 && docker-compose up backend",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "8. Start Socket Server",
+            "type": "shell",
+            "command": "bash start-socket-server.sh",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "9. Start Worker",
+            "type": "shell",
+            "command": "bash start-worker.sh",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "10. Start Frontend",
+            "type": "shell",
+            "command": "bash start-frontend.sh",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": true,
+                "showReuseMessage": false
+            }
+        },
+        
+        // ==========================================
+        // Legacy Individual Tasks (for backward compatibility)
+        // ==========================================
+        {
             "label": "2. Start Backend",
             "type": "shell",
-            "command": "bash start-backend.sh",
+            "command": "docker-compose up -d backend && echo '✅ Backend started. Showing logs...' && docker-compose logs -f backend",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
@@ -37,9 +182,9 @@
             }
         },
         {
-            "label": "ML: Start OCR Service",
+            "label": "ML: Start SmolDocling Service",
             "type": "shell",
-            "command": "docker-compose up ocr-service",
+            "command": "docker-compose up docling-service",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
@@ -49,9 +194,9 @@
             }
         },
         {
-            "label": "ML: Start Extractor Service",
+            "label": "ML: Start Qwen2.5 Service",
             "type": "shell",
-            "command": "docker-compose up extractor-service",
+            "command": "docker-compose up qwen-service",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
@@ -61,9 +206,9 @@
             }
         },
         {
-            "label": "ML: Start API Gateway",
+            "label": "ML: Start Orchestrator",
             "type": "shell",
-            "command": "docker-compose up api-gateway",
+            "command": "docker-compose up orchestrator-service",
             "problemMatcher": [],
             "isBackground": true,
             "presentation": {
@@ -97,6 +242,17 @@
             }
         },
         {
+            "label": "ML: Start All Microservices",
+            "type": "shell",
+            "command": "docker-compose up -d docling-service qwen-service orchestrator-service redis",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": false
+            }
+        },
+        {
             "label": "ML: Start Socket Server",
             "type": "shell",
             "command": "bash start-socket-server.sh",
@@ -120,6 +276,10 @@
                 "focus": false
             }
         },
+        
+        // ==========================================
+        // Utility Tasks
+        // ==========================================
         {
             "label": "Utility: Kill Process on Port",
             "type": "shell",
@@ -143,7 +303,7 @@
         {
             "label": "Utility: Stop All Services",
             "type": "shell",
-            "command": "docker-compose down",
+            "command": "docker-compose down && echo '✅ All services stopped'",
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
@@ -159,6 +319,18 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Utility: Health Check All Services",
+            "type": "shell",
+            "command": "bash health-check.sh",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "showReuseMessage": false
             }
         }
     ],

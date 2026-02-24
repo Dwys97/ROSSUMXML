@@ -1,72 +1,163 @@
-import React, { useState, memo, useEffect } from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/useAuth";
-import UserProfile from "./profile/UserProfile";
-import ApiSettingsModal from "./common/ApiSettingsModal";
-import AnalyticsDashboardModal from "./analytics/AnalyticsDashboardModal";
-import styles from "./TopNav.module.css";
-import logo from "../assets/logo-light.svg";
+import React, { useState, memo, useEffect } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/useAuth';
+import UserProfile from './profile/UserProfile';
+import ApiSettingsModal from './common/ApiSettingsModal';
+import AnalyticsDashboardModal from './analytics/AnalyticsDashboardModal';
+import styles from './TopNav.module.css';
+import logo from '../assets/logo-light.svg';
 
 const TopNav = memo(function TopNav() {
-	const { user, checkAuth, logout } = useAuth();
-	const location = useLocation();
-	const isPublicPage = ["/", "/request-demo", "/solutions", "/enterprise", "/about", "/contact", "/api-docs"].includes(location.pathname);
-	const isAdminPage = location.pathname.startsWith("/admin");
-	const [isProfileOpen, setIsProfileOpen] = useState(false);
-	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-	const [showApiSettings, setShowApiSettings] = useState(false);
-	const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+    const { user, checkAuth, logout } = useAuth();
+    const location = useLocation();
+    const isPublicPage = ['/', '/request-demo', '/solutions', '/enterprise', '/about', '/contact', '/api-docs'].includes(location.pathname);
+    const isAdminPage = location.pathname.startsWith('/admin');
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [showApiSettings, setShowApiSettings] = useState(false);
+    const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
-	// Check authentication state when entering the page
-	useEffect(() => {
-		const verifyAuth = async () => {
-			if (!user) {
-				await checkAuth();
-			}
-		};
-		verifyAuth();
-	}, [location.pathname, checkAuth, user]);
+    // Check authentication state when entering the page
+    useEffect(() => {
+        const verifyAuth = async () => {
+            if (!user) {
+                await checkAuth();
+            }
+        };
+        verifyAuth();
+    }, [location.pathname, checkAuth, user]);
 
-	// Close mobile menu when route changes
-	useEffect(() => {
-		setIsMobileMenuOpen(false);
-	}, [location.pathname]);
+    // Close mobile menu when route changes
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [location.pathname]);
 
-	const handleNavLinkClick = () => {
-		setIsMobileMenuOpen(false);
-	};
+    const handleNavLinkClick = () => {
+        setIsMobileMenuOpen(false);
+    };
 
-	const handleProfileClick = () => {
-		setIsProfileOpen(true);
-		setIsMobileMenuOpen(false);
-	};
+    const handleProfileClick = () => {
+        setIsProfileOpen(true);
+        setIsMobileMenuOpen(false);
+    };
 
-	const handleLogout = () => {
-		setIsMobileMenuOpen(false);
-		setIsProfileOpen(false);
+    const handleLogout = () => {
+        setIsMobileMenuOpen(false);
+        setIsProfileOpen(false);
+        
+        // Clear auth data first
+        logout();
+        
+        // Force hard redirect to landing page
+        window.location.href = '/';
+    };
 
-		// Clear auth data first
-		logout();
+    const toggleMobileMenu = () => {
+        setIsMobileMenuOpen(!isMobileMenuOpen);
+    };
 
-		// Force hard redirect to landing page
-		window.location.href = "/";
-	};
+    // Handle keyboard navigation for mobile menu
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape' && isMobileMenuOpen) {
+                setIsMobileMenuOpen(false);
+            }
+        };
 
-	const toggleMobileMenu = () => {
-		setIsMobileMenuOpen(!isMobileMenuOpen);
-	};
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isMobileMenuOpen]);
 
-	// Handle keyboard navigation for mobile menu
-	useEffect(() => {
-		const handleKeyDown = (event) => {
-			if (event.key === "Escape" && isMobileMenuOpen) {
-				setIsMobileMenuOpen(false);
-			}
-		};
+    return (
+        <>
+            <nav className={styles.mainNav}>
+                <div className={styles.navContainer}>
+                    <NavLink to="/" onClick={handleNavLinkClick} aria-label="Home">
+                        <img src={logo} alt="RossumXML Logo" className={styles.logo} />
+                    </NavLink>
 
-		document.addEventListener("keydown", handleKeyDown);
-		return () => document.removeEventListener("keydown", handleKeyDown);
-	}, [isMobileMenuOpen]);
+                    {/* Desktop Navigation */}
+                    <div className={styles.navLinks}>
+                        {isPublicPage ? (
+                            <>
+                                <NavLink to="/solutions" className={styles.navLink}>Solutions</NavLink>
+                                <NavLink to="/enterprise" className={styles.navLink}>Enterprise</NavLink>
+                                <NavLink to="/api-docs" className={styles.navLink}>API Docs</NavLink>
+                                <NavLink to="/about" className={styles.navLink}>About Us</NavLink>
+                                <NavLink to="/contact" className={styles.navLink}>Contact Us</NavLink>
+                                {user ? (
+                                    <NavLink 
+                                        to="/transformer" 
+                                        className={`${styles.navLink} ${styles.transformerButton}`}
+                                        onClick={handleNavLinkClick}
+                                    >
+                                        Dashboard
+                                    </NavLink>
+                                ) : (
+                                    <>
+                                        <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
+                                        <NavLink to="/register" className={styles.loginButton}>Register</NavLink>
+                                    </>
+                                )}
+                            </>
+                        ) : user ? (
+                            <>
+                                {!isAdminPage && (
+                                    <>
+                                        <NavLink to="/" className={styles.navLink} onClick={handleNavLinkClick}>
+                                            🏠 Home
+                                        </NavLink>
+                                        <NavLink to="/invoices" className={styles.navLink} onClick={handleNavLinkClick}>
+                                            📄 Invoice Extractor
+                                        </NavLink>
+                                        {user?.isAdmin && (
+                                            <NavLink to="/admin" className={styles.navLink} onClick={handleNavLinkClick}>
+                                                👨‍💼 Admin
+                                            </NavLink>
+                                        )}
+                                        <button 
+                                            onClick={() => {
+                                                setIsAnalyticsOpen(true);
+                                                setIsMobileMenuOpen(false);
+                                            }} 
+                                            className={styles.navLink}
+                                            aria-label="Analytics Dashboard"
+                                        >
+                                            📊 Analytics
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowApiSettings(true)} 
+                                            className={styles.navLink}
+                                            aria-label="API Settings"
+                                        >
+                                            ⚙️ API Settings
+                                        </button>
+                                    </>
+                                )}
+                                {isAdminPage && (
+                                    <>
+                                        <NavLink to="/transformer" className={styles.navLink} onClick={handleNavLinkClick}>
+                                            🔄 Transformer
+                                        </NavLink>
+                                    </>
+                                )}
+                                <button 
+                                    onClick={handleProfileClick} 
+                                    className={styles.userButton}
+                                    aria-label="User profile"
+                                >
+                                    <div className={styles.userAvatar}>
+                                        {user?.username?.[0]?.toUpperCase() || 'U'}
+                                    </div>
+                                    <span className={styles.userName}>
+                                        {user?.username || 'Profile'}
+                                    </span>
+                                </button>
+                            </>
+                        ) : (
+                            <NavLink to="/login" className={styles.loginButton}>Login</NavLink>
+                        )}
+                    </div>
 
 	return (
 		<>

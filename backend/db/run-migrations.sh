@@ -1,40 +1,24 @@
 #!/bin/bash
 
-# Database Migration Runner
-# Runs all migration files in order
+# ============================================================================
+# Database Migration Runner (Legacy - Use run-final-migration.sh instead)
+# ============================================================================
+# This script redirects to the new final migration system
+# ============================================================================
 
 set -e
 
-echo "Running database migrations..."
+echo "============================================"
+echo "⚠️  NOTICE: Using legacy migration script"
+echo "============================================"
+echo ""
+echo "This script redirects to the new final migration system."
+echo "Please use 'run-final-migration.sh' directly in the future."
+echo ""
+echo "Redirecting to run-final-migration.sh..."
 echo ""
 
-MIGRATIONS_DIR="$(dirname "$0")/migrations"
+SCRIPT_DIR="$(dirname "$0")"
 
-# List of migrations in order
-MIGRATIONS=(
-    "001_api_settings.sql"
-    "002_transformation_mappings.sql"
-    "003_add_destination_schema.sql"
-    "004_add_user_profile_fields.sql"
-    "004_rbac_system.sql"
-    "004_rbac_system_uuid.sql"
-    "005_fix_audit_log_resource_id.sql"
-    "006_add_location_fields.sql"
-    "007_schema_templates.sql"
-    "008_rossum_integration.sql"
-    "009_user_analytics_dashboard.sql"
-    "010_mapping_change_tracking.sql"
-)
-
-for migration in "${MIGRATIONS[@]}"; do
-    if [ -f "$MIGRATIONS_DIR/$migration" ]; then
-        echo "Applying migration: $migration"
-        docker exec -i rossumxml-db-1 psql -U postgres -d rossumxml < "$MIGRATIONS_DIR/$migration"
-        echo "✅ $migration completed"
-        echo ""
-    else
-        echo "⚠️  Warning: $migration not found, skipping..."
-    fi
-done
-
-echo "✅ All migrations completed successfully!"
+# Redirect to the new script
+exec "$SCRIPT_DIR/run-final-migration.sh"

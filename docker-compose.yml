@@ -1,18 +1,16 @@
-version: '3.8'
-
 services:
   # ==========================================
-  # P1: OCR & Layout Processor (PaddleOCR + PP-Structure)
+  # P1: Document Processing (SmolDocling v2)
   # ==========================================
-  ocr-service:
-    build: ./services/ocr-service
+  docling-service:
+    build: ./services/docling-service
     ports:
-      - "5002:5002"
+      - "5004:5004"
     environment:
-      PORT: 5002
+      PORT: 5004
       PYTHONUNBUFFERED: 1
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5004/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -20,51 +18,88 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # P2: Semantic Extractor (GLiNER)
+  # P2: Field Extraction (Qwen2.5-1.5B Q8_0 - PRODUCTION)
   # ==========================================
-  extractor-service:
-    build: ./services/extractor-service
+  qwen-service:
+    build: ./services/qwen-service
     ports:
-      - "5003:5003"
+      - "5006:5006"
     environment:
-      PORT: 5003
-      GLINER_MODEL_PATH: urchade/gliner_small-v2.1
+      PORT: 5006
       PYTHONUNBUFFERED: 1
+      HF_HOME: /app/models
     volumes:
-      - ./services/models:/app/models
+      - qwen_models:/app/models
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5006/health')"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
-      start_period: 90s
+      start_period: 180s  # 3 minutes for model download
     restart: unless-stopped
 
   # ==========================================
-  # P3: API Gateway & HITL Orchestrator
+  # P3: Haystack Orchestration & HITL
   # ==========================================
-  api-gateway:
-    build: ./services/api-gateway
+  orchestrator-service:
+    build: ./services/orchestrator-service
     ports:
       - "8000:8000"
     environment:
       PORT: 8000
-      SERVICE_OCR_URL: http://ocr-service:5002
-      SERVICE_EXTRACTOR_URL: http://extractor-service:5003
+      DOCLING_SERVICE_URL: http://docling-service:5004
+      CIR_SERVICE_URL: http://cir-service:5007
+      VALIDATION_SERVICE_URL: http://validation-service:5008
+      QWEN_SERVICE_URL: http://qwen-service:5006
       LABEL_STUDIO_URL: http://label-studio:8080
       LABEL_STUDIO_API_KEY: ${LABEL_STUDIO_API_KEY:-}
+      LABEL_STUDIO_PROJECT_ID: ${LABEL_STUDIO_PROJECT_ID:-1}
       CONFIDENCE_THRESHOLD: 0.90
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/rossumxml
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      DETERMINISTIC_THRESHOLD: 0.80
     depends_on:
-      - ocr-service
-      - extractor-service
+      - docling-service
+      - cir-service
+      - validation-service
+      - qwen-service
       - label-studio
-      - db
-      - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # ==========================================
+  # CIR Service (Deterministic Extraction)
+  # ==========================================
+  cir-service:
+    build: ./services/cir-service
+    ports:
+      - "5007:5007"
+    environment:
+      PORT: 5007
+      PYTHONUNBUFFERED: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5007/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # ==========================================
+  # Validation Service (Confidence Engine)
+  # ==========================================
+  validation-service:
+    build: ./services/validation-service
+    ports:
+      - "5008:5008"
+    environment:
+      PORT: 5008
+      PYTHONUNBUFFERED: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5008/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -82,17 +117,12 @@ services:
       LABEL_STUDIO_HOST: http://localhost:8080
       LABEL_STUDIO_USERNAME: admin@localhost
       LABEL_STUDIO_PASSWORD: admin123
-      # Use shared PostgreSQL database
-      DJANGO_DB: default
-      POSTGRE_NAME: rossumxml
-      POSTGRE_USER: postgres
-      POSTGRE_PASSWORD: postgres
-      POSTGRE_HOST: db
-      POSTGRE_PORT: 5432
-      # Disable default SQLite
+      # Use SQLite database (to keep PostgreSQL clean)
       LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
-    depends_on:
-      - db
+      # Disable strict CSP for development
+      LABEL_STUDIO_CSP_SCRIPT_SRC: "'self' 'unsafe-inline' 'unsafe-eval'"
+      LABEL_STUDIO_CSP_STYLE_SRC: "'self' 'unsafe-inline'"
+      LABEL_STUDIO_CSP_FONT_SRC: "'self' data:"
     volumes:
       - label_studio_data:/label-studio/data
     healthcheck:
@@ -109,7 +139,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "3001:3000"
+      - "3000:3000"
     environment:
       NODE_ENV: development
       POSTGRES_USER: postgres
@@ -118,13 +148,51 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       JWT_SECRET: 6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e
+      # Redis connection for Bull queue
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       # Route invoice extraction to new microservices
-      INVOICE_EXTRACTION_URL: http://api-gateway:8000
-      API_GATEWAY_URL: http://api-gateway:8000
+      INVOICE_EXTRACTION_URL: http://orchestrator-service:8000
+      API_GATEWAY_URL: http://orchestrator-service:8000
     depends_on:
       - db
-      - api-gateway
-    restart: unless-stopped  # ==========================================
+      - redis
+      - orchestrator-service
+    restart: unless-stopped
+
+  # Extraction Worker (Bull Queue Consumer)
+  # ==========================================
+  worker:
+    build: ./backend
+    command: node workers/extractionWorker.js
+    environment:
+      NODE_ENV: development
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rossumxml
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      # Redis connection for Bull queue
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Microservices endpoints
+      DOCLING_SERVICE_URL: http://docling-service:5004
+      NUEXTRACT_SERVICE_URL: http://qwen-service:5006
+      QWEN_SERVICE_URL: http://qwen-service:5006
+      ORCHESTRATOR_SERVICE_URL: http://orchestrator-service:8000
+      API_GATEWAY_URL: http://orchestrator-service:8000
+      SOCKET_SERVER_URL: http://host.docker.internal:3001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+      - redis
+      - docling-service
+      - qwen-service
+      - orchestrator-service
+    restart: unless-stopped
+
+  # ==========================================
   # Infrastructure Services
   # ==========================================
   db:
@@ -157,3 +225,4 @@ volumes:
   postgres_data:
   redis_data:
   label_studio_data:
+  qwen_models:  # Persistent cache for Qwen2.5 model (~1.9GB)

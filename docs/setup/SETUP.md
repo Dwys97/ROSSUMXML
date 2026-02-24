@@ -6,7 +6,9 @@ Complete setup instructions for fresh codespaces or forked repositories.
 
 - Docker and Docker Compose
 - Node.js v18+ and npm
-- AWS SAM CLI
+- Docker & Docker Compose
+- Node.js 18+
+- npm
 - ngrok account (for webhook tunneling)
 - Git
 
@@ -37,7 +39,10 @@ node --version          # Should be v18+
 npm --version
 docker --version
 docker-compose --version
-sam --version          # AWS SAM CLI
+docker --version
+docker-compose --version
+node --version
+npm --version
 ngrok version          # Optional but recommended
 ```
 
@@ -178,7 +183,8 @@ bash start-dev.sh
 # Terminal 1: Start Database (if not already running)
 bash start-db.sh
 
-# Terminal 2: Start Backend (AWS SAM Local)
+# Terminal 2: Start Backend (Express + docker-compose)
+bash start-backend.sh
 bash start-backend.sh
 
 # Terminal 3: Start Frontend (Vite)
@@ -250,8 +256,9 @@ docker logs rossumxml-db-1
 ```bash
 # Clean and rebuild
 cd backend
-rm -rf .aws-sam/build
-sam build --skip-pull-image
+# Rebuild backend image
+docker-compose build backend
+docker-compose up backend -d
 ```
 
 ### Permission Denied Errors
@@ -273,7 +280,8 @@ bash fix-database-schema.sh
 
 # Rebuild backend
 cd backend
-sam build
+npm install
+docker-compose restart backend
 ```
 
 ## Common Issues & Solutions
@@ -314,8 +322,9 @@ ROSSUMXML/
 │   ├── services/                 # Business logic
 │   ├── middleware/               # Auth, RBAC, security
 │   ├── utils/                    # Utilities
-│   ├── index.js                  # Lambda handler
-│   └── template.yml              # SAM template
+│   ├── index.js                  # Lambda handler (business logic)
+│   ├── server.js                 # Express wrapper
+│   └── template.yml              # SAM template (reference only)
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/               # React pages

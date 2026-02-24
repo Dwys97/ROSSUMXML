@@ -9,14 +9,38 @@ const LineItemsTable = ({ lineItems, onUpdate, onFieldClick }) => {
         setEditedItems(lineItems || []);
     }, [lineItems]);
     
+    const parseDecimal = (value) => {
+        if (value === null || value === undefined || value === '') return 0;
+        const raw = String(value).trim();
+        if (!raw) return 0;
+        let cleaned = raw.replace(/[^0-9,.-]/g, '');
+        if (!cleaned || cleaned === '-' || cleaned === '.') return 0;
+        const hasDot = cleaned.includes('.');
+        const hasComma = cleaned.includes(',');
+        if (hasDot && hasComma) {
+            const lastDot = cleaned.lastIndexOf('.');
+            const lastComma = cleaned.lastIndexOf(',');
+            if (lastComma > lastDot) {
+                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+            } else {
+                cleaned = cleaned.replace(/,/g, '');
+            }
+        } else if (!hasDot && hasComma) {
+            cleaned = cleaned.replace(',', '.');
+        }
+        const num = Number(cleaned);
+        return Number.isNaN(num) ? 0 : num;
+    };
+
     const handleFieldChange = (index, field, value) => {
         const updated = [...editedItems];
         updated[index] = { ...updated[index], [field]: value };
         
         if (field === 'quantity' || field === 'unit_price') {
-            const quantity = parseFloat(updated[index].quantity) || 0;
-            const unitPrice = parseFloat(updated[index].unit_price) || 0;
-            updated[index].total_value = quantity * unitPrice;
+            const quantity = parseDecimal(updated[index].quantity);
+            const unitPrice = parseDecimal(updated[index].unit_price);
+            const total = quantity * unitPrice;
+            updated[index].total_value = Number.isFinite(total) ? total.toFixed(2) : '';
         }
         setEditedItems(updated);
     };

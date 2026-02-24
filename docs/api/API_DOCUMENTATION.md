@@ -619,7 +619,11 @@ ps aux | grep node
 ```bash
 bash start-backend.sh
 # or
-cd backend && sam local start-api --port 3000
+# Option 1: Via docker-compose (recommended)
+docker-compose up backend -d
+
+# Option 2: Via npm (requires PostgreSQL running)
+cd backend && npm run dev
 ```
 
 ---
@@ -712,7 +716,13 @@ curl -X POST http://localhost:3000/api/schema/parse \
 
 ## Environment Variables
 
-### Backend (AWS SAM)
+### Backend (Express + Docker Compose)
+
+**Architecture:** The backend uses an Express server wrapper (`backend/server.js`) that converts HTTP requests to Lambda event format and forwards them to the Lambda handler (`backend/index.js`). This approach:
+- Saves ~600MB disk space (no Lambda base images required)
+- Maintains compatibility with the existing Lambda handler code
+- Enables local development without AWS SAM CLI
+- Supports docker-compose deployment
 
 Set in `backend/template.yml`:
 

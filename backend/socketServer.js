@@ -91,6 +91,47 @@ io.on('connection', (socket) => {
     socket.leave(`job:${jobId}`);
     console.log(`[Socket.io] Client ${socket.id} left job room: ${jobId}`);
   });
+
+  // --- Worker Events Relay ---
+  // Use io.to() instead of socket.to() to broadcast to ALL clients in room (including sender)
+  
+  socket.on('extraction:started', (data) => {
+    console.log(`[Event Relay] extraction:started for invoice ${data.invoiceId}`);
+    // Broadcast to ALL clients in the invoice room
+    io.to(`invoice:${data.invoiceId}`).emit('extraction:started', data);
+    // Broadcast to job room
+    if (data.jobId) io.to(`job:${data.jobId}`).emit('extraction:started', data);
+  });
+
+  socket.on('extraction:progress', (data) => {
+    // Reduce log spam for progress
+    if (data.progress % 20 === 0) {
+      console.log(`[Event Relay] extraction:progress for invoice ${data.invoiceId}: ${data.progress}%`);
+    }
+    io.to(`invoice:${data.invoiceId}`).emit('extraction:progress', data);
+  });
+
+  socket.on('extraction:completed', (data) => {
+    console.log(`[Event Relay] extraction:completed for invoice ${data.invoiceId}`);
+    io.to(`invoice:${data.invoiceId}`).emit('extraction:completed', data);
+  });
+
+  socket.on('extraction:failed', (data) => {
+    console.error(`[Event Relay] extraction:failed for invoice ${data.invoiceId}`);
+    io.to(`invoice:${data.invoiceId}`).emit('extraction:failed', data);
+  });
+
+  // Field update relay for progressive extraction
+  socket.on('extraction:field-update', (data) => {
+    console.log(`[Event Relay] extraction:field-update for invoice ${data.invoiceId}: ${data.field}`);
+    io.to(`invoice:${data.invoiceId}`).emit('extraction:field-update', data);
+  });
+
+  // OCR preview relay
+  socket.on('extraction:ocr-preview', (data) => {
+    console.log(`[Event Relay] extraction:ocr-preview for invoice ${data.invoiceId}`);
+    io.to(`invoice:${data.invoiceId}`).emit('extraction:ocr-preview', data);
+  });
 });
 
 // Export io instance for use by worker

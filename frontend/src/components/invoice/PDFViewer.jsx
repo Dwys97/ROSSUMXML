@@ -13,6 +13,7 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
     const [scale, setScale] = useState(1.5);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
     const canvasRef = useRef(null);
     const renderTaskRef = useRef(null);
     const documentRef = useRef(null);
@@ -64,19 +65,13 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
                     throw new Error('Server returned non-PDF content');
                 }
                 
-                // Backend returns base64 encoded PDF with isBase64Encoded=true
-                // We need to decode it manually
-                const base64String = await response.text();
-                if (!base64String || base64String.length === 0) {
+                // Backend returns binary PDF (Express decoded base64 automatically)
+                const arrayBuffer = await response.arrayBuffer();
+                if (arrayBuffer.byteLength === 0) {
                     throw new Error('Empty file received from server');
                 }
                 
-                // Decode base64 to binary
-                const binaryString = atob(base64String);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
+                const bytes = new Uint8Array(arrayBuffer);
                 
                 // Validate PDF header
                 const pdfHeader = String.fromCharCode(...bytes.slice(0, 5));
@@ -84,9 +79,7 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
                     throw new Error('Invalid PDF file format');
                 }
                 
-                const arrayBuffer = bytes.buffer;
-                
-                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const loadingTask = pdfjsLib.getDocument({ data: bytes });
                 const pdf = await loadingTask.promise;
                 setPdfDoc(pdf);
                 setPageCount(pdf.numPages);
@@ -123,6 +116,10 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
                 const viewport = page.getViewport({ scale });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                
+                // Update canvas dimensions state for bounding box overlay
+                setCanvasDimensions({ width: viewport.width, height: viewport.height });
+                
                 const renderContext = {
                     canvasContext: context,
                     viewport: viewport
@@ -210,6 +207,9 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
         );
     }
 
+    // Get current canvas dimensions for bounding box overlay
+    const { width: canvasWidth, height: canvasHeight } = canvasDimensions;
+
     return (
         <div className={styles.container}>
             <div className={styles.toolbar}>
@@ -235,8 +235,9 @@ const PDFViewer = ({ invoiceId, fileName, fileType, selectedField, children }) =
                     )}
                     {React.Children.map(children, child => 
                         child ? React.cloneElement(child, {
-                            containerWidth: canvasRef.current?.width,
-                            containerHeight: canvasRef.current?.height
+                            containerWidth: canvasWidth,
+                            containerHeight: canvasHeight,
+                            scale: scale
                         }) : null
                     )}
                 </div>

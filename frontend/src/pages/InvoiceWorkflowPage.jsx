@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import InvoiceUploader from '../components/invoice/InvoiceUploader';
 import InvoiceQueue from '../components/invoice/InvoiceQueue';
+import FieldTemplateManager from '../components/invoice/FieldTemplateManager';
 import styles from './InvoiceWorkflowPage.module.css';
 
 const InvoiceWorkflowPage = () => {
@@ -14,6 +15,7 @@ const InvoiceWorkflowPage = () => {
     const [error, setError] = useState(null);
     const [selectedStatus, setSelectedStatus] = useState('all');
     const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+    const [showFieldManager, setShowFieldManager] = useState(false);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 20,
@@ -146,7 +148,15 @@ const InvoiceWorkflowPage = () => {
                     </p>
                 </div>
                 <div className={styles.headerRight}>
-                    <InvoiceUploader onUploadSuccess={handleUploadSuccess} />
+                    <div className={styles.headerActions}>
+                        <button
+                            className={styles.fieldManagerBtn}
+                            onClick={() => setShowFieldManager(true)}
+                        >
+                            📋 Field Manager
+                        </button>
+                        <InvoiceUploader onUploadSuccess={handleUploadSuccess} />
+                    </div>
                 </div>
             </div>
             
@@ -216,6 +226,28 @@ const InvoiceWorkflowPage = () => {
                     pagination={pagination}
                     onPageChange={handlePageChange}
                 />
+            )}
+
+            {showFieldManager && (
+                <div className={styles.modalOverlay} onClick={() => setShowFieldManager(false)}>
+                    <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <div>
+                                <h2>Extraction Field Manager</h2>
+                                <p>Set required fields and templates for invoice extraction.</p>
+                            </div>
+                            <button
+                                className={styles.closeBtn}
+                                onClick={() => setShowFieldManager(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className={styles.modalBody}>
+                            <FieldTemplateManager />
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

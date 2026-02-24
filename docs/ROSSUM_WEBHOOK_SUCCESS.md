@@ -210,7 +210,7 @@ This shows the first 3 sections of extracted data from Rossum.
 
 ```
 ✅ Database: Running (rossumxml-db-1)
-✅ Backend: SAM Local on port 3000
+✅ Backend: Express (docker-compose) on port 3000
 ✅ ngrok: https://maladapted-taren-interparenthetically.ngrok-free.dev
 ✅ Total Webhooks: 25+ received
 ✅ Success Rate: 100%

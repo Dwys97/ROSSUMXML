@@ -1,0 +1,440 @@
+"""
+Service: Field Extraction with NuExtract-large
+Architecture: NuExtract-large via transformers (CPU-optimized, ~1.5GB)
+Purpose: Schema-driven structured field extraction from customs invoice text
+Compliance: CPU-only, GDPR-compliant (no external API calls)
+
+NuExtract is specifically designed for structured extraction with custom schemas,
+making it ideal for customs invoice data where field definitions vary by organization.
+"""
+
+import os
+import json
+import logging
+from typing import Dict, Any, List, Optional
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+CORS(app)
+
+# Global model instances
+model = None
+tokenizer = None
+
+# Default extraction schema for customs invoices
+DEFAULT_SCHEMA = {
+    "invoice_number": "Invoice identifier",
+    "invoice_date": "Date in YYYY-MM-DD format",
+    "currency": "Currency code (USD, EUR, GBP, etc.)",
+    "total_amount": "Total invoice amount as number",
+    "vendor_name": "Seller/exporter company name",
+    "vendor_address": "Full address of vendor",
+    "vendor_vat_number": "VAT/Tax registration number of vendor",
+    "vendor_country": "Country of vendor/exporter",
+    "buyer_name": "Buyer/importer company name",
+    "buyer_address": "Full address of buyer",
+    "buyer_country": "Country of buyer/importer",
+    "consignee_name": "Name of consignee if different from buyer",
+    "consignee_address": "Address of consignee",
+    "total_gross_weight": "Total gross weight as number",
+    "total_net_weight": "Total net weight as number",
+    "weight_unit": "Weight unit (KG, LB, etc.)",
+    "incoterms": "Trade terms (FOB, CIF, EXW, etc.)",
+    "payment_terms": "Payment terms description",
+    "port_of_loading": "Port/place of loading",
+    "port_of_discharge": "Port/place of discharge",
+    "country_of_origin": "Country where goods originated",
+    "line_items": [
+        {
+            "hs_code": "Harmonized System code",
+            "description": "Product description",
+            "quantity": "Quantity as number",
+            "unit_of_measure": "Unit (PCS, KG, LTR, etc.)",
+            "unit_price": "Unit price as number",
+            "total_value": "Line total value as number",
+            "gross_weight": "Line gross weight as number",
+            "net_weight": "Line net weight as number",
+            "country_of_origin": "Country of origin for this item"
+        }
+    ]
+}
+
+
+def build_nuextract_prompt(text: str, schema: Dict[str, Any]) -> str:
+    """
+    Build NuExtract-compatible prompt with schema
+    NuExtract uses a specific format: <|input|>...<|schema|>...<|output|>
+    """
+    schema_str = json.dumps(schema, indent=2)
+    
+    prompt = f"""<|input|>
+### Document Text:
+{text}
+
+<|schema|>
+{schema_str}
+
+<|output|>
+"""
+    return prompt
+
+
+def schema_to_extraction_template(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert field definitions to a NuExtract-compatible schema
+    """
+    result = {}
+    for key, value in schema.items():
+        if isinstance(value, list) and len(value) > 0:
+            # Array field (like line_items)
+            result[key] = [schema_to_extraction_template(value[0])]
+        elif isinstance(value, dict):
+            result[key] = schema_to_extraction_template(value)
+        else:
+            # Simple field - use empty string as placeholder
+            result[key] = ""
+    return result
+
+
+def initialize_model():
+    """Lazy load NuExtract-large model"""
+    global model, tokenizer
+    
+    if model is None:
+        model_name = os.getenv('NUEXTRACT_MODEL', 'numind/NuExtract-large')
+        logger.info(f"Loading NuExtract model: {model_name}")
+        
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                trust_remote_code=True
+            )
+            
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.float32,  # CPU-compatible
+                device_map="cpu",
+                trust_remote_code=True,
+                low_cpu_mem_usage=True
+            )
+            model.eval()
+            
+            logger.info("✓ NuExtract-large model loaded successfully")
+        except Exception as e:
+            logger.error(f"Failed to load NuExtract model: {e}")
+            raise
+
+
+def extract_json_from_output(output: str) -> Optional[Dict[str, Any]]:
+    """
+    Parse JSON from model output, handling various edge cases
+    """
+    try:
+        # Try direct parse first
+        return json.loads(output)
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to find JSON in output
+    output = output.strip()
+    
+    # Look for JSON block
+    start_markers = ['{', '[']
+    end_markers = {'{': '}', '[': ']'}
+    
+    for start_marker in start_markers:
+        if start_marker in output:
+            start_idx = output.find(start_marker)
+            end_marker = end_markers[start_marker]
+            
+            # Find matching closing bracket
+            depth = 0
+            for i, char in enumerate(output[start_idx:], start_idx):
+                if char == start_marker:
+                    depth += 1
+                elif char == end_marker:
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            json_str = output[start_idx:i+1]
+                            return json.loads(json_str)
+                        except json.JSONDecodeError:
+                            continue
+    
+    logger.warning(f"Could not parse JSON from output: {output[:200]}...")
+    return None
+
+
+def calculate_field_confidence(fields: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Calculate confidence scores for each extracted field
+    Returns fields with confidence metadata
+    """
+    result = {}
+    total_confidence = 0.0
+    field_count = 0
+    
+    for key, schema_value in schema.items():
+        extracted_value = fields.get(key)
+        
+        if isinstance(schema_value, list) and len(schema_value) > 0:
+            # Array field
+            if isinstance(extracted_value, list) and len(extracted_value) > 0:
+                items_with_conf = []
+                for item in extracted_value:
+                    if isinstance(item, dict):
+                        item_result = calculate_field_confidence(item, schema_value[0])
+                        items_with_conf.append(item_result)
+                result[key] = {
+                    "value": items_with_conf,
+                    "confidence": 0.85 if items_with_conf else 0.0,
+                    "item_count": len(items_with_conf)
+                }
+                total_confidence += result[key]["confidence"]
+                field_count += 1
+            else:
+                result[key] = {
+                    "value": [],
+                    "confidence": 0.0,
+                    "item_count": 0
+                }
+        elif isinstance(schema_value, dict):
+            # Nested object
+            if isinstance(extracted_value, dict):
+                result[key] = calculate_field_confidence(extracted_value, schema_value)
+            else:
+                result[key] = {"value": None, "confidence": 0.0}
+        else:
+            # Simple field
+            if extracted_value is not None and extracted_value != "" and extracted_value != "null":
+                # Heuristic confidence based on value characteristics
+                confidence = 0.9  # Base confidence for extracted values
+                
+                # Reduce confidence for very short values
+                if isinstance(extracted_value, str) and len(extracted_value) < 2:
+                    confidence = 0.6
+                
+                # Increase confidence for well-formatted values
+                if key.endswith('_date') and '-' in str(extracted_value):
+                    confidence = 0.95
+                if key.endswith('_number') and any(c.isdigit() for c in str(extracted_value)):
+                    confidence = 0.95
+                    
+                result[key] = {
+                    "value": extracted_value,
+                    "confidence": confidence
+                }
+                total_confidence += confidence
+                field_count += 1
+            else:
+                result[key] = {
+                    "value": None,
+                    "confidence": 0.0
+                }
+    
+    # Add overall confidence
+    if field_count > 0:
+        result["_overall_confidence"] = total_confidence / field_count
+    else:
+        result["_overall_confidence"] = 0.0
+        
+    return result
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'nuextract-service',
+        'version': '1.0.0',
+        'model': 'NuExtract-large',
+        'model_loaded': model is not None
+    })
+
+
+@app.route('/extract-fields', methods=['POST'])
+def extract_fields():
+    """
+    Extract structured invoice fields using NuExtract-large
+    
+    Request:
+        {
+            "document_text": "Full invoice text (markdown or plain text)",
+            "schema": { ... } (optional, custom field definitions),
+            "max_tokens": 2048 (optional)
+        }
+    
+    Response:
+        {
+            "success": true,
+            "fields": {
+                "invoice_number": {"value": "INV-2024-001", "confidence": 0.95},
+                "total_amount": {"value": "1250.00", "confidence": 0.89},
+                ...
+            },
+            "raw_output": "Model raw JSON output",
+            "confidence_score": 0.87
+        }
+    """
+    try:
+        initialize_model()
+        
+        # Get input
+        data = request.json
+        if not data or 'document_text' not in data:
+            return jsonify({'error': 'No document_text provided'}), 400
+        
+        document_text = data['document_text']
+        custom_schema = data.get('schema', None)
+        max_tokens = int(data.get('max_tokens', 2048))
+        
+        if not document_text:
+            return jsonify({'error': 'Empty document_text'}), 400
+        
+        # Use custom schema if provided, otherwise use default
+        schema = custom_schema if custom_schema else DEFAULT_SCHEMA
+        
+        # Convert schema to extraction template
+        extraction_template = schema_to_extraction_template(schema)
+        
+        logger.info(f"Extracting {len(schema)} fields from {len(document_text)} chars...")
+        
+        # Build prompt
+        # Limit text to prevent OOM
+        text_limit = 6000
+        if len(document_text) > text_limit:
+            document_text = document_text[:text_limit]
+            logger.info(f"Truncated document to {text_limit} chars")
+        
+        prompt = build_nuextract_prompt(document_text, extraction_template)
+        
+        # Tokenize
+        inputs = tokenizer(
+            prompt,
+            return_tensors="pt",
+            truncation=True,
+            max_length=4096
+        )
+        
+        # Generate
+        with torch.no_grad():
+            outputs = model.generate(
+                inputs["input_ids"],
+                max_new_tokens=max_tokens,
+                do_sample=False,
+                num_beams=1,
+                pad_token_id=tokenizer.eos_token_id
+            )
+        
+        # Decode output
+        generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        # Extract JSON from output (after <|output|>)
+        if "<|output|>" in generated_text:
+            raw_output = generated_text.split("<|output|>")[-1].strip()
+        else:
+            raw_output = generated_text
+        
+        # Parse JSON
+        extracted_fields = extract_json_from_output(raw_output)
+        
+        if extracted_fields is None:
+            logger.warning("Failed to parse extraction output as JSON")
+            return jsonify({
+                'success': False,
+                'error': 'Failed to parse extraction output',
+                'raw_output': raw_output[:500]
+            }), 500
+        
+        # Calculate confidence for each field
+        fields_with_confidence = calculate_field_confidence(extracted_fields, schema)
+        
+        # Get overall confidence
+        overall_confidence = fields_with_confidence.pop("_overall_confidence", 0.0)
+        
+        logger.info(f"Extraction complete. Overall confidence: {overall_confidence:.2f}")
+        
+        return jsonify({
+            'success': True,
+            'fields': fields_with_confidence,
+            'raw_output': raw_output,
+            'confidence_score': overall_confidence,
+            'schema_used': schema
+        })
+        
+    except Exception as e:
+        logger.error(f"Extraction failed: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/schema/default', methods=['GET'])
+def get_default_schema():
+    """Get the default extraction schema"""
+    return jsonify({
+        'success': True,
+        'schema': DEFAULT_SCHEMA
+    })
+
+
+@app.route('/schema/validate', methods=['POST'])
+def validate_schema():
+    """Validate a custom extraction schema"""
+    try:
+        data = request.json
+        if not data or 'schema' not in data:
+            return jsonify({'error': 'No schema provided'}), 400
+        
+        schema = data['schema']
+        
+        # Basic validation
+        if not isinstance(schema, dict):
+            return jsonify({
+                'valid': False,
+                'error': 'Schema must be a JSON object'
+            }), 400
+        
+        if len(schema) == 0:
+            return jsonify({
+                'valid': False,
+                'error': 'Schema cannot be empty'
+            }), 400
+        
+        # Check for reserved keys
+        reserved_keys = ['_overall_confidence', '_metadata']
+        for key in reserved_keys:
+            if key in schema:
+                return jsonify({
+                    'valid': False,
+                    'error': f'Reserved key "{key}" cannot be used in schema'
+                }), 400
+        
+        return jsonify({
+            'valid': True,
+            'field_count': len(schema),
+            'template': schema_to_extraction_template(schema)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'valid': False,
+            'error': str(e)
+        }), 400
+
+
+if __name__ == '__main__':
+    port = int(os.getenv('PORT', 5005))
+    app.run(host='0.0.0.0', port=port, debug=False)

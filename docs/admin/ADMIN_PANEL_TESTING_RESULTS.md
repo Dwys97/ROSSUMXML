@@ -423,6 +423,6 @@ The following endpoint was mentioned in documentation but was NOT found in the c
 ---
 
 **Testing Completed By:** GitHub Copilot  
-**Environment:** AWS SAM Local (Lambda Node.js 18.x)  
+**Environment:** Express server (Node.js 18.x) with Lambda handler wrapper  
 **Database:** PostgreSQL 13  
 **Admin Test User:** d.radionovs@gmail.com

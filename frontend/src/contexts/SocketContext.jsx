@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
 const SocketContext = createContext(null);
@@ -73,35 +73,51 @@ export const SocketProvider = ({ children }) => {
         };
     }, []);
 
-    const joinInvoice = (invoiceId) => {
+    const joinInvoice = useCallback((invoiceId) => {
         if (socket && connected) {
             console.log(`[Socket.IO] Joining invoice room: ${invoiceId}`);
             socket.emit('join-invoice', invoiceId);
         }
-    };
+    }, [socket, connected]);
 
-    const leaveInvoice = (invoiceId) => {
+    const leaveInvoice = useCallback((invoiceId) => {
         if (socket && connected) {
             console.log(`[Socket.IO] Leaving invoice room: ${invoiceId}`);
             socket.emit('leave-invoice', invoiceId);
         }
-    };
+    }, [socket, connected]);
 
-    const onFieldUpdate = (callback) => {
+    const onFieldUpdate = useCallback((callback) => {
         if (socket) {
             socket.on('extraction:field-update', callback);
             return () => socket.off('extraction:field-update', callback);
         }
         return () => {};
-    };
+    }, [socket]);
 
-    const onExtractionComplete = (callback) => {
+    const onExtractionComplete = useCallback((callback) => {
         if (socket) {
             socket.on('extraction:completed', callback);
             return () => socket.off('extraction:completed', callback);
         }
         return () => {};
-    };
+    }, [socket]);
+
+    const onExtractionProgress = useCallback((callback) => {
+        if (socket) {
+            socket.on('extraction:progress', callback);
+            return () => socket.off('extraction:progress', callback);
+        }
+        return () => {};
+    }, [socket]);
+
+    const onOCRPreview = useCallback((callback) => {
+        if (socket) {
+            socket.on('extraction:ocr-preview', callback);
+            return () => socket.off('extraction:ocr-preview', callback);
+        }
+        return () => {};
+    }, [socket]);
 
     const value = {
         socket,
@@ -109,7 +125,9 @@ export const SocketProvider = ({ children }) => {
         joinInvoice,
         leaveInvoice,
         onFieldUpdate,
-        onExtractionComplete
+        onExtractionComplete,
+        onExtractionProgress,
+        onOCRPreview
     };
 
     return (
