@@ -2,7 +2,7 @@
   "name": "rossumxml",
   "version": "1.0.0",
   "scripts": {
-    "start:all": "concurrently --names \"DOCKER,VITE\" -c \"blue,cyan\" \"docker-compose up --build\" \"cd frontend && npm run dev\""
+    "start:all": "concurrently \"bash start-db.sh\" \"bash start-backend.sh\" \"bash start-frontend.sh\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

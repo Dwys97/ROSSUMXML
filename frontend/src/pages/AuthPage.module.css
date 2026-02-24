@@ -222,6 +222,46 @@ body {
     color: rgba(255, 255, 255, 0.4);
 }
 
+/* Checkbox Group */
+.checkboxGroup {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 1.5rem;
+	margin-top: 0.5rem;
+}
+
+.checkboxGroup input[type="checkbox"] {
+	width: 18px;
+	height: 18px;
+	cursor: pointer;
+	accent-color: #1d72f3;
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 4px;
+	background: rgba(13, 27, 42, 0.5);
+	transition: all 0.2s ease-in-out;
+}
+
+.checkboxGroup input[type="checkbox"]:hover {
+	border-color: #1d72f3;
+	background: rgba(29, 114, 243, 0.1);
+}
+
+.checkboxGroup input[type="checkbox"]:focus {
+	outline: none;
+	border-color: #1d72f3;
+	box-shadow: 0 0 0 2px rgba(29, 114, 243, 0.2);
+}
+
+.checkboxGroup label {
+	color: rgba(255, 255, 255, 0.85);
+	font-size: 0.9rem;
+	font-weight: 500;
+	cursor: pointer;
+	user-select: none;
+	margin: 0;
+}
+
 /* Button */
 .authButton {
     width: 100%;
